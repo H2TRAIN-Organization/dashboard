@@ -50,9 +50,9 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
         <div className="lg:hidden py-4">
           {/* Primera fila - Solo logo grande */}
           <div className="flex justify-center mb-4">
-            <Image 
-              src="/logo-horizontal.png" 
-              alt="H2TRAIN Logo" 
+            <Image
+              src="/logo-horizontal.png"
+              alt="H2TRAIN Logo"
               width={1050}
               height={425}
               className="h-16 w-auto rounded-xl shadow-xl"
@@ -169,9 +169,9 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
             <div className="flex items-center space-x-4 xl:space-x-6 min-w-0 flex-1">
               {/* Logo H2TRAIN - Desktop */}
               <div className="flex-shrink-0">
-                <Image 
-                  src="/logo-horizontal.png" 
-                  alt="H2TRAIN Logo" 
+                <Image
+                  src="/logo-horizontal.png"
+                  alt="H2TRAIN Logo"
                   width={1050}
                   height={425}
                   className="h-16 xl:h-20 w-auto rounded-xl shadow-xl"
@@ -228,4 +228,4 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
       </div>
     </div>
   )
-} 
+}
