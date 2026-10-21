@@ -1,13 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useSyncExternalStore } from 'react'
 
-// Hook para detectar si la aplicación se ha hidratado
+const subscribe = () => () => {}
+const getClientSnapshot = () => true
+const getServerSnapshot = () => false
+
+// Hook to detect whether the application has hydrated on the client.
 export function useHydration() {
-  const [isHydrated, setIsHydrated] = useState(false)
-
-  useEffect(() => {
-    setIsHydrated(true)
-  }, [])
-
-  return isHydrated
+  return useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot)
 }
-
