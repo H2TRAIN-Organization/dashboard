@@ -1,0 +1,12 @@
+{
+  "name": "t014-sql-validation",
+  "private": true,
+  "type": "module",
+  "description": "T-014: real-PostgreSQL validation harness for T-009 auth/persistence SQL. Isolated, synthetic data only.",
+  "scripts": {
+    "validate": "node run-sql-validation.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.16.0"
+  }
+}

@@ -1,0 +1,23 @@
+$kind: http-request
+name: '12 find seeded user with data'
+method: GET
+url: '{{baseUrl}}/api/users?search={{hasDataUsername}}&limit=1'
+order: 12000
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('search is 200', () => pm.response.to.have.status(200));
+      pm.test('seeded user exists', () => {
+        pm.expect(body.users).to.be.an('array').with.length.greaterThan(0);
+      });
+      if (body.users && body.users.length > 0) {
+        pm.collectionVariables.set('hasDataId', body.users[0].id);
+      }
+    language: text/javascript
+
+settings:
+  disableCookies: true

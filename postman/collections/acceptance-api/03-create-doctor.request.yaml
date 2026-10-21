@@ -1,0 +1,35 @@
+$kind: http-request
+name: '03 admin creates doctor'
+method: POST
+url: '{{baseUrl}}/api/users'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Cookie
+    value: '{{admin_cookie}}'
+  - key: Origin
+    value: '{{baseUrl}}'
+body:
+  type: json
+  content: |-
+    {
+      "username": "acceptance.doctor.{{runId}}",
+      "password": "{{doctorPassword}}",
+      "role": "doctor"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('created', () => pm.response.to.have.status(201));
+      pm.test('doctor DTO', () => {
+        pm.expect(body.user.role).to.eql('doctor');
+        pm.expect(body.user).to.not.have.property('PasswordHash');
+        pm.expect(body.user).to.not.have.property('token');
+      });
+      pm.collectionVariables.set('doctorId', body.user.id);
+    language: text/javascript
+
+settings:
+  disableCookies: true

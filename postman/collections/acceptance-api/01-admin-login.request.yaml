@@ -1,0 +1,55 @@
+$kind: http-request
+name: '01 admin login (email, cookie)'
+method: POST
+url: '{{baseUrl}}/api/auth/login'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Origin
+    value: '{{baseUrl}}'
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{adminEmail}}",
+      "password": "{{adminPassword}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      if (!pm.collectionVariables.get('runId')) {
+        pm.collectionVariables.set('runId', String(Date.now()));
+      }
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('login is 200', () => pm.response.to.have.status(200));
+      pm.test('no JSON token', () => {
+        pm.expect(body).to.not.have.property('token');
+        pm.expect(body).to.not.have.property('access_token');
+        pm.expect(body).to.not.have.property('refresh_token');
+      });
+      pm.test('method and expiry', () => {
+        pm.expect(body.method).to.eql('email');
+        pm.expect(Date.parse(body.expiresAt)).to.be.a('number').and.greaterThan(Date.now());
+      });
+      pm.test('admin role', () => pm.expect(body.user.role).to.eql('admin'));
+      pm.collectionVariables.set('adminUserId', body.user.id);
+      const raw = pm.response.headers.all()
+        .filter((header) => header.key.toLowerCase() === 'set-cookie')
+        .map((header) => header.value)
+        .join('\n');
+      pm.test('HttpOnly cookie', () => pm.expect(raw.toLowerCase()).to.include('httponly'));
+      pm.test('SameSite cookie', () => pm.expect(raw.toLowerCase()).to.include('samesite='));
+      const pairs = [...raw.matchAll(/(?:^|\n)\s*([^=;\s]+)=([^;\n]*)/g)]
+        .map((match) => `${match[1]}=${match[2]}`);
+      pm.collectionVariables.set('admin_cookie', pairs.join('; '));
+      pm.test('cookie captured', () => pm.expect(pairs.length).to.be.greaterThan(0));
+      // Keep the Postman automatic jar from replacing an explicit actor cookie
+      // with the most recently logged-in identity.
+    language: text/javascript
+
+settings:
+  disableCookies: true

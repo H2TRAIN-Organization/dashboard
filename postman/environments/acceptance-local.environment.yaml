@@ -1,0 +1,32 @@
+name: Acceptance local
+values:
+  - key: baseUrl
+    value: 'http://127.0.0.1:3000'
+    enabled: true
+    type: default
+    description: Mounted dashboard under test.
+  - key: adminEmail
+    value: 'admin.acceptance@example.test'
+    enabled: true
+    type: default
+    description: Seeded synthetic admin.
+  - key: adminPassword
+    value: 'Acceptance-Admin-1!'
+    enabled: true
+    type: secret
+    description: Synthetic acceptance credential only.
+  - key: doctorPassword
+    value: 'Acceptance-Doctor-1!'
+    enabled: true
+    type: secret
+    description: Synthetic acceptance credential only.
+  - key: userPassword
+    value: 'Acceptance-User-1!'
+    enabled: true
+    type: secret
+    description: Synthetic acceptance credential only.
+  - key: hasDataUsername
+    value: 'acceptance.hasdata'
+    enabled: true
+    type: default
+    description: Seeded synthetic user with health data for the 409 case.

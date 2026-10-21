@@ -1,0 +1,5 @@
+simulation: supabase-local
+routing: path
+mocks:
+  - routeKey: supabase
+    path: ../mocks/supabase/config.yaml

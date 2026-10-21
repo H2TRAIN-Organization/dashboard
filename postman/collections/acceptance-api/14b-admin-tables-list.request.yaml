@@ -1,0 +1,22 @@
+$kind: http-request
+name: '14b admin lists known tables'
+method: GET
+url: '{{baseUrl}}/api/admin/database/tables'
+order: 14500
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('tables is 200', () => pm.response.to.have.status(200));
+      pm.test('shape', () => {
+        pm.expect(body.success).to.eql(true);
+        pm.expect(body.tables).to.be.an('array');
+        pm.expect(body.totalRecords).to.be.a('number');
+      });
+    language: text/javascript
+
+settings:
+  disableCookies: true

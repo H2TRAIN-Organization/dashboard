@@ -1,0 +1,18 @@
+$kind: http-request
+name: '18 admin deletes synthetic doctor'
+method: DELETE
+url: '{{baseUrl}}/api/users/{{doctorId}}'
+order: 18000
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+  - key: Origin
+    value: '{{baseUrl}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('deleted', () => pm.response.to.have.status(204));
+    language: text/javascript
+
+settings:
+  disableCookies: true

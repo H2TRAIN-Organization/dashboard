@@ -1,0 +1,16 @@
+$kind: http-request
+name: '19 deleted doctor session is rejected'
+method: GET
+url: '{{baseUrl}}/api/auth/session'
+order: 19000
+headers:
+  - key: Cookie
+    value: '{{doctor_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('revoked session', () => pm.response.to.have.status(401));
+    language: text/javascript
+
+settings:
+  disableCookies: true

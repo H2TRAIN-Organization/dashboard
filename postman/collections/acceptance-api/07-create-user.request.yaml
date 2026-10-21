@@ -1,0 +1,34 @@
+$kind: http-request
+name: '07 admin creates user'
+method: POST
+url: '{{baseUrl}}/api/users'
+order: 7000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Cookie
+    value: '{{admin_cookie}}'
+  - key: Origin
+    value: '{{baseUrl}}'
+body:
+  type: json
+  content: |-
+    {
+      "username": "acceptance.user.{{runId}}",
+      "password": "{{userPassword}}",
+      "role": "user"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('created', () => pm.response.to.have.status(201));
+      pm.test('user DTO', () => {
+        pm.expect(body.user.role).to.eql('user');
+        pm.expect(body.user).to.not.have.property('PasswordHash');
+      });
+      pm.collectionVariables.set('userId', body.user.id);
+    language: text/javascript
+
+settings:
+  disableCookies: true

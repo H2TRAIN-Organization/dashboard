@@ -1,0 +1,38 @@
+$kind: http-request
+name: '04 doctor login (username, cookie)'
+method: POST
+url: '{{baseUrl}}/api/auth/login'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Origin
+    value: '{{baseUrl}}'
+body:
+  type: json
+  content: |-
+    {
+      "username": "acceptance.doctor.{{runId}}",
+      "password": "{{doctorPassword}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('login is 200', () => pm.response.to.have.status(200));
+      pm.test('username method and no token', () => {
+        pm.expect(body.method).to.eql('username');
+        pm.expect(body).to.not.have.property('token');
+      });
+      const raw = pm.response.headers.all()
+        .filter((header) => header.key.toLowerCase() === 'set-cookie')
+        .map((header) => header.value)
+        .join('\n');
+      pm.test('HttpOnly cookie', () => pm.expect(raw.toLowerCase()).to.include('httponly'));
+      const pairs = [...raw.matchAll(/(?:^|\n)\s*([^=;\s]+)=([^;\n]*)/g)]
+        .map((match) => `${match[1]}=${match[2]}`);
+      pm.collectionVariables.set('doctor_cookie', pairs.join('; '));
+    language: text/javascript
+
+settings:
+  disableCookies: true

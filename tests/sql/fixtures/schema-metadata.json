@@ -1,0 +1,391 @@
+{
+  "formatVersion": 1,
+  "description": "Sanitized schema definitions only. No host, keys, row counts, values or PII.",
+  "metadata": {
+    "users": {
+      "required": [
+        "UserID",
+        "Username",
+        "PasswordHash"
+      ],
+      "properties": {
+        "UserID": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "Username": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 100
+        },
+        "PasswordHash": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 255
+        },
+        "UUID": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 255
+        },
+        "GDPRConsent": {
+          "type": "boolean",
+          "format": "boolean",
+          "default": false
+        },
+        "GDPRConsentDate": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "sexo": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 10
+        },
+        "bomba_insulina": {
+          "type": "boolean",
+          "format": "boolean",
+          "default": false
+        },
+        "role": {
+          "type": "string",
+          "format": "text",
+          "default": "user"
+        }
+      }
+    },
+    "insulindata": {
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "username": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 100
+        },
+        "insulinType": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 100
+        },
+        "dose": {
+          "type": "string",
+          "format": "text"
+        },
+        "date_time": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "actualDateTime": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "insulintype_iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "dose_iv": {
+          "type": "string",
+          "format": "text"
+        }
+      }
+    },
+    "fooddata": {
+      "required": [
+        "id",
+        "username",
+        "food_type",
+        "quantity",
+        "carbs",
+        "date_time"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "username": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 100
+        },
+        "food_type": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 50
+        },
+        "quantity": {
+          "type": "string",
+          "format": "text"
+        },
+        "carbs": {
+          "type": "string",
+          "format": "text"
+        },
+        "date_time": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "food_type_iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "quantity_iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "carbs_iv": {
+          "type": "string",
+          "format": "text"
+        }
+      }
+    },
+    "exercisedata": {
+      "required": [
+        "id",
+        "username",
+        "exercise_type",
+        "intensity",
+        "exercise_start_time",
+        "exercise_end_time",
+        "date_time"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "username": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 100
+        },
+        "exercise_type": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 50
+        },
+        "intensity": {
+          "type": "integer",
+          "format": "smallint"
+        },
+        "exercise_start_time": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "exercise_end_time": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "exercise_description": {
+          "type": "string",
+          "format": "text"
+        },
+        "date_time": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "exercise_type_iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "exercise_description_iv": {
+          "type": "string",
+          "format": "text"
+        }
+      }
+    },
+    "periodrecords": {
+      "required": [
+        "id",
+        "username",
+        "startDate"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "username": {
+          "type": "string",
+          "format": "character varying",
+          "maxLength": 255
+        },
+        "startDate": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "timestamp without time zone"
+        },
+        "intensity": {
+          "type": "string",
+          "format": "text"
+        },
+        "symptoms": {
+          "type": "array",
+          "format": "text[]",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "string",
+          "format": "text"
+        },
+        "date_time": {
+          "type": "string",
+          "format": "timestamp without time zone",
+          "default": "now()"
+        },
+        "iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "intensity_iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "symptoms_iv": {
+          "type": "array",
+          "format": "text[]",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes_iv": {
+          "type": "string",
+          "format": "text"
+        }
+      }
+    },
+    "mooddata": {
+      "required": [
+        "id",
+        "username",
+        "mood_value",
+        "out_of_routine",
+        "emotions"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "username": {
+          "type": "string",
+          "format": "text"
+        },
+        "mood_value": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "out_of_routine": {
+          "type": "boolean",
+          "format": "boolean"
+        },
+        "routine_description": {
+          "type": "string",
+          "format": "text"
+        },
+        "emotions": {
+          "type": "array",
+          "format": "text[]",
+          "items": {
+            "type": "string"
+          }
+        },
+        "other_emotion": {
+          "type": "string",
+          "format": "text"
+        },
+        "date_time": {
+          "type": "string",
+          "format": "timestamp with time zone",
+          "default": "now()"
+        },
+        "iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "routine_description_iv": {
+          "type": "string",
+          "format": "text"
+        },
+        "emotions_iv": {
+          "type": "array",
+          "format": "text[]",
+          "items": {
+            "type": "string"
+          }
+        },
+        "other_emotion_iv": {
+          "type": "string",
+          "format": "text"
+        }
+      }
+    },
+    "polar_data": {
+      "required": [
+        "id",
+        "username",
+        "timestamp",
+        "heart_rate"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "username": {
+          "type": "string",
+          "format": "text"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "timestamp with time zone"
+        },
+        "heart_rate": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "rri_data": {
+          "format": "jsonb"
+        },
+        "device_id": {
+          "type": "string",
+          "format": "text",
+          "default": "polar_h10"
+        },
+        "data_type": {
+          "type": "string",
+          "format": "text",
+          "default": "heart_rate_reading"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "timestamp with time zone",
+          "default": "now()"
+        }
+      }
+    }
+  }
+}

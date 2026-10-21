@@ -1,0 +1,24 @@
+$kind: http-request
+name: '20 admin logout'
+method: POST
+url: '{{baseUrl}}/api/auth/logout'
+order: 20000
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+  - key: Origin
+    value: '{{baseUrl}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('logout is 204', () => pm.response.to.have.status(204));
+      const raw = pm.response.headers.all()
+        .filter((header) => header.key.toLowerCase() === 'set-cookie')
+        .map((header) => header.value)
+        .join('\n');
+      pm.test('cookie is cleared', () => pm.expect(raw.toLowerCase()).to.include('max-age=0'));
+      pm.collectionVariables.set('admin_cookie', '');
+    language: text/javascript
+
+settings:
+  disableCookies: true
