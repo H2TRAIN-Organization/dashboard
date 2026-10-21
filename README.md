@@ -87,7 +87,7 @@ No se copian valores reales en este README ni en `.env.example`. La plantilla co
 | `SUPABASE_SERVICE_ROLE_KEY` o `SUPABASE_SECRET_KEY` | Solo servidor | Clave privada para operaciones administrativas. Preferir `SUPABASE_SERVICE_ROLE_KEY`; el código acepta JWT `service_role` o `sb_secret_` opaco válido y rechaza `anon`. Nunca exponerla ni prefijarla con `NEXT_PUBLIC_`. |
 | `ENCRYPTION_SECRET_KEY` | Solo servidor | Clave de cifrado actual. El algoritmo, los IV y el esquema real no están verificados. |
 | `ENCRYPTION_SECRET_KEY0` | Solo servidor | Clave anterior, solo si se aplica rotación. No verificada. |
-| `AUTH_SESSION_SECRET` | Solo servidor | Secreto de firma de sesiones; obligatorio en producción (32+ bytes aleatorios). No generar ni escribir claves reales en este repositorio. |
+| `AUTH_SESSION_SECRET` | Solo servidor | Secreto de firma de sesiones; obligatorio en producción (32+ bytes aleatorios), estable entre instancias/despliegues del mismo entorno y distinto por entorno. No generar ni escribir claves reales en este repositorio. |
 | `AUTH_SESSION_TTL_SECONDS` | Solo servidor | TTL de sesión en segundos; el runtime aplica un valor por defecto si falta o es inválido. |
 | `AUTH_LOGIN_WINDOW_SECONDS` | Solo servidor | Ventana del rate limit de login, en segundos. |
 | `AUTH_LOGIN_MAX_ATTEMPTS` | Solo servidor | Intentos máximos de login por ventana. |
@@ -170,7 +170,7 @@ Estado actual: `dev` `fcb2bda`, BUILD_ID `ktSETdnx6ZkFPtJqM5Gf9`; **código loca
 
 ## Despliegue
 
-La guía ejecutable de Vercel está en `docs/despliegue.md`: Node 24.x, `npm ci`, `npm run check && npm run build`, salida `.next`, variables de Preview/Producción separadas y SQL manual en staging. No se ha desplegado: falta aplicar SQL/Auth remoto. La entrega local queda para `codex/release/0.2.0`, que preparará el integrador tras el commit documental; no hay promoción automática a producción/main.
+La guía ejecutable de Vercel está en `docs/despliegue.md`: Node 24.x, `npm ci`, `npm run check && npm run build`, salida `.next`, variables de Preview/Producción separadas y SQL manual en staging. La release está preparada: `codex/release/0.2.0`, HEAD `50f950e`, versión `0.2.0`; dev `96c25b6`. La publicación remota sigue pendiente (SQL/Auth remoto y deploy no aplicados); no hay promoción automática a producción/main.
 
 ## Estructura
 

@@ -1,6 +1,6 @@
 # Despliegue en Vercel
 
-Guía ejecutable para publicar el dashboard cuando las migraciones y la vinculación de Auth estén aplicadas. **No se ha desplegado nada**: el SQL/Auth remoto no está aplicado. El código local está validado en `dev` `fcb2bda` (BUILD_ID `ktSETdnx6ZkFPtJqM5Gf9`): launcher portable con calendario 1/1 + 12 browser PASS (2 backend real + 10 mock), 0 fallos/skips. La configuración `82970b0` está integrada como `9dbde4d`; solo quedan los prerrequisitos remotos y la entrega `codex/release/0.2.0`.
+Guía ejecutable para publicar el dashboard cuando las migraciones y la vinculación de Auth estén aplicadas. **No se ha desplegado nada**: el SQL/Auth remoto no está aplicado. El código local está validado en `dev` `fcb2bda` (BUILD_ID `ktSETdnx6ZkFPtJqM5Gf9`): launcher portable con calendario 1/1 + 12 browser PASS (2 backend real + 10 mock), 0 fallos/skips. La configuración `82970b0` está integrada como `9dbde4d`. La release está preparada: `codex/release/0.2.0`, HEAD `50f950e`, versión `0.2.0`; dev `96c25b6`. Solo queda la publicación remota y sus prerrequisitos.
 
 ## Prerrequisitos
 
@@ -37,17 +37,33 @@ El `vercel.json` del commit `82970b0` (merge `9dbde4d`) ya declara `npm ci`, `np
 
 Git Flow: desplegar primero una rama `codex/release/*` como Preview. No publicar automáticamente a Production ni a `main`; la promoción a producción se hace cuando el usuario ejecute el flujo de release. Configurar la rama de producción más adelante, no en esta fase.
 
-CLI opcional (consultar versiones actuales en las fuentes oficiales):
+**Aviso de primer despliegue:** en un proyecto Vercel nuevo, el primer deploy se crea como Production aunque no se use `--prod`. Crear primero un proyecto Vercel de staging separado y cargar solo credenciales Supabase de staging, para que esa primera publicación nunca use datos ni credenciales de producción. No asumir que un primer `--target=preview` es inocuo en un proyecto nuevo.
+
+CLI para proyecto ya inicializado (consultar la fuente oficial):
 
 ```bash
 npx vercel link
-npx vercel --preview
+npx vercel deploy --target=preview
 ```
+
+La opción `--target` admite `preview`, `production` y `custom`:
+https://vercel.com/docs/cli/deploy
 
 Referencias:
 - https://vercel.com/docs/projects/deploy-from-cli
 - https://vercel.com/docs/environment-variables
 - https://vercel.com/docs/git
+
+## Producción
+
+Solo después de validar staging:
+
+1. Crear un proyecto Vercel de Production separado y configurar variables Production propias.
+2. Aplicar en Supabase Production el mismo SQL auth + M1-M5 y el provisioning de Auth, con backup previo.
+3. Promover la release a `main` mediante GitFlow.
+4. Desplegar con la integración Git (push a `main`) o, desde `main`, con `npx vercel deploy --prod`.
+
+`main` sigue siendo la rama de producción. El primer proyecto de Production debe estar etiquetado como tal y no reutilizar el proyecto de staging. Estos comandos son instrucciones futuras del usuario: **no se ejecutaron**.
 
 ## Variables de entorno
 
@@ -58,7 +74,7 @@ Solo servidor (nunca `NEXT_PUBLIC_` para secretos):
 - `SUPABASE_SERVICE_ROLE_KEY`: JWT `service_role` o `sb_secret_` opaco válido. El código actual acepta ambas clases y rechaza `anon`. Una clave privada nunca va al cliente.
 - `ENCRYPTION_SECRET_KEY`: clave actual; no rotar por azar.
 - `ENCRYPTION_SECRET_KEY0`: solo si se usa rotación y existe dato cifrado con la anterior.
-- `AUTH_SESSION_SECRET`: 32 bytes aleatorios, estable entre instancias y entornos. No cambiar entre despliegues.
+- `AUTH_SESSION_SECRET`: 32 bytes aleatorios, estable entre instancias y despliegues del mismo entorno; debe ser distinto por entorno. No cambiar entre despliegues del mismo entorno.
 - `AUTH_SESSION_TTL_SECONDS` (default 28800), `AUTH_LOGIN_WINDOW_SECONDS` (900), `AUTH_LOGIN_MAX_ATTEMPTS` (10), `AUTH_LOGIN_BLOCK_SECONDS` (900).
 
 No existe `APP_ORIGIN`: el CSRF usa mismo origen. El login por email con SDK no requiere redirect OAuth para estos flujos. No usar `NEXT_PUBLIC_` para claves privadas.
@@ -103,5 +119,5 @@ El rollback de Vercel revierte la app, no el SQL ni la privacidad. No reabrir an
 
 - Migraciones SQL y provisioning Auth en staging. No aplicadas en remoto.
 - Variables de Preview/Production y verificación HTTP real contra staging.
-- Preparar `codex/release/0.2.0` tras el commit documental; no main/push/deploy automático.
+- Release `codex/release/0.2.0` preparada (HEAD `50f950e`, versión `0.2.0`); publicación remota pendiente. No main/push/deploy automático.
 - `progress.txt` de 0 bytes no es documentación ni se versiona.

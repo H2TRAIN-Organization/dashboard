@@ -10,7 +10,7 @@ Guía de prerrequisitos y pendientes para preparar Supabase. **No implica que mi
 - SQL local: T-054 65/65, 0 fail/warn/skip en PostgreSQL 16.15 con auth SQL + M1-M5; M5 `2d67b0d`. No aplicado en remoto.
 - Visual: 20 PASS, 2 skips estructurales, 12 pixel PASS y 6 REVIEW de contenido esperado; sin CSS defectuoso ni claim de equivalencia pixel global.
 - Config Vercel `82970b0` integrada como `9dbde4d` (T-062 PASS); guía: `docs/despliegue.md`.
-- Entrega local: `codex/release/0.2.0`, que prepara el integrador tras el commit documental. Sin SQL remoto, Auth provisioning ni deploy real.
+- Release preparada: `codex/release/0.2.0`, HEAD `50f950e`, versión `0.2.0`; dev `96c25b6`. Publicación remota pendiente: sin SQL remoto, Auth provisioning ni deploy real.
 
 ## Prerrequisitos conocidos
 
@@ -33,7 +33,7 @@ Guía de prerrequisitos y pendientes para preparar Supabase. **No implica que mi
 5. **M4/M5 e ingestores:** las 6 tablas de salud y `users` quedan privadas para anon/authenticated/PUBLIC; los clientes legacy necesitan identidad/política dedicada, nunca service key en cliente.
 6. **Datos sintéticos:** usar fixtures y datos de prueba; nunca PII ni datos de producción.
 7. **Borrado:** un usuario con registros de salud asociados debe devolver 409 sin borrar datos ni identidad de Auth.
-8. **Entrega:** preparar `codex/release/0.2.0` tras el commit documental del integrador; no publicar main/push/deploy sin ejecutar el flujo de release.
+8. **Entrega:** release `codex/release/0.2.0` preparada (HEAD `50f950e`, versión `0.2.0`); publicación remota pendiente. No main/push/deploy sin ejecutar el flujo de release.
 
 ## Checklist operativo pendiente
 
@@ -44,9 +44,9 @@ No hay aplicación automática. Este checklist describe el orden operativo; no a
 - [ ] **Hashes:** los 4 no-bcrypt fallan cerrado; reset manual autorizado, sin adivinar algoritmo.
 - [ ] **RLS/grants:** verificar en remoto que publishable no lee `PasswordHash` ni datos de salud.
 - [ ] **M4/M5:** confirmar privatización de 6 tablas de salud y `users`; ingestores legacy con identidad/política dedicada, nunca service key en cliente.
-- [ ] **Entorno remoto:** configurar `SUPABASE_URL`, publishable y service role válida; `AUTH_SESSION_SECRET` estable; cifrado actual/anterior.
+- [ ] **Entorno remoto:** configurar `SUPABASE_URL`, publishable y service role válida; `AUTH_SESSION_SECRET` estable entre instancias/despliegues del mismo entorno y distinto por entorno; cifrado actual/anterior.
 - [ ] **Vercel:** importar repo, Node 24.x, `npm ci`, `npm run check && npm run build`, `.next`; Preview separado de Production.
-- [ ] **Entrega:** preparar `codex/release/0.2.0` tras el commit documental; no main/push/deploy automático.
+- [ ] **Entrega:** release `codex/release/0.2.0` preparada; publicación remota pendiente. No main/push/deploy automático.
 - [ ] **Rollback:** el rollback de Vercel no revierte SQL ni reabre anon; no borrar tablas automáticamente.
 
 ## Niveles de evidencia

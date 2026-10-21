@@ -449,3 +449,11 @@ Resultado: CIERRE LOCAL VALIDADO / SUPABASE REMOTO PENDIENTE. Root `dev` `fcb2bd
 Observaciones: Sesión `ses_ea1d42504ffeiZdPGFHjocTx5O`; inicio 15:43:48. Solo README/docs/.env.example; sin git mutante, fuentes, tests ajenos ni claves/PII. `progress.txt` de 0 bytes se preserva sin stage. No se declara deploy, usuarios live ni release remoto.
 
 ------------------------------------
+
+Rol: Documentador
+Timestamp: 2026-10-21T15:51:38+01:00
+Tarea ejecutada: T-068 — Corrección final de release y guía de despliegue.
+Resultado: La release existe: `codex/release/0.2.0`, HEAD `50f950ebaf79fcd490b8244dbaf08e1f946fa664`, versión `0.2.0`; dev `96c25b6`. README/setup/guía actualizados de “preparar release/entrega pendiente” a “release preparada; publicación remota pendiente”. En `docs/despliegue.md`, comando corregido a `npx vercel deploy --target=preview` para proyecto ya inicializado, con fuente oficial https://vercel.com/docs/cli/deploy; añadido aviso de que el primer deploy de un proyecto nuevo es Production aunque no use `--prod`, por lo que debe crearse primero un proyecto Vercel staging separado con credenciales Supabase staging. Añadido párrafo de producción: proyecto/variables Production propios, SQL auth+M1-M5 y provisioning en Supabase Production con backup, promoción GitFlow a `main` y deploy por integración Git o `npx vercel deploy --prod`. `AUTH_SESSION_SECRET` corregido a estable entre instancias/despliegues del mismo entorno y distinto por entorno.
+Observaciones: Sesión `ses_ea1d42504ffeiZdPGFHjocTx5O`; inicio 15:51:38. Solo README/docs/.env.example; sin código, package, versión, build ni servidores. Sin git mutante. `progress.txt` de 0 bytes preservado. No hay nuevos gates; publicación remota pendiente.
+
+------------------------------------
