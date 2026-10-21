@@ -11,7 +11,8 @@ import type {
  * sees already-decrypted, public health records.
  *
  * Stable window contract: `from` is inclusive (or null), `to` is exclusive.
- * `selectedUser` is already normalized by the application layer.
+ * `selectedUser` is already normalized by the application layer: null means all
+ * users (privileged only); any string is a literal username, including "all".
  */
 export interface HealthDataRepository {
   getDecryptedData(query: ResolvedDataQuery): Promise<DecryptedData>;

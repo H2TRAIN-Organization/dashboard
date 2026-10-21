@@ -48,7 +48,11 @@ function parseUtcDay(day: string): Date {
   return start;
 }
 
-function resolveDataQuery(query: DataQuery, now: Date): ResolvedDataQuery {
+function resolveDataQuery(
+  query: DataQuery,
+  selectedUser: string | null,
+  now: Date,
+): ResolvedDataQuery {
   const days = daysForTimeRange(query.timeRange);
   const rangeFrom =
     days === null ? null : new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
@@ -70,6 +74,7 @@ function resolveDataQuery(query: DataQuery, now: Date): ResolvedDataQuery {
 
   return {
     ...query,
+    selectedUser,
     // Keep the caller's calendar day for traceability; repositories use
     // from/to exclusively for the window.
     dateFilter: query.dateFilter,
@@ -87,14 +92,19 @@ export function createDataUseCases(
       actor: ActiveActor,
       query: DataQuery,
     ): Promise<DecryptedData> {
-      // Server-side normalization is the security boundary. A regular user's
-      // requested user (including `all`) is ignored and replaced by their own
-      // username; the browser filter is never the only protection.
+      // Server-side normalization is the security boundary. Regular users are
+      // always scoped to their literal username, even when that username is the
+      // legacy value "all". Only privileged roles may turn the HTTP "all" UI
+      // sentinel into a null (global) repository query.
       const selectedUser =
-        actor.role === "user" ? actor.username : query.selectedUser;
+        actor.role === "user"
+          ? actor.username
+          : query.selectedUser === "all"
+            ? null
+            : query.selectedUser;
 
       return repository.getDecryptedData(
-        resolveDataQuery({ ...query, selectedUser }, clock.now()),
+        resolveDataQuery(query, selectedUser, clock.now()),
       );
     },
 
