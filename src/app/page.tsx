@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const formatCount = (value: number | null) =>
     value === null ? 'No disponible' : value.toLocaleString()
   const formatPercent = (value: number | null) =>
-    value === null ? 'No disponible' : `${value}%`
+    value === null ? '—' : `${value}%`
 
   // Componente de loading con puntos animados
   const LoadingDots = () => (

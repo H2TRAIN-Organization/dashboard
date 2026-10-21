@@ -653,7 +653,7 @@ export const translations: Record<Language, Translations> = {
       analyzeData: 'Visualiza tus datos, analiza tu progreso y supervisa tus métricas de variabilidad cardíaca.',
       monitorMetrics: 'Monitoreo personal de tu salud con tecnología de vanguardia.',
       totalUsers: 'Usuarios Totales',
-      totalRecords: 'Registros Totales',
+      totalRecords: 'registros totales',
       hrvUsers: 'Usuarios HRV',
       systemAccuracy: 'Precisión Sistema',
       myRecords: 'Mis Registros',
