@@ -47,6 +47,13 @@ function Portal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body)
 }
 
+interface CalendarPosition {
+  top: number
+  left: number
+  width: number
+  maxHeight: number
+}
+
 interface CustomCalendarProps {
   isOpen: boolean
   onClose: () => void
@@ -56,7 +63,8 @@ interface CustomCalendarProps {
   onDateChange: (date: Date) => void
   onSelectDate: (date: Date) => void
   containerRef?: RefObject<HTMLDivElement | null>
-  position?: { top: number; left: number; width: number }
+  popupRef?: RefObject<HTMLDivElement | null>
+  position?: CalendarPosition
 }
 
 // Componente de calendario personalizado
@@ -69,6 +77,7 @@ function CustomCalendar({
   onDateChange,
   onSelectDate,
   containerRef,
+  popupRef,
   position,
 }: CustomCalendarProps) {
   if (!isOpen) return null
@@ -151,12 +160,15 @@ function CustomCalendar({
       style={{ zIndex: 9999999 }}
     >
       <div
+        ref={popupRef}
         className="bg-white border-2 border-slate-200/60 rounded-2xl shadow-2xl overflow-hidden w-80 relative"
         style={position ? {
           position: 'fixed',
           top: position.top,
           left: position.left,
-          width: Math.max(position.width, 320),
+          width: position.width,
+          maxHeight: position.maxHeight,
+          overflowY: 'auto',
           zIndex: 9999999
         } : {
           position: 'fixed',
@@ -164,6 +176,8 @@ function CustomCalendar({
           left: '50%',
           transform: 'translate(-50%, -50%)',
           width: '320px',
+          maxHeight: 'calc(100vh - 16px)',
+          overflowY: 'auto',
           zIndex: 9999999
         }}
       >
@@ -256,7 +270,8 @@ export default function DataPage() {
   const [today] = useState(() => new Date())
   const datePickerRef = useRef<HTMLButtonElement>(null)
   const datePickerPortalRef = useRef<HTMLDivElement | null>(null)
-  const [datePickerPosition, setDatePickerPosition] = useState<{ top: number; left: number; width: number } | null>(null)
+  const datePickerPopupRef = useRef<HTMLDivElement | null>(null)
+  const [datePickerPosition, setDatePickerPosition] = useState<CalendarPosition | null>(null)
 
   const fetchData = useCallback(async () => {
     const controller = new AbortController()
@@ -339,14 +354,40 @@ export default function DataPage() {
     }
 
     const updateDatePickerPosition = () => {
-      if (datePickerRef.current && isDatePickerOpen) {
-        const rect = datePickerRef.current.getBoundingClientRect()
-        setDatePickerPosition({
-          top: rect.bottom + window.scrollY + 8,
-          left: rect.left + window.scrollX,
-          width: Math.max(rect.width, 320) // Mínimo 320px de ancho
-        })
-      }
+      if (!datePickerRef.current || !isDatePickerOpen) return
+
+      const trigger = datePickerRef.current.getBoundingClientRect()
+      const popup = datePickerPopupRef.current?.getBoundingClientRect()
+      if (!popup) return
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const padding = 8
+      const gap = 8
+      const maxHeight = Math.max(0, viewportHeight - padding * 2)
+      const width = Math.min(
+        Math.max(trigger.width, 320),
+        Math.max(0, viewportWidth - padding * 2),
+      )
+      const height = Math.min(popup.height, maxHeight)
+      const left = Math.max(
+        padding,
+        Math.min(trigger.left, viewportWidth - padding - width),
+      )
+
+      const spaceBelow = viewportHeight - trigger.bottom - gap - padding
+      const spaceAbove = trigger.top - gap - padding
+      const fitsBelow = height === 0 || height <= spaceBelow
+      const fitsAbove = height > 0 && height <= spaceAbove
+
+      let top = fitsBelow || !fitsAbove
+        ? trigger.bottom + gap
+        : trigger.top - gap - height
+      top = Math.max(
+        padding,
+        Math.min(top, viewportHeight - padding - height),
+      )
+
+      setDatePickerPosition({ top, left, width, maxHeight })
     }
 
     // Solo agregar listeners si el calendario está abierto
@@ -1050,6 +1091,7 @@ export default function DataPage() {
                       onDateChange={handleDateChange}
                       onSelectDate={selectDate}
                       containerRef={datePickerPortalRef}
+                      popupRef={datePickerPopupRef}
                       position={datePickerPosition || undefined}
                     />
                   </Portal>
