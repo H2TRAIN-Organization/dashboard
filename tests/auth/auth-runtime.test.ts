@@ -13,7 +13,9 @@ const SERVICE_KEY = jwt({ role: "service_role", ref: "project" });
 const ANON_KEY = jwt({ role: "anon", ref: "project" });
 const SESSION_SECRET = "ab".repeat(32);
 
-function environment(overrides: Record<string, string | undefined> = {}) {
+function environment(
+  overrides: Record<string, string | undefined> = {},
+): NodeJS.ProcessEnv {
   return {
     NODE_ENV: "production",
     SUPABASE_URL: "https://project.supabase.co",
