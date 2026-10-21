@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 async function migration(name: string): Promise<string> {
-  return readFile(
+  const source = await readFile(
     new URL(`../../supabase/migrations/${name}`, import.meta.url),
     "utf8",
   );
+  return source.replace(/\r\n/g, "\n");
 }
 
 describe("T-009 SQL migrations", () => {
