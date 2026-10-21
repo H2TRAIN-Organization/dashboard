@@ -17,12 +17,7 @@
     "openapi:check": "vitest run tests/contracts/openapi.test.ts",
     "check:layers": "node scripts/check-layers.mjs",
     "check": "npm run typecheck && npm run lint && npm run check:layers && npm run test",
-    "insert-test-data": "node scripts/insert_test_data.js",
-    "insert-real-data": "node scripts/insert_real_test_data.js",
     "check-db": "node scripts/check_database.js",
-    "test-decryption": "node scripts/test_decryption.js",
-    "test-production": "node scripts/test_production_backend.js",
-    "test-frontend": "node scripts/test_frontend_api.js",
     "check-env": "node scripts/check_env.js",
     "setup-https": "bash ../scripts/setup-https-dev.sh"
   },
