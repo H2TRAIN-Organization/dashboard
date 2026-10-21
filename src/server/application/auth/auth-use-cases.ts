@@ -1,5 +1,6 @@
 import { UnauthorizedError, ValidationError } from "@/server/domain/errors";
 import type { Session } from "@/server/domain/session";
+import { USERNAME_MAX_LENGTH } from "@/server/domain/user";
 import type { AuthGateway } from "../ports/auth-gateway";
 
 export type LoginCommand =
@@ -19,10 +20,23 @@ export function createAuthUseCases(auth: AuthGateway): AuthUseCases {
         throw new ValidationError("La contraseña es obligatoria");
       }
 
+      let username: string | undefined;
+      if (command.kind === "username") {
+        username = command.username.trim();
+        if (username.length === 0) {
+          throw new ValidationError("El nombre de usuario es obligatorio");
+        }
+        if (username.length > USERNAME_MAX_LENGTH) {
+          throw new ValidationError(
+            `El nombre de usuario no puede superar ${USERNAME_MAX_LENGTH} caracteres`,
+          );
+        }
+      }
+
       const session =
         command.kind === "email"
           ? await auth.authenticateByEmail(command.email, command.password)
-          : await auth.authenticateByUsername(command.username, command.password);
+          : await auth.authenticateByUsername(username ?? "", command.password);
 
       if (session === null) {
         throw new UnauthorizedError("Credenciales inválidas");

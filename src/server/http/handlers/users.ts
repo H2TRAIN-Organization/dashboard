@@ -1,5 +1,6 @@
 import type { AuthUseCases } from "@/server/application/auth/auth-use-cases";
 import type { UserUseCases } from "@/server/application/users/user-use-cases";
+import type { UpdateUserPatch } from "@/server/domain/user";
 import { handle, jsonResult, parseInput, type HttpResult } from "../problem";
 import { requireActor } from "./auth";
 import {
@@ -60,7 +61,6 @@ export function createUsersHttpHandlers(
         const body = parseInput(createUserBodySchema, input.body);
         const user = await users.create(actor, {
           username: body.username,
-          email: body.email ?? null,
           password: body.password,
           role: body.role,
           gdprConsent: body.gdprConsent,
@@ -83,7 +83,22 @@ export function createUsersHttpHandlers(
         const actor = await requireActor(auth, input.sessionToken);
         const id = parseInput(userIdSchema, input.id);
         const body = parseInput(updateUserBodySchema, input.body);
-        const user = await users.update(actor, id, body);
+        const patch: UpdateUserPatch = {
+          ...(body.username === undefined ? {} : { username: body.username }),
+          ...(body.role === undefined ? {} : { role: body.role }),
+          ...(body.gdprConsent === undefined
+            ? {}
+            : { gdprConsent: body.gdprConsent }),
+        };
+
+        // `email: null` is an accepted compatibility no-op, never a persisted
+        // identity update. Email remains owned by the authentication layer.
+        if (Object.keys(patch).length === 0) {
+          const user = await users.get(actor, id);
+          return jsonResult(200, { user });
+        }
+
+        const user = await users.update(actor, id, patch);
         return jsonResult(200, { user });
       });
     },

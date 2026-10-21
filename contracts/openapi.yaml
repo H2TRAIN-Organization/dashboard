@@ -536,9 +536,11 @@ components:
           type: string
         username:
           type: string
+          maxLength: 100
         email:
           type: [string, "null"]
           format: email
+          description: Identidad de autenticación de solo lectura; puede ser nula.
         role:
           $ref: "#/components/schemas/UserRole"
         uuid:
@@ -601,7 +603,7 @@ components:
         username:
           type: string
           minLength: 1
-          maxLength: 128
+          maxLength: 100
         password:
           type: string
           minLength: 1
@@ -621,16 +623,17 @@ components:
           format: date-time
     UserCreateRequest:
       type: object
+      description: El email nuevo no se persiste; solo se admite omitido o null por compatibilidad.
       additionalProperties: false
       required: [username, password]
       properties:
         username:
           type: string
           minLength: 1
-          maxLength: 128
+          maxLength: 100
         email:
-          type: [string, "null"]
-          format: email
+          type: "null"
+          description: Compatibilidad; cualquier string es inválido. La identidad email pertenece a auth.
         password:
           type: string
           minLength: 1
@@ -644,16 +647,17 @@ components:
           default: false
     UserUpdateRequest:
       type: object
+      description: El email nuevo no se persiste; solo se admite omitido o null por compatibilidad.
       additionalProperties: false
       minProperties: 1
       properties:
         username:
           type: string
           minLength: 1
-          maxLength: 128
+          maxLength: 100
         email:
-          type: [string, "null"]
-          format: email
+          type: "null"
+          description: No-op de compatibilidad; cualquier string es inválido.
         role:
           $ref: "#/components/schemas/UserRole"
         gdprConsent:

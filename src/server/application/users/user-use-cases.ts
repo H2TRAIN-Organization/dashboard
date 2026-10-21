@@ -4,13 +4,14 @@ import {
   canWriteUsers,
 } from "@/server/domain/access-policy";
 import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "@/server/domain/errors";
-import type {
-  ActiveActor,
-  UpdateUserPatch,
-  User,
-  UserListFilter,
-  UserPage,
-  UserRole,
+import {
+  USERNAME_MAX_LENGTH,
+  type ActiveActor,
+  type UpdateUserPatch,
+  type User,
+  type UserListFilter,
+  type UserPage,
+  type UserRole,
 } from "@/server/domain/user";
 import type {
   CreateUserRecord,
@@ -20,7 +21,6 @@ import type {
 
 export interface CreateUserCommand {
   readonly username: string;
-  readonly email: string | null;
   readonly role: UserRole;
   readonly gdprConsent: boolean;
   readonly password: string;
@@ -85,13 +85,17 @@ export function createUserUseCases(
       if (username.length === 0) {
         throw new ValidationError("El nombre de usuario es obligatorio");
       }
+      if (username.length > USERNAME_MAX_LENGTH) {
+        throw new ValidationError(
+          `El nombre de usuario no puede superar ${USERNAME_MAX_LENGTH} caracteres`,
+        );
+      }
       if (command.password.length === 0) {
         throw new ValidationError("La contraseña es obligatoria");
       }
 
       const record: CreateUserRecord = {
         username,
-        email: command.email,
         role: command.role,
         gdprConsent: command.gdprConsent,
         password: command.password,
@@ -101,10 +105,32 @@ export function createUserUseCases(
 
     async update(actor: ActiveActor, id: string, patch: UpdateUserPatch): Promise<User> {
       assertAdmin(actor);
-      if (Object.keys(patch).length === 0) {
+
+      const username = patch.username?.trim();
+      if (username !== undefined) {
+        if (username.length === 0) {
+          throw new ValidationError("El nombre de usuario es obligatorio");
+        }
+        if (username.length > USERNAME_MAX_LENGTH) {
+          throw new ValidationError(
+            `El nombre de usuario no puede superar ${USERNAME_MAX_LENGTH} caracteres`,
+          );
+        }
+      }
+
+      // Only explicitly supported fields are forwarded; an incoming email is
+      // never persisted or used to create a new identity.
+      const safePatch: UpdateUserPatch = {
+        ...(username === undefined ? {} : { username }),
+        ...(patch.role === undefined ? {} : { role: patch.role }),
+        ...(patch.gdprConsent === undefined
+          ? {}
+          : { gdprConsent: patch.gdprConsent }),
+      };
+      if (Object.keys(safePatch).length === 0) {
         throw new ValidationError("No hay campos que actualizar");
       }
-      const updated = await users.update(id, patch);
+      const updated = await users.update(id, safePatch);
       if (updated === null) {
         throw new NotFoundError("Usuario no encontrado");
       }
