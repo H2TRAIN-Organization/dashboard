@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint \"src/server/**/*.ts\" \"src/app/api/**/*.ts\" \"tests/**/*.ts\" scripts/check-layers.mjs vitest.config.mts playwright.config.ts --max-warnings=0",
+    "lint:src": "eslint \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" scripts/check-layers.mjs vitest.config.mts playwright.config.ts --max-warnings=0",
     "typecheck": "tsc -p tsconfig.server.json --noEmit",
     "typecheck:app": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
