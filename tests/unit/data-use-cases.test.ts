@@ -24,6 +24,9 @@ const doctorActor = actorFor(
 const userActor = actorFor(
   makeUser({ id: "user-1", username: "alice", role: "user" }),
 );
+const userNamedAllActor = actorFor(
+  makeUser({ id: "user-all", username: "all", role: "user" }),
+);
 
 function setup() {
   const repository = new InMemoryHealthDataRepository(data, {
@@ -47,6 +50,7 @@ describe("health data use cases", () => {
     });
 
     expect(result.insulinData).toHaveLength(1);
+    expect(repository.lastDecryptedQuery?.selectedUser).toBeNull();
     expect(repository.lastDecryptedQuery?.from).toBe("2026-01-01T12:00:00.000Z");
     expect(repository.lastDecryptedQuery?.to).toBe(now.toISOString());
   });
@@ -120,7 +124,7 @@ describe("health data use cases", () => {
     expect(repository.lastDecryptedQuery?.to).toBe(now.toISOString());
   });
 
-  it("normalizes a regular user's selectedUser to their own username", async () => {
+  it("normalizes a regular user's selectedUser to their own literal username", async () => {
     const { repository, useCases } = setup();
     const base = {
       timeRange: "30d",
@@ -136,6 +140,28 @@ describe("health data use cases", () => {
       expect(own.insulinData).toHaveLength(1);
       expect(repository.lastDecryptedQuery?.selectedUser).toBe("alice");
     }
+  });
+
+  it("keeps the literal username all for users and reserves null for privileged all", async () => {
+    const { repository, useCases } = setup();
+    const query = {
+      selectedUser: "all",
+      timeRange: "30d",
+      selectedDataType: "all",
+      dateFilter: null,
+    } as const;
+
+    await useCases.getDecryptedData(userNamedAllActor, query);
+    expect(repository.lastDecryptedQuery?.selectedUser).toBe("all");
+
+    await useCases.getDecryptedData(adminActor, query);
+    expect(repository.lastDecryptedQuery?.selectedUser).toBeNull();
+
+    await useCases.getDecryptedData(doctorActor, {
+      ...query,
+      selectedUser: "alice",
+    });
+    expect(repository.lastDecryptedQuery?.selectedUser).toBe("alice");
   });
 
   it("rejects invalid calendar days", async () => {

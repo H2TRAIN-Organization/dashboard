@@ -52,7 +52,12 @@ export interface DataQuery {
   readonly dateFilter: string | null;
 }
 
-export interface ResolvedDataQuery extends DataQuery {
+export interface ResolvedDataQuery extends Omit<DataQuery, "selectedUser"> {
+  /**
+   * null means every user and is only produced for privileged roles. Any
+   * string is a literal username, including the legacy username "all".
+   */
+  readonly selectedUser: string | null;
   /** Inclusive lower bound, ISO-8601, or null for no lower bound. */
   readonly from: string | null;
   /** Exclusive upper bound, ISO-8601. Repositories must use `< to`. */
