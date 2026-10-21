@@ -7,8 +7,10 @@ export interface EncryptionKeyConfig {
 
 const HEX_32_BYTES = /^[0-9a-f]{64}$/i;
 
+type Environment = Readonly<Record<string, string | undefined>>;
+
 function readKey(
-  environment: NodeJS.ProcessEnv,
+  environment: Environment,
   name: string,
 ): string | null {
   const value = environment[name];
@@ -24,7 +26,7 @@ function readKey(
  * hexadecimal strings (32 bytes). Values are never included in errors or logs.
  */
 export function readEncryptionKeyConfig(
-  environment: NodeJS.ProcessEnv = process.env,
+  environment: Environment = process.env,
 ): EncryptionKeyConfig {
   const currentKeyHex = readKey(environment, "ENCRYPTION_SECRET_KEY");
   const previousKeyHex = readKey(environment, "ENCRYPTION_SECRET_KEY0");

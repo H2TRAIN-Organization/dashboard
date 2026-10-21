@@ -40,8 +40,10 @@ export function isServiceRoleCredential(token: string): boolean {
   return decodeJwtRole(value) === "service_role";
 }
 
+type Environment = Readonly<Record<string, string | undefined>>;
+
 function readNonEmpty(
-  environment: NodeJS.ProcessEnv,
+  environment: Environment,
   name: string,
 ): string | null {
   const value = environment[name];
@@ -53,7 +55,7 @@ function readNonEmpty(
 }
 
 export function readSupabasePersistenceConfig(
-  environment: NodeJS.ProcessEnv = process.env,
+  environment: Environment = process.env,
 ): SupabasePersistenceConfig {
   const rawUrl = readNonEmpty(environment, "SUPABASE_URL");
   if (rawUrl === null) {
