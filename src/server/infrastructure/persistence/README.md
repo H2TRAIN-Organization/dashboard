@@ -143,5 +143,6 @@ Discordancias detectadas antes de crear los adaptadores:
   exclusivo (`>= from`, `< to`); el endpoint legacy conserva `to` inclusivo.
 - `dateFilter` se interpreta como día UTC completo en la capa de aplicación;
   persistencia solo recibe `from`/`to`.
-- `selectedUser=all` solo queda sin filtro para admin/doctor; la aplicación
-  normaliza al username propio para rol `user`.
+- `selectedUser=null` es la única consulta global; cualquier string se filtra
+  como username literal, incluido el usuario legacy llamado `all`. La
+  aplicación convierte el centinela HTTP `all` a `null` solo para admin/doctor.

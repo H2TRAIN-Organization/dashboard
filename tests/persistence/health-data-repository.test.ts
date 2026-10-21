@@ -205,10 +205,10 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
     expect(legacy.insulin).toHaveLength(1);
   });
 
-  it("treats selectedUser=all as unscoped for privileged reads", async () => {
+  it("treats selectedUser=null as unscoped for privileged reads", async () => {
     const { gateway, repo } = repository();
     const data = await repo.getDecryptedData({
-      selectedUser: "all",
+      selectedUser: null,
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
@@ -224,6 +224,47 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
         ),
       ),
     ).toBe(false);
+  });
+
+  it("filters the literal username all in decrypted and legacy reads", async () => {
+    const gateway = new FakePersistenceGateway({
+      insulindata: [
+        insulinRow(1, "all", "2026-01-15T10:00:00"),
+        insulinRow(2, "alice", "2026-01-16T10:00:00"),
+      ],
+    });
+    const repo = new SupabaseHealthDataRepository(gateway, decryptor());
+
+    const decrypted = await repo.getDecryptedData({
+      selectedUser: "all",
+      timeRange: "all",
+      selectedDataType: "insulin",
+      dateFilter: null,
+      from: null,
+      to: "2026-12-31T23:59:59.999Z",
+    });
+    expect(decrypted.insulinData).toHaveLength(1);
+    expect(decrypted.insulinData[0]?.username).toBe("all");
+
+    const legacy = await repo.getLegacyData({
+      type: "insulin",
+      rangeDays: 365,
+      selectedUser: "all",
+      from: "2026-01-01T00:00:00.000Z",
+      to: "2026-12-31T23:59:59.999Z",
+    });
+    expect(legacy.insulin).toHaveLength(1);
+    expect(legacy.insulin[0]?.username).toBe("all");
+    expect(
+      gateway.selectCalls.every((call) =>
+        call.request.filters?.some(
+          (filter) =>
+            filter.kind === "eq" &&
+            filter.column === "username" &&
+            filter.value === "all",
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("returns only the selected type and pages by id without truncation", async () => {

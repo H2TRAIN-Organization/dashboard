@@ -118,8 +118,7 @@ export class SupabaseHealthDataRepository implements HealthDataRepository {
 
   async getLegacyData(query: LegacyDataQuery): Promise<LegacyData> {
     const tableQuery: TableQuery = {
-      selectedUser:
-        query.selectedUser === "all" ? null : query.selectedUser,
+      selectedUser: query.selectedUser,
       from: query.from,
       to: query.to,
     };
@@ -164,7 +163,7 @@ export class SupabaseHealthDataRepository implements HealthDataRepository {
     toExclusive: boolean,
   ): Promise<readonly HealthRecord[]> {
     const filters: PersistenceFilter[] = [];
-    if (query.selectedUser !== null && query.selectedUser !== "all") {
+    if (query.selectedUser !== null) {
       filters.push({ kind: "eq", column: "username", value: query.selectedUser });
     }
     if (query.from !== null && query.from.length > 0) {
