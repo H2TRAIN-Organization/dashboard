@@ -1,10 +1,25 @@
 # Ignorar archivos que pueden causar problemas
 node_modules
 .next
-.env.local
-.env.*.local
+.env*
+!.env.example
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .DS_Store
 *.tsbuildinfo
+
+# Directorios raíz no desplegables
+pi-mqtt-agent
+kub-kubioscloud-demo
+Uploader
+
+# Artefactos locales de tests y diagnósticos
+test-results
+playwright-report
+coverage
+tests/visual/.output
+.visual-baseline
+.visual-candidate
+.visual-compare
+.visual-final

@@ -2,6 +2,9 @@
   "name": "dashboard-vercel-fix",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:https": "next dev --turbopack --experimental-https --experimental-https-key ../ssl/localhost.key --experimental-https-cert ../ssl/localhost.crt",
