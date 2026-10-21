@@ -46,9 +46,9 @@ export default function HybridNavigation({ title, showBackButton = true }: Hybri
             )}
             <div className="flex items-center space-x-6">
               {/* Logo H2TRAIN - Logo horizontal, muy grande */}
-              <Image 
-                src="/logo-horizontal.png" 
-                alt="H2TRAIN Logo" 
+              <Image
+                src="/logo-horizontal.png"
+                alt="H2TRAIN Logo"
                 width={1050}
                 height={425}
                 className="h-16 w-auto rounded-xl shadow-xl"
