@@ -1,8 +1,59 @@
 'use client'
 
-import { createContext, useState, useContext, useEffect, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react'
 import { Language, translations } from '@/lib/translations'
-import { useHydration } from '@/hooks/useHydration'
+
+const DEFAULT_LANGUAGE: Language = 'es'
+const LANGUAGE_STORAGE_KEY = 'language'
+const listeners = new Set<() => void>()
+
+function isLanguage(value: string | null): value is Language {
+  return value === 'es' || value === 'en'
+}
+
+function readStoredLanguage(): Language {
+  if (typeof window === 'undefined') return DEFAULT_LANGUAGE
+
+  try {
+    const savedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
+    return isLanguage(savedLanguage) ? savedLanguage : DEFAULT_LANGUAGE
+  } catch {
+    return DEFAULT_LANGUAGE
+  }
+}
+
+let currentLanguage: Language = readStoredLanguage()
+
+function subscribe(listener: () => void) {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+function getSnapshot(): Language {
+  return currentLanguage
+}
+
+function getServerSnapshot(): Language {
+  return DEFAULT_LANGUAGE
+}
+
+function updateLanguage(language: Language) {
+  currentLanguage = language
+  try {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
+  } catch {
+    // Storage can be unavailable; the in-memory preference still applies.
+  }
+
+  for (const listener of listeners) listener()
+}
 
 interface LanguageContextType {
   language: Language
@@ -13,41 +64,15 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  // Inicializar con el idioma por defecto para evitar problemas de hidratación
-  const [language, setLanguage] = useState<Language>('es')
-  const isHydrated = useHydration()
-
-  // Cargar idioma desde localStorage al inicializar (solo después de la hidratación)
-  useEffect(() => {
-    if (isHydrated) {
-      const savedLanguage = localStorage.getItem('language') as Language
-      console.log('🌍 LanguageContext: Loading language from localStorage:', savedLanguage)
-      if (savedLanguage && (savedLanguage === 'es' || savedLanguage === 'en')) {
-        setLanguage(savedLanguage)
-        console.log('🌍 LanguageContext: Language set to:', savedLanguage)
-      } else {
-        console.log('🌍 LanguageContext: Using default language: es')
-      }
-    }
-  }, [isHydrated])
-
-  // Guardar idioma en localStorage cuando cambie
-  const handleSetLanguage = (newLanguage: Language) => {
-    console.log('🌍 LanguageContext: Changing language to:', newLanguage)
-    setLanguage(newLanguage)
-    if (isHydrated) {
-      localStorage.setItem('language', newLanguage)
-      console.log('🌍 LanguageContext: Language saved to localStorage:', newLanguage)
-    }
-  }
-
+  const language = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  )
   const t = translations[language]
 
-  // No mostrar loading para evitar problemas de hidratación
-  // El idioma se cargará en el cliente
-
   return (
-    <LanguageContext.Provider value={{ language, setLanguage: handleSetLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage: updateLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   )
