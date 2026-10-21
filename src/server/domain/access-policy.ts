@@ -37,17 +37,19 @@ export function canListUser(actor: ActiveActor, targetUserId: string): boolean {
 }
 
 /**
- * `selectedUser` is a username in the legacy data schema, not a user id.
- * Regular users may only request their own username; `all` is privileged.
+ * `selectedUser` is a username in the legacy data schema, not a user id. null
+ * is the privileged global selector; any string is literal, including the
+ * legacy username "all". Regular users may only read their own literal
+ * username.
  */
 export function canReadHealthDataFor(
   actor: ActiveActor,
-  selectedUser: string,
+  selectedUser: string | null,
 ): boolean {
   if (canReadAllHealthData(actor)) {
     return true;
   }
-  return selectedUser !== "all" && selectedUser === actor.username;
+  return selectedUser !== null && selectedUser === actor.username;
 }
 
 export function canReadAdminDatabase(actor: ActiveActor): boolean {

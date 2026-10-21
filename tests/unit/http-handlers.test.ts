@@ -29,6 +29,11 @@ const user = makeUser({
   email: "alice@example.com",
   role: "user",
 });
+const allUser = makeUser({
+  id: "user-all",
+  username: "all",
+  role: "user",
+});
 
 function setup() {
   const accounts: TestAccount[] = [
@@ -53,14 +58,22 @@ function setup() {
       method: "email",
       expiresAt: "2026-12-31T23:59:59.000Z",
     },
+    {
+      user: allUser,
+      password: "all-secret",
+      token: "all-token",
+      method: "username",
+      expiresAt: "2026-12-31T23:59:59.000Z",
+    },
   ];
   const auth = createAuthUseCases(new TestAuthGateway(accounts));
   const users = createUserUseCases(
-    new InMemoryUserRepository([admin, doctor, user]),
+    new InMemoryUserRepository([admin, doctor, user, allUser]),
     new InMemoryUserDataPresence(),
   );
+  const dataRepository = new InMemoryHealthDataRepository();
   const data = createDataUseCases(
-    new InMemoryHealthDataRepository(),
+    dataRepository,
     { now: () => new Date("2026-01-31T12:00:00.000Z") },
   );
   const adminDatabase = createAdminDatabaseUseCases(
@@ -69,7 +82,7 @@ function setup() {
     }),
   );
   const api = createHttpApi({ auth, users, data, adminDatabase });
-  return { api };
+  return { api, dataRepository };
 }
 
 function bodyOf(result: { body?: unknown }): Record<string, unknown> {
@@ -234,6 +247,24 @@ describe("HTTP data and admin handlers", () => {
       "moodData",
       "periodData",
     ]);
+  });
+
+  it("keeps a user literally named all scoped on both data endpoints", async () => {
+    const { api, dataRepository } = setup();
+
+    const decrypted = await api.data.decrypted({
+      sessionToken: "all-token",
+      query: { selectedUser: "all" },
+    });
+    expect(decrypted.status).toBe(200);
+    expect(dataRepository.lastDecryptedQuery?.selectedUser).toBe("all");
+
+    const legacy = await api.data.legacy({
+      sessionToken: "all-token",
+      query: { type: "all", range: "30" },
+    });
+    expect(legacy.status).toBe(200);
+    expect(dataRepository.lastLegacyQuery?.selectedUser).toBe("all");
   });
 
   it("keeps legacy single-type responses as arrays and protects admin routes", async () => {
