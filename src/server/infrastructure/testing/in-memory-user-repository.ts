@@ -55,7 +55,7 @@ export class InMemoryUserRepository implements UserRepository {
     const user: User = {
       id: `test-user-${this.nextId++}`,
       username: record.username,
-      email: record.email,
+      email: null,
       role: record.role,
       uuid: null,
       gdprConsent: record.gdprConsent,
@@ -75,7 +75,6 @@ export class InMemoryUserRepository implements UserRepository {
     const updated: User = {
       ...current,
       ...(patch.username === undefined ? {} : { username: patch.username }),
-      ...(patch.email === undefined ? {} : { email: patch.email }),
       ...(patch.role === undefined ? {} : { role: patch.role }),
       ...(patch.gdprConsent === undefined ? {} : { gdprConsent: patch.gdprConsent }),
     };

@@ -1,5 +1,8 @@
 export const USER_ROLES = ["admin", "doctor", "user"] as const;
 
+/** Maximum username length accepted by the legacy users table. */
+export const USERNAME_MAX_LENGTH = 100;
+
 export type UserRole = (typeof USER_ROLES)[number];
 
 export function isUserRole(value: string): value is UserRole {
@@ -41,7 +44,6 @@ export interface UserPage {
 
 export interface UpdateUserPatch {
   readonly username?: string;
-  readonly email?: string | null;
   readonly role?: UserRole;
   readonly gdprConsent?: boolean;
 }

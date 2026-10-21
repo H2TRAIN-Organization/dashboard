@@ -139,6 +139,21 @@ describe("authoritative OpenAPI contract", () => {
     expect(roles).toEqual(["admin", "doctor", "user"]);
   });
 
+  it("enforces the P1 username and email request contract", async () => {
+    const spec = await loadSpec();
+    const schemas = recordAt(spec, "components", "schemas");
+    for (const name of ["UsernameLoginRequest", "UserCreateRequest", "UserUpdateRequest"]) {
+      const username = recordAt(schemas, name, "properties", "username");
+      expect(username.maxLength, name).toBe(100);
+    }
+    for (const name of ["UserCreateRequest", "UserUpdateRequest"]) {
+      const email = recordAt(schemas, name, "properties", "email");
+      expect(email.type, name).toBe("null");
+    }
+    const userEmail = recordAt(schemas, "User", "properties", "email");
+    expect(userEmail.type).toEqual(["string", "null"]);
+  });
+
   it("accepts dateFilter and documents decrypted-data scoping", async () => {
     const spec = await loadSpec();
     const operation = recordAt(spec, "paths", "/api/decrypted-data", "get");

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { USERNAME_MAX_LENGTH } from "@/server/domain/user";
 
 export const userRoleSchema = z.enum(["admin", "doctor", "user"]);
 
@@ -17,8 +18,8 @@ export const userListQuerySchema = z
   }));
 
 export const createUserBodySchema = z.strictObject({
-  username: z.string().trim().min(1).max(128),
-  email: z.email().max(320).nullable().optional(),
+  username: z.string().trim().min(1).max(USERNAME_MAX_LENGTH),
+  email: z.null().optional(),
   password: z.string().min(1).max(1024),
   role: userRoleSchema.default("user"),
   gdprConsent: z.boolean().default(false),
@@ -26,8 +27,8 @@ export const createUserBodySchema = z.strictObject({
 
 export const updateUserBodySchema = z
   .strictObject({
-    username: z.string().trim().min(1).max(128).optional(),
-    email: z.email().max(320).nullable().optional(),
+    username: z.string().trim().min(1).max(USERNAME_MAX_LENGTH).optional(),
+    email: z.null().optional(),
     role: userRoleSchema.optional(),
     gdprConsent: z.boolean().optional(),
   })

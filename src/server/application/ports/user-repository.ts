@@ -8,7 +8,6 @@ import type {
 
 export interface CreateUserRecord {
   readonly username: string;
-  readonly email: string | null;
   readonly role: UserRole;
   readonly gdprConsent: boolean;
   /**

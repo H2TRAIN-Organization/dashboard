@@ -56,7 +56,6 @@ describe("user use cases", () => {
     await expect(
       useCases.create(doctorActor, {
         username: "new-user",
-        email: null,
         password: "not-a-real-password",
         role: "user",
         gdprConsent: false,
@@ -76,12 +75,12 @@ describe("user use cases", () => {
 
     const created = await useCases.create(adminActor, {
       username: "new-user",
-      email: "new@example.com",
       password: "plain-input-not-persisted-by-fixture",
       role: "user",
       gdprConsent: true,
     });
     expect(created.username).toBe("new-user");
+    expect(created.email).toBeNull();
     expect(Object.keys(created)).not.toContain("password");
     expect(JSON.stringify(created)).not.toContain("plain-input");
 

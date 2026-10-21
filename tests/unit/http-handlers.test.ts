@@ -191,13 +191,14 @@ describe("HTTP user handlers", () => {
       sessionToken: "admin-token",
       body: {
         username: "new-user",
-        email: "new@example.com",
+        email: null,
         password: "create-secret",
         role: "user",
         gdprConsent: true,
       },
     });
     expect(created.status).toBe(201);
+    expect((bodyOf(created).user as { email: string | null }).email).toBeNull();
     expect(JSON.stringify(created.body)).not.toContain("create-secret");
     expect(JSON.stringify(created.body)).not.toContain("password");
 
@@ -261,5 +262,97 @@ describe("HTTP data and admin handlers", () => {
       query: { table: "users;drop", limit: "10" },
     });
     expect(badTable.status).toBe(400);
+  });
+});
+
+describe("username and email request contract", () => {
+  it("accepts 100-character usernames and rejects 101 for login", async () => {
+    const { api } = setup();
+    const hundred = "u".repeat(100);
+
+    const accepted = await api.auth.login({
+      body: { username: hundred, password: "not-a-real-password" },
+    });
+    expect(accepted.status).toBe(401);
+
+    const rejected = await api.auth.login({
+      body: { username: "u".repeat(101), password: "not-a-real-password" },
+    });
+    expect(rejected.status).toBe(400);
+  });
+
+  it("enforces 100/101 on create and update", async () => {
+    const { api } = setup();
+
+    const tooLongCreate = await api.users.create({
+      sessionToken: "admin-token",
+      body: { username: "u".repeat(101), password: "secret" },
+    });
+    expect(tooLongCreate.status).toBe(400);
+
+    const created = await api.users.create({
+      sessionToken: "admin-token",
+      body: { username: "u".repeat(100), password: "secret" },
+    });
+    expect(created.status).toBe(201);
+    const id = (bodyOf(created).user as { id: string }).id;
+
+    const tooLongUpdate = await api.users.update({
+      sessionToken: "admin-token",
+      id,
+      body: { username: "v".repeat(101) },
+    });
+    expect(tooLongUpdate.status).toBe(400);
+
+    const acceptedUpdate = await api.users.update({
+      sessionToken: "admin-token",
+      id,
+      body: { username: "v".repeat(100) },
+    });
+    expect(acceptedUpdate.status).toBe(200);
+  });
+
+  it("accepts omitted/null email but rejects new email strings", async () => {
+    const { api } = setup();
+
+    const omitted = await api.users.create({
+      sessionToken: "admin-token",
+      body: { username: "no-email-user", password: "secret" },
+    });
+    expect(omitted.status).toBe(201);
+    expect((bodyOf(omitted).user as { email: string | null }).email).toBeNull();
+
+    const nullEmail = await api.users.create({
+      sessionToken: "admin-token",
+      body: { username: "null-email-user", password: "secret", email: null },
+    });
+    expect(nullEmail.status).toBe(201);
+    expect((bodyOf(nullEmail).user as { email: string | null }).email).toBeNull();
+
+    const stringEmail = await api.users.create({
+      sessionToken: "admin-token",
+      body: {
+        username: "string-email-user",
+        password: "secret",
+        email: "new@example.com",
+      },
+    });
+    expect(stringEmail.status).toBe(400);
+
+    const id = (bodyOf(nullEmail).user as { id: string }).id;
+    const updateNull = await api.users.update({
+      sessionToken: "admin-token",
+      id,
+      body: { email: null },
+    });
+    expect(updateNull.status).toBe(200);
+    expect((bodyOf(updateNull).user as { email: string | null }).email).toBeNull();
+
+    const updateString = await api.users.update({
+      sessionToken: "admin-token",
+      id,
+      body: { email: "changed@example.com" },
+    });
+    expect(updateString.status).toBe(400);
   });
 });
