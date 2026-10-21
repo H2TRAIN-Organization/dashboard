@@ -182,6 +182,12 @@ describe("health data use cases", () => {
     await useCases.getLegacyData(userActor, { type: "all", rangeDays: 30 });
     expect(repository.lastLegacyQuery?.selectedUser).toBe("alice");
 
+    await useCases.getLegacyData(userNamedAllActor, {
+      type: "all",
+      rangeDays: 30,
+    });
+    expect(repository.lastLegacyQuery?.selectedUser).toBe("all");
+
     await useCases.getLegacyData(adminActor, { type: "all", rangeDays: 30 });
     expect(repository.lastLegacyQuery?.selectedUser).toBeNull();
     expect(repository.lastLegacyQuery?.from).toBe("2026-01-01T12:00:00.000Z");

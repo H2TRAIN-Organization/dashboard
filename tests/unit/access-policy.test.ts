@@ -17,6 +17,9 @@ const doctor = actorFor(
 const user = actorFor(
   makeUser({ id: "user-1", username: "alice", role: "user" }),
 );
+const userNamedAll = actorFor(
+  makeUser({ id: "user-all", username: "all", role: "user" }),
+);
 
 describe("role access policy", () => {
   it("gives admins user writes and database access", () => {
@@ -30,6 +33,7 @@ describe("role access policy", () => {
     expect(canReadAdminDatabase(doctor)).toBe(false);
     expect(canReadHealthDataFor(doctor, "alice")).toBe(true);
     expect(canReadHealthDataFor(doctor, "all")).toBe(true);
+    expect(canReadHealthDataFor(doctor, null)).toBe(true);
     expect(canListUser(doctor, "someone-else")).toBe(true);
   });
 
@@ -38,7 +42,9 @@ describe("role access policy", () => {
     expect(canListUser(user, "someone-else")).toBe(false);
     expect(canReadHealthDataFor(user, "alice")).toBe(true);
     expect(canReadHealthDataFor(user, "all")).toBe(false);
+    expect(canReadHealthDataFor(user, null)).toBe(false);
     expect(canReadHealthDataFor(user, "bob")).toBe(false);
+    expect(canReadHealthDataFor(userNamedAll, "all")).toBe(true);
     expect(canWriteUsers(user)).toBe(false);
     expect(canReadAdminDatabase(user)).toBe(false);
   });
