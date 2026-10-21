@@ -72,12 +72,10 @@ an explicit message if their seeds are absent; a skip is not a pass.
 - Premerge validation trees may temporarily junction the integrated root
   `node_modules` when packages are absent. The junction is not versioned and is
   removed before final evidence; final tests use the merged package graph.
-- The T-065 harness is frozen for integration: final execution must run from the
-  merged repository root, not a hardcoded validation worktree.
-- **T-065 static FREEZE.** Browser execution remains pending the T-066 calendar
-  fix and a new integrated build. No 10/10 mock PASS is claimed yet. Node and
-  Postman remain frozen; release remains blocked until the functional target
-  and full mock rerun.
+- The T-065 harness is frozen and was executed from the merged repository root,
+  not a hardcoded validation worktree.
+- **T-065 PASS.** Target calendar and full portable browser suites passed; see
+  T-057 result below. Node and Postman remain frozen.
 
 ## Postman
 
@@ -148,22 +146,28 @@ T-037 reports **15/15 API and 22/22 Postman with no skips**. The T-037 Node
 evidence and `postman/` remain frozen; T-057 adds browser checks only. Node and
 Postman are not repeated while the API/server byte SHA remains unchanged.
 
-## T-057 final browser execution (BUG, no freeze)
+## T-057 final browser execution (PASS, frozen)
 
-Executed against root `c9f6ef2f09d6829bcc12807d2864a5718b57b58f` using the
-existing final production build. The same launcher starts the synthetic
-Supabase stand-in on 4900 and Next on 4630; the final browser rerun does **not**
-repeat Node/Postman:
+Executed from the merged root `fcb2bda3958906c879545fc82d47c3d16bb074d6`
+with build `ktSETdnx6ZkFPtJqM5Gf9` (Node 24.16, Next 16.4.2). The launcher
+started the synthetic Supabase stand-in on 4900 and served the production build
+on 4630; Node/Postman were **not** repeated:
 
 ```powershell
 .\tests\acceptance\t037-launcher.ps1 -RunPlaywright -RunMockPlaywright `
-  -AppRoot (Resolve-Path .).Path
+  -UseBuild -AppRoot (Resolve-Path .).Path
 ```
 
-Do not add `-RunTests`; Node and Postman evidence is frozen. The launcher also
-accepts `-SkipNode`/`-SkipPostman` for guarded T-037-compatible runs. On the
-T-057 host an existing Root dev process on 3000 held the Next dev lock, so the
-run used `-UseBuild` to serve the c9f6 production build on 4630:
+The focused target was run first:
+
+```powershell
+.\tests\acceptance\t037-launcher.ps1 -RunMockPlaywright -UseBuild `
+  -Grep "data calendar"
+```
+
+Do not add `-RunTests`; Node and Postman evidence is frozen. The existing Root
+dev process on 3000 remained untouched; `-UseBuild` served the final production
+build on 4630:
 
 - Backend-real: the original **2** tests in `frontend-real.spec.mjs`; auth and
   users still hit the real Root API. Only `/api/kubios/**` and non-local hosts
@@ -188,33 +192,22 @@ run used `-UseBuild` to serve the c9f6 production build on 4630:
 
 ### Result
 
-- Backend-real: **2/2 PASS** (both logins, cookie reload, Users CRUD, logout).
-  Not repeated after this because API/session context did not change.
-- Frontend mock existing tests: **7/7 PASS** inside the full run.
-- Language + blocked-storage focused run: **2/2 PASS** (ES/EN reload
-  persistence, guarded loading, no throw with blocked storage).
-- Data calendar: **FAIL — product defect, not a relaxed-assertion failure**.
-  The harness selector was corrected from `div.fixed.inset-0` to the actual
-  portal class `div.fixed`; after that the overlay opened and the product
-  positioning bug surfaced. Failed action: `calendar.locator('button').nth(1).click()` at
-  `frontend.spec.mjs:221`. Playwright repeatedly reported the resolved
-  next-month button as `visible`, `enabled`, `stable`, but `element is outside
-  of the viewport`; viewport was 1440x1000. A bounding box and scroll offset
-  were not captured.
-  Root cause confirmed preexisting at `2bba6e0`: `src/app/data/page.tsx`
-  computes `top: rect.bottom + window.scrollY + 8` and
-  `left: rect.left + window.scrollX` while rendering the calendar overlay with
-  `position: fixed` (`src/app/data/page.tsx:345` and `:156`), without viewport
-  clamping. T-047 extraction preserved the preexisting bug.
-- The full 10-test mock run therefore stopped at 7 passed / 1 failed /
-  2 did not run; the two skipped-in-serial language/storage tests were then run
-  independently and passed. No test was force-clicked and no source was edited.
-- T-057 is **not frozen**. Author fix belongs in a new worktree with minimal
-  overlay-position change (preserve CSS/layout). After integration, a new build
-  is required for `-UseBuild`, and the integrator must stop the existing Root
-  dev server on 3000 before a dev-mode rerun. Target retest is calendar-only
-  first, then the full 10 mock; real tests do not need repeating unless API or
-  session context changes.
+- Calendar target: **1/1 PASS** in 6.4s. It verifies desktop 1440x1000, mobile
+  375x812 with bottom-edge flip, resize/orientation 667x375 -> 667x667, popup
+  bounding boxes inside the viewport, real day click, preserved
+  user/type/time filters, and clear. No force clicks.
+- Backend-real: **2/2 PASS** in 10.0s (both logins, cookie reload, Users CRUD,
+  logout).
+- Frontend mock: **10/10 PASS** in 34.8s, with 0 skips.
+- Total final browser evidence: **12/12 PASS**. The portable launcher ran from
+  the merged root with package imports and synthetic environment.
+- Calendar fix source SHA-256:
+  `1F30AA02F5B8A12C182A6765F701FDA7F466BACA51D16EC123E0B34273EECBB1`.
+- Ports 4900/4630/4910 closed after teardown. No `.env` real, remote SQL,
+  Supabase write, 18-shot repeat, or visual recapture. Root dev 3000 remained
+  untouched.
+- T-057 is **frozen** for the documentary commit and release 0.2.0. Node 15
+  and Postman 22 were not repeated because API/server bytes remained identical.
 
 ## Evidence boundary
 
