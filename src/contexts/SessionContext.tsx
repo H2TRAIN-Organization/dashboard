@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import { ApiError, authApi, errorFrom } from '@/lib/api-client'
 import type { ClientSession, LoginInput } from '@/lib/api-types'
@@ -21,7 +22,42 @@ interface SessionContextType {
   logout: () => Promise<void>
 }
 
+interface SessionState {
+  session: ClientSession | null
+  loading: boolean
+  error: Error | null
+}
+
+interface SessionStore {
+  subscribe: (listener: () => void) => () => void
+  getSnapshot: () => SessionState
+  set: (patch: Partial<SessionState>) => void
+}
+
 const SessionContext = createContext<SessionContextType | undefined>(undefined)
+
+function createSessionStore(): SessionStore {
+  let state: SessionState = { session: null, loading: true, error: null }
+  const listeners = new Set<() => void>()
+
+  return {
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    getSnapshot() {
+      return state
+    },
+    set(patch) {
+      state = { ...state, ...patch }
+      for (const listener of listeners) {
+        listener()
+      }
+    },
+  }
+}
 
 /**
  * Single source of truth for the verified backend session. Both AuthContext
@@ -30,9 +66,12 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined)
  * only keeps the public user returned by the backend.
  */
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<ClientSession | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const [store] = useState(createSessionStore)
+  const state = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  )
   const mountedRef = useRef(true)
   const revisionRef = useRef(0)
 
@@ -40,38 +79,37 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     mountedRef.current = true
     const handleUnauthorized = () => {
       revisionRef.current += 1
-      setSession(null)
-      setError(null)
-      setLoading(false)
+      store.set({ session: null, error: null, loading: false })
     }
     window.addEventListener('auth:unauthorized', handleUnauthorized)
     return () => {
       mountedRef.current = false
       window.removeEventListener('auth:unauthorized', handleUnauthorized)
     }
-  }, [])
+  }, [store])
 
   const refresh = useCallback(async () => {
     const revision = revisionRef.current
-    setLoading(true)
+    store.set({ loading: true })
     try {
       const next = await authApi.session()
       if (!mountedRef.current || revision !== revisionRef.current) return
-      setSession(next)
-      setError(null)
+      store.set({ session: next, error: null })
     } catch (caught) {
       if (!mountedRef.current || revision !== revisionRef.current) return
-      setSession(null)
-      if (caught instanceof ApiError && caught.status === 401) {
-        // No session is a normal state, not an error.
-        setError(null)
-      } else {
-        setError(errorFrom(caught))
-      }
+      store.set({
+        session: null,
+        error:
+          caught instanceof ApiError && caught.status === 401
+            ? null
+            : errorFrom(caught),
+      })
     } finally {
-      if (mountedRef.current && revision === revisionRef.current) setLoading(false)
+      if (mountedRef.current && revision === revisionRef.current) {
+        store.set({ loading: false })
+      }
     }
-  }, [])
+  }, [store])
 
   useEffect(() => {
     void refresh()
@@ -81,13 +119,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     revisionRef.current += 1
     try {
       const next = await authApi.login(input)
-      setSession(next)
-      setError(null)
+      store.set({ session: next, error: null })
       return next
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (mountedRef.current) store.set({ loading: false })
     }
-  }, [])
+  }, [store])
 
   const logout = useCallback(async () => {
     revisionRef.current += 1
@@ -97,15 +134,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       // The local state must be cleared even when the network fails; the next
       // session check will confirm whether the cookie was revoked.
     } finally {
-      setSession(null)
-      setError(null)
-      if (mountedRef.current) setLoading(false)
+      store.set({ session: null, error: null })
+      if (mountedRef.current) store.set({ loading: false })
     }
-  }, [])
+  }, [store])
 
   const value = useMemo(
-    () => ({ session, loading, error, refresh, login, logout }),
-    [session, loading, error, refresh, login, logout],
+    () => ({
+      session: state.session,
+      loading: state.loading,
+      error: state.error,
+      refresh,
+      login,
+      logout,
+    }),
+    [state.session, state.loading, state.error, refresh, login, logout],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
