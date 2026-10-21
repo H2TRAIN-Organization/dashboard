@@ -3,63 +3,66 @@
 import { useState, useEffect } from 'react'
 import { Database, Table, Download, Upload, RefreshCw, BarChart3, FileText, HardDrive, Activity, TrendingUp, CheckCircle, AlertTriangle, Clock, Users, Database as DatabaseIcon } from 'lucide-react'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
+import HybridRoleGuard from '@/components/HybridRoleGuard'
 import HybridNavigation from '@/components/HybridNavigation'
-import { useAuth } from '@/contexts/AuthContext'
-import { useAppAuth } from '@/contexts/AppAuthContext'
+import type { AdminTableInfo } from '@/lib/api-types'
+import { adminApi, errorMessage } from '@/lib/api-client'
+import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
 
 export default function AdminDatabasePage() {
-  const { user } = useAuth()
-  const { user: appUser } = useAppAuth()
   const { t } = useLanguage()
+  const { session } = useSession()
   
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [dbStats, setDbStats] = useState({
-    totalTables: 0,
-    totalRecords: 0,
-    databaseSize: 0,
-    lastBackup: '',
-    uptime: 0
+    totalTables: null as number | null,
+    totalRecords: null as number | null,
+    databaseSize: null as number | null,
+    lastBackup: null as string | null,
+    uptime: null as number | null
   })
 
-  const [tables, setTables] = useState([
-    { name: 'users', records: 15, size: '2.1 MB' },
-    { name: 'insulin_data', records: 2847, size: '1.8 MB' },
-    { name: 'food_data', records: 1923, size: '1.2 MB' },
-    { name: 'exercise_data', records: 1456, size: '0.9 MB' },
-    { name: 'period_records', records: 234, size: '0.3 MB' },
-    { name: 'mood_data', records: 1876, size: '0.8 MB' },
-    { name: 'kubios_results', records: 456, size: '0.5 MB' }
-  ])
-
-  // Determinar si es un usuario individual o administrador
-  const isIndividualUser = appUser && !user
+  const [tables, setTables] = useState<AdminTableInfo[]>([])
 
   useEffect(() => {
+    if (session?.user.role !== 'admin') return
     const loadDbStats = async () => {
       try {
         setLoading(true)
-        
-        // Simular carga de estadísticas de base de datos
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
+        setError(null)
+
+        const result = await adminApi.listTables()
+        setTables(result.tables)
         setDbStats({
-          totalTables: 7,
-          totalRecords: 8807,
-          databaseSize: 7.6,
-          lastBackup: '2024-01-15 14:30:00',
-          uptime: 99.9
+          totalTables: result.totalCount,
+          totalRecords: result.totalRecords,
+          databaseSize: null,
+          lastBackup: null,
+          uptime: null
         })
-      } catch (error) {
-        console.error('Error loading database stats:', error)
+      } catch (caught) {
+        console.error('Error loading database stats:', caught)
+        setError(errorMessage(caught))
+        setDbStats({
+          totalTables: null,
+          totalRecords: null,
+          databaseSize: null,
+          lastBackup: null,
+          uptime: null
+        })
       } finally {
         setLoading(false)
       }
     }
 
     loadDbStats()
-  }, [])
+  }, [session])
+
+  const formatCount = (value: number | null) =>
+    value === null ? 'No disponible' : value.toLocaleString()
 
   const databaseFeatures = [
     {
@@ -67,33 +70,34 @@ export default function AdminDatabasePage() {
       description: 'Explorar y visualizar todas las tablas de la base de datos',
       icon: Table,
       color: 'from-blue-500 to-cyan-500',
-      stats: `${dbStats.totalTables} tablas`
+      stats: dbStats.totalTables === null ? 'No disponible' : `${dbStats.totalTables} tablas`
     },
     {
       title: t.admin.exportData,
       description: 'Exportar datos en formato JSON o CSV',
       icon: Download,
       color: 'from-green-500 to-emerald-500',
-      stats: `${dbStats.totalRecords.toLocaleString()} registros`
+      stats: dbStats.totalRecords === null ? 'No disponible' : `${dbStats.totalRecords.toLocaleString()} registros`
     },
     {
       title: t.admin.createBackup,
       description: 'Crear respaldo completo de la base de datos',
       icon: Upload,
       color: 'from-purple-500 to-pink-500',
-      stats: `${dbStats.databaseSize} GB`
+      stats: 'No disponible'
     },
     {
       title: t.admin.refreshStats,
       description: 'Actualizar estadísticas y métricas del sistema',
       icon: RefreshCw,
       color: 'from-orange-500 to-red-500',
-      stats: `${dbStats.uptime}% uptime`
+      stats: 'No disponible'
     }
   ]
 
   return (
     <HybridProtectedRoute>
+      <HybridRoleGuard requiredRole="admin">
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden" style={{ colorScheme: 'light' }}>
         {/* Elementos decorativos de fondo */}
         <div className="absolute inset-0 overflow-hidden">
@@ -110,6 +114,11 @@ export default function AdminDatabasePage() {
         </div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          )}
           {/* Header con estadísticas generales */}
           <div className="mb-12">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">
@@ -133,7 +142,7 @@ export default function AdminDatabasePage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">{t.admin.tables}</p>
-                      <p className="text-2xl font-bold text-gray-900">{dbStats.totalTables}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatCount(dbStats.totalTables)}</p>
                     </div>
                   </div>
                 </div>
@@ -145,7 +154,7 @@ export default function AdminDatabasePage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">{t.admin.records}</p>
-                      <p className="text-2xl font-bold text-gray-900">{dbStats.totalRecords.toLocaleString()}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatCount(dbStats.totalRecords)}</p>
                     </div>
                   </div>
                 </div>
@@ -157,7 +166,7 @@ export default function AdminDatabasePage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">{t.admin.databaseSize}</p>
-                      <p className="text-2xl font-bold text-gray-900">{dbStats.databaseSize} GB</p>
+                      <p className="text-2xl font-bold text-gray-900">No disponible</p>
                     </div>
                   </div>
                 </div>
@@ -215,25 +224,46 @@ export default function AdminDatabasePage() {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-600 font-semibold">{t.admin.operational}</span>
+                <div className={`w-3 h-3 rounded-full animate-pulse ${error ? 'bg-gray-400' : 'bg-green-500'}`}></div>
+                <span className={`font-semibold ${error ? 'text-gray-500' : 'text-green-600'}`}>
+                  {error ? 'No disponible' : t.admin.operational}
+                </span>
               </div>
             </div>
             
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="flex items-center space-x-3">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="text-gray-600 font-medium">Cargando tablas...</span>
+                </div>
+              </div>
+            ) : tables.length === 0 ? (
+              <div className="py-16 text-center text-gray-600 font-medium">
+                No disponible
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tables.map((table, index) => (
-                <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+              {tables.map((table) => (
+                <div key={table.name} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-2 bg-blue-500 rounded-lg">
                       <Database className="h-5 w-5 text-white" />
                     </div>
-                    <span className="text-sm text-gray-500 font-medium">{table.size}</span>
+                    <span className={`text-sm font-medium ${table.accessible ? 'text-green-600' : 'text-gray-500'}`}>
+                      {table.accessible ? t.admin.operational : 'No disponible'}
+                    </span>
                   </div>
                   <h4 className="text-lg font-bold text-gray-900 mb-2">{table.name}</h4>
-                  <p className="text-gray-600 text-sm">{table.records.toLocaleString()} {t.admin.records}</p>
+                  <p className="text-gray-600 text-sm">
+                    {table.accessible
+                      ? `${table.recordCount.toLocaleString()} ${t.admin.records}`
+                      : 'No disponible'}
+                  </p>
                 </div>
               ))}
             </div>
+            )}
           </div>
 
           {/* Estado del sistema */}
@@ -249,8 +279,10 @@ export default function AdminDatabasePage() {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-600 font-semibold">{t.admin.operational}</span>
+                <div className={`w-3 h-3 rounded-full animate-pulse ${error ? 'bg-gray-400' : 'bg-green-500'}`}></div>
+                <span className={`font-semibold ${error ? 'text-gray-500' : 'text-green-600'}`}>
+                  {error ? 'No disponible' : t.admin.operational}
+                </span>
               </div>
             </div>
             
@@ -260,7 +292,7 @@ export default function AdminDatabasePage() {
                   <div className="p-2 bg-blue-500 rounded-lg">
                     <HardDrive className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-blue-600">{dbStats.databaseSize} GB</span>
+                  <span className="text-2xl font-bold text-blue-600">No disponible</span>
                 </div>
                 <p className="text-blue-700 font-medium">{t.admin.databaseSize}</p>
               </div>
@@ -270,7 +302,7 @@ export default function AdminDatabasePage() {
                   <div className="p-2 bg-green-500 rounded-lg">
                     <Activity className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-green-600">{dbStats.uptime}%</span>
+                  <span className="text-2xl font-bold text-green-600">No disponible</span>
                 </div>
                 <p className="text-green-700 font-medium">{t.admin.uptime}</p>
               </div>
@@ -280,7 +312,7 @@ export default function AdminDatabasePage() {
                   <div className="p-2 bg-purple-500 rounded-lg">
                     <Clock className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-purple-600">{dbStats.lastBackup}</span>
+                  <span className="text-2xl font-bold text-purple-600">No disponible</span>
                 </div>
                 <p className="text-purple-700 font-medium">{t.admin.lastBackup}</p>
               </div>
@@ -288,6 +320,7 @@ export default function AdminDatabasePage() {
           </div>
         </div>
       </div>
+      </HybridRoleGuard>
     </HybridProtectedRoute>
   )
 }

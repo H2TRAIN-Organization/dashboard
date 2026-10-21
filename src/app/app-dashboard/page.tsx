@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useAppAuth } from '@/contexts/AppAuthContext'
 import AppProtectedRoute from '@/components/AppProtectedRoute'
 import AppRoleGuard from '@/components/AppRoleGuard'
+import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
+import { getDisplayUsername } from '@/lib/user-mapper'
 import { 
   Users, 
   BarChart3, 
@@ -29,69 +31,74 @@ export default function AppDashboardPage() {
   const { t } = useLanguage()
   const { user, userRole, signOut } = useAppAuth()
   const [stats, setStats] = useState({
-    users: 0,
-    totalRecords: 0,
-    hrvUsers: 0,
-    systemAccuracy: 0
+    users: null as number | null,
+    totalRecords: null as number | null,
+    hrvUsers: null as number | null,
+    systemAccuracy: null as number | null
   })
   const [loading, setLoading] = useState(true)
+  const [statsError, setStatsError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!user) return
     loadDashboardStats()
-  }, [])
+  }, [user?.UserID, user?.role])
 
   const loadDashboardStats = async () => {
     try {
       setLoading(true)
-      
-      let userCount = 0
-      let totalRecords = 0
+      setStatsError(null)
 
-      // Cargar estadísticas de usuarios con manejo de errores
-      try {
-        const usersResponse = await fetch('/api/users/count')
-        if (usersResponse.ok) {
-          const usersData = await usersResponse.json()
-          userCount = usersData?.count || 0
-        }
-      } catch (error) {
-        console.warn('Error loading user count:', error)
+      const selectedUser = user?.role === 'user' ? user.Username : 'all'
+      if (user?.role === 'user' && selectedUser.length === 0) {
+        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
       }
 
-      // Cargar estadísticas de datos con manejo de errores
-      try {
-        const dataResponse = await fetch('/api/decrypted-data')
-        if (dataResponse.ok) {
-          const dataData = await dataResponse.json()
-          totalRecords = (dataData?.insulinData?.length || 0) + 
-                        (dataData?.foodData?.length || 0) + 
-                        (dataData?.exerciseData?.length || 0) + 
-                        (dataData?.moodData?.length || 0) + 
-                        (dataData?.periodData?.length || 0)
-        }
-      } catch (error) {
-        console.warn('Error loading data stats:', error)
-      }
-      
+      const [usersResult, dataResult] = await Promise.allSettled([
+        usersApi.count(),
+        dataApi.getDecrypted({ selectedUser, timeRange: 'all' }),
+      ])
+
+      const userCount = usersResult.status === 'fulfilled' ? usersResult.value : null
+      const totalRecords =
+        dataResult.status === 'fulfilled'
+          ? dataResult.value.insulinData.length +
+            dataResult.value.foodData.length +
+            dataResult.value.exerciseData.length +
+            dataResult.value.periodData.length +
+            dataResult.value.moodData.length
+          : null
+
       setStats({
         users: userCount,
-        totalRecords: totalRecords,
-        hrvUsers: 3, // Usuarios con datos HRV
-        systemAccuracy: 95 // Precisión del sistema
+        totalRecords,
+        hrvUsers: null,
+        systemAccuracy: null
       })
-    } catch (error) {
-      console.error('Error loading dashboard stats:', error)
-      // Valores por defecto en caso de error
+
+      if (usersResult.status === 'rejected') {
+        setStatsError(errorMessage(usersResult.reason))
+      } else if (dataResult.status === 'rejected') {
+        setStatsError(errorMessage(dataResult.reason))
+      }
+    } catch (caught) {
+      console.error('Error loading dashboard stats:', caught)
       setStats({
-        users: 0,
-        totalRecords: 0,
-        hrvUsers: 0,
-        systemAccuracy: 0
+        users: null,
+        totalRecords: null,
+        hrvUsers: null,
+        systemAccuracy: null
       })
+      setStatsError(errorMessage(caught))
     } finally {
       setLoading(false)
     }
   }
+
+  const formatCount = (value: number | null) =>
+    value === null ? 'No disponible' : value.toLocaleString()
+  const formatPercent = (value: number | null) =>
+    value === null ? 'No disponible' : `${value}%`
 
   const LoadingDots = () => (
     <span className="flex space-x-1">
@@ -172,7 +179,7 @@ export default function AppDashboardPage() {
                     <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-blue-300 to-blue-400 rounded-full border-2 border-blue-600"></div>
                   </div>
                   <div className="text-sm">
-                    <p className="font-semibold text-white">{user?.Username}</p>
+                    <p className="font-semibold text-white">{getDisplayUsername(user)}</p>
                     <div className="flex items-center space-x-1">
                       {userRole === 'admin' && <Shield className="h-3 w-3 text-yellow-300" />}
                       {userRole === 'doctor' && <UserCheck className="h-3 w-3 text-green-300" />}
@@ -199,6 +206,11 @@ export default function AppDashboardPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+          {statsError && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {statsError}
+            </div>
+          )}
           {/* Hero Section */}
           <div className="text-center mb-20">
             <div className="inline-flex items-center space-x-3 bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-full px-8 py-4 mb-8 shadow-lg">
@@ -228,7 +240,7 @@ export default function AppDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.myRecords}</p>
                       <p className="text-3xl font-bold text-blue-600">
-                        {loading ? <LoadingDots /> : stats.totalRecords.toLocaleString()}
+                        {loading ? <LoadingDots /> : formatCount(stats.totalRecords)}
                       </p>
                     </div>
                     <div className="p-3 bg-blue-100 rounded-2xl">
@@ -242,7 +254,7 @@ export default function AppDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.myHrv}</p>
                       <p className="text-3xl font-bold text-green-600">
-                        {loading ? <LoadingDots /> : t.dashboard.activeStatus}
+                        {loading ? <LoadingDots /> : 'No disponible'}
                       </p>
                     </div>
                     <div className="p-3 bg-green-100 rounded-2xl">
@@ -256,7 +268,7 @@ export default function AppDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.myStatus}</p>
                       <p className="text-3xl font-bold text-purple-600">
-                        {loading ? <LoadingDots /> : t.dashboard.healthyStatus}
+                        {loading ? <LoadingDots /> : 'No disponible'}
                       </p>
                     </div>
                     <div className="p-3 bg-purple-100 rounded-2xl">
@@ -270,7 +282,7 @@ export default function AppDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.myProgress}</p>
                       <p className="text-3xl font-bold text-orange-600">
-                        {loading ? <LoadingDots /> : '95%'}
+                        {loading ? <LoadingDots /> : 'No disponible'}
                       </p>
                     </div>
                     <div className="p-3 bg-orange-100 rounded-2xl">
@@ -287,7 +299,7 @@ export default function AppDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.totalUsers}</p>
                       <p className="text-3xl font-bold text-blue-600">
-                        {loading ? <LoadingDots /> : stats.users}
+                        {loading ? <LoadingDots /> : formatCount(stats.users)}
                       </p>
                     </div>
                     <div className="p-3 bg-blue-100 rounded-2xl">
@@ -301,7 +313,7 @@ export default function AppDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.totalRecords}</p>
                       <p className="text-3xl font-bold text-green-600">
-                        {loading ? <LoadingDots /> : stats.totalRecords.toLocaleString()}
+                        {loading ? <LoadingDots /> : formatCount(stats.totalRecords)}
                       </p>
                     </div>
                     <div className="p-3 bg-green-100 rounded-2xl">
@@ -315,7 +327,7 @@ export default function AppDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.hrvUsers}</p>
                       <p className="text-3xl font-bold text-purple-600">
-                        {loading ? <LoadingDots /> : stats.hrvUsers}
+                        {loading ? <LoadingDots /> : formatCount(stats.hrvUsers)}
                       </p>
                     </div>
                     <div className="p-3 bg-purple-100 rounded-2xl">
@@ -329,7 +341,7 @@ export default function AppDashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.systemAccuracy}</p>
                       <p className="text-3xl font-bold text-orange-600">
-                        {loading ? <LoadingDots /> : `${stats.systemAccuracy}%`}
+                        {loading ? <LoadingDots /> : formatPercent(stats.systemAccuracy)}
                       </p>
                     </div>
                     <div className="p-3 bg-orange-100 rounded-2xl">
@@ -356,7 +368,7 @@ export default function AppDashboardPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-green-800 group-hover:text-green-600 transition-colors">
-                            {loading ? <LoadingDots /> : stats.totalRecords.toLocaleString()}
+                            {loading ? <LoadingDots /> : formatCount(stats.totalRecords)}
                           </div>
                           <div className="text-xs text-green-600/70">{t.dashboard.myRecords}</div>
                         </div>
@@ -448,7 +460,7 @@ export default function AppDashboardPage() {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-blue-800 group-hover:text-blue-600 transition-colors">
-                              {loading ? <LoadingDots /> : stats.users}
+                              {loading ? <LoadingDots /> : formatCount(stats.users)}
                             </div>
                             <div className="text-xs text-blue-600/70">{t.dashboard.appDashboard.total}</div>
                           </div>
@@ -479,7 +491,7 @@ export default function AppDashboardPage() {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-green-800 group-hover:text-green-600 transition-colors">
-                              {loading ? <LoadingDots /> : stats.totalRecords.toLocaleString()}
+                              {loading ? <LoadingDots /> : formatCount(stats.totalRecords)}
                             </div>
                             <div className="text-xs text-green-600/70">{t.dashboard.appDashboard.records}</div>
                           </div>
@@ -510,7 +522,7 @@ export default function AppDashboardPage() {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-purple-800 group-hover:text-purple-600 transition-colors">
-                              {loading ? <LoadingDots /> : `${stats.systemAccuracy}%`}
+                              {loading ? <LoadingDots /> : formatPercent(stats.systemAccuracy)}
                             </div>
                             <div className="text-xs text-purple-600/70">{t.dashboard.appDashboard.precision}</div>
                           </div>
@@ -541,7 +553,7 @@ export default function AppDashboardPage() {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-indigo-800 group-hover:text-indigo-600 transition-colors">
-                              {loading ? <LoadingDots /> : stats.hrvUsers}
+                              {loading ? <LoadingDots /> : formatCount(stats.hrvUsers)}
                             </div>
                             <div className="text-xs text-indigo-600/70">{t.dashboard.appDashboard.users}</div>
                           </div>

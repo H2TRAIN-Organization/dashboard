@@ -2,18 +2,18 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { supabase, User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/supabase'
+import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
+import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
+import { getDisplayUsername } from '@/lib/user-mapper'
 import { Download, Activity, Heart, Calendar, User as UserIcon, Filter, TrendingUp, TrendingDown, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
-import { useAuth } from '@/contexts/AuthContext'
-import { useAppAuth } from '@/contexts/AppAuthContext'
+import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
 
 export default function DataPage() {
-  const { user } = useAuth()
-  const { user: appUser } = useAppAuth()
+  const { session } = useSession()
   const { t } = useLanguage()
   
   const [insulinData, setInsulinData] = useState<InsulinData[]>([])
@@ -24,6 +24,7 @@ export default function DataPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingProgress, setLoadingProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
   const [selectedUser, setSelectedUser] = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('')
   const [timeRange, setTimeRange] = useState<string>('all')
@@ -32,10 +33,10 @@ export default function DataPage() {
   const [showAllRecords, setShowAllRecords] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState<string>('')
   
-  // Determinar si es un usuario individual o administrador
-  const isIndividualUser = appUser && !user
-  const currentUserId = appUser?.UserID?.toString()
-  const currentUsername = appUser?.Username
+  // Regular users only ever receive their own data; admins and doctors may read all.
+  const currentRole = session?.user.role ?? null
+  const currentUsername = session?.user.username ?? null
+  const isIndividualUser = currentRole === 'user'
   
   // Estados para el timepicker personalizado
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
@@ -45,99 +46,66 @@ export default function DataPage() {
   const [datePickerPosition, setDatePickerPosition] = useState<{ top: number; left: number; width: number } | null>(null)
 
   const fetchData = useCallback(async () => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
     try {
       setLoading(true)
       setLoadingProgress(0)
-      
-      // Construir parámetros para la API
-      const params = new URLSearchParams()
-      
-      // Para usuarios individuales, siempre filtrar por su username
-      if (isIndividualUser && currentUsername) {
-        params.append('selectedUser', currentUsername)
-      } else {
-        // Para administradores, usar el usuario seleccionado
-        params.append('selectedUser', selectedUser)
-      }
-      
-      params.append('timeRange', timeRange)
-      if (dateFilter) {
-        params.append('dateFilter', dateFilter)
-      }
+      setError(null)
 
       setLoadingProgress(20)
-      
-      // Llamar al endpoint que descifra los datos con timeout
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 segundos timeout
-      
-      setLoadingProgress(40)
-      
-      const response = await fetch(`/api/decrypted-data?${params}`, {
-        signal: controller.signal,
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      })
-      
-      clearTimeout(timeoutId)
-      setLoadingProgress(60)
-      
-      if (!response.ok) {
-        throw new Error(`Error al obtener datos: ${response.status}`)
+
+      const selected = isIndividualUser ? (currentUsername ?? '') : selectedUser
+      if (isIndividualUser && selected.length === 0) {
+        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
       }
 
-      const data = await response.json()
+      setLoadingProgress(40)
+      const data = await dataApi.getDecrypted(
+        {
+          selectedUser: selected,
+          timeRange: timeRange as '7d' | '30d' | '90d' | 'all',
+          selectedDataType: selectedDataType as 'all' | 'insulin' | 'food' | 'exercise' | 'period' | 'mood',
+          dateFilter: dateFilter || undefined,
+        },
+        { signal: controller.signal },
+      )
+
       setLoadingProgress(80)
-      
-      // Los datos ya vienen descifrados del servidor
-      setInsulinData(data.insulinData || [])
-      setFoodData(data.foodData || [])
-      setExerciseData(data.exerciseData || [])
-      setPeriodData(data.periodData || [])
-      setMoodData(data.moodData || [])
-      
+      setInsulinData(data.insulinData)
+      setFoodData(data.foodData)
+      setExerciseData(data.exerciseData)
+      setPeriodData(data.periodData)
+      setMoodData(data.moodData)
       setLoadingProgress(100)
-      
-    } catch (error) {
-      console.error('Error fetching data:', error)
+    } catch (caught) {
+      if (caught instanceof Error && caught.name === 'AbortError') {
+        setError('La consulta de datos tardó demasiado. Inténtalo de nuevo.')
+      } else {
+        console.error('Error fetching data:', caught)
+        setError(errorMessage(caught))
+      }
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
-  }, [selectedUser, dateFilter, timeRange, isIndividualUser, currentUsername])
+  }, [selectedUser, dateFilter, timeRange, selectedDataType, isIndividualUser, currentUsername])
 
   const fetchUsers = useCallback(async () => {
     try {
-      // Para usuarios individuales, solo cargar su propio usuario
-      if (isIndividualUser && currentUsername) {
-        const { data: result, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('Username', currentUsername)
-          .single()
-
-        if (error) throw error
-        setUsers(result ? [result] : [])
-      } else {
-        // Para administradores, cargar todos los usuarios
-        const { data: result, error } = await supabase
-          .from('users')
-          .select('*')
-          .order('Username')
-
-        if (error) throw error
-        setUsers(result || [])
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error)
+      const result = await usersApi.listAll()
+      setUsers(result.users)
+    } catch (caught) {
+      console.error('Error fetching users:', caught)
+      setError(errorMessage(caught))
     }
-  }, [isIndividualUser, currentUsername])
+  }, [])
 
   useEffect(() => {
+    if (!session) return
     fetchData()
     fetchUsers()
-  }, [fetchData, fetchUsers])
+  }, [session, fetchData, fetchUsers])
 
   // Cerrar calendario al hacer click fuera y recalcular posición al hacer scroll/resize
   useEffect(() => {
@@ -859,6 +827,12 @@ export default function DataPage() {
             </div>
           </div>
 
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          )}
+
           {/* Estadísticas generales */}
           <div className="mb-8 sm:mb-12">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
@@ -988,9 +962,9 @@ export default function DataPage() {
                       }}
                     >
                       <option value="all" className="bg-white text-blue-900 py-2">{t.dashboard.allUsers}</option>
-                      {users.map(user => (
+                      {users.filter(user => user.Username.length > 0).map(user => (
                         <option key={user.UserID} value={user.Username} className="bg-white text-blue-900">
-                          {user.Username}
+                          {getDisplayUsername(user)}
                         </option>
                       ))}
                     </select>
@@ -1114,7 +1088,7 @@ export default function DataPage() {
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
                         <div className="flex-1 min-w-0">
                           <h3 className="text-lg sm:text-xl font-bold text-blue-900 mb-1 truncate">
-                            {group.user.Username}
+                            {getDisplayUsername(group.user)}
                           </h3>
                           <p className="text-sm sm:text-base text-blue-700">
                             {group.stats.totalRecords} {t.dashboard.totalRecords}

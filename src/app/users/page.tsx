@@ -1,15 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase, User } from '@/lib/supabase'
+import type { User, UserRole } from '@/lib/api-types'
+import { errorMessage, usersApi } from '@/lib/api-client'
+import { getDisplayUsername } from '@/lib/user-mapper'
 import { Edit, Trash2, Search, Save, X, RefreshCw, User as UserIcon, Key, Shield, CheckCircle, AlertCircle, Users, Sparkles, Zap, Plus, Mail, Lock } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
-import { getBackendUrl } from '@/lib/config'
+import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 
 export default function UsersPage() {
   const { t } = useLanguage()
+  const { session } = useSession()
+  const canWrite = session?.user.role === 'admin'
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -22,7 +26,7 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false)
   const [clearingUUID, setClearingUUID] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [createForm, setCreateForm] = useState({
+  const [createForm, setCreateForm] = useState<{ password: string; role: UserRole; username: string }>({
     password: '',
     role: 'user',
     username: '',
@@ -31,39 +35,32 @@ export default function UsersPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
+    if (!session) return
     fetchUsers()
-  }, [])
+  }, [session])
 
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('UserID', { ascending: false })
-
-      if (error) throw error
-      setUsers(data || [])
+      const result = await usersApi.listAll()
+      setUsers(result.users)
     } catch (error) {
       console.error('Error fetching users:', error)
+      setMessage({ type: 'error', text: errorMessage(error) })
     } finally {
       setLoading(false)
     }
   }
 
-  const deleteUser = async (userId: number) => {
+  const deleteUser = async (userId: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar este usuario? Esta acción no se puede deshacer.')) {
       try {
-        const { error } = await supabase
-          .from('users')
-          .delete()
-          .eq('UserID', userId)
-
-        if (error) throw error
+        await usersApi.remove(userId)
+        setMessage({ type: 'success', text: 'Usuario eliminado exitosamente' })
         fetchUsers()
       } catch (error) {
         console.error('Error deleting user:', error)
-        alert('Error al eliminar el usuario')
+        setMessage({ type: 'error', text: errorMessage(error) })
       }
     }
   }
@@ -86,75 +83,59 @@ export default function UsersPage() {
     })
   }
 
+  const replaceUser = (updated: User) => {
+    setUsers(current => current.map(entry => entry.UserID === updated.UserID ? updated : entry))
+  }
+
   const saveUser = async () => {
     if (!editingUser) return
 
     try {
       setSaving(true)
-      const { error } = await supabase
-        .from('users')
-        .update({
-          Username: editForm.Username,
-          GDPRConsent: editForm.GDPRConsent
-        })
-        .eq('UserID', editingUser.UserID)
+      const updated = await usersApi.update(editingUser.UserID, {
+        username: editForm.Username.trim(),
+        gdprConsent: editForm.GDPRConsent,
+      })
 
-      if (error) throw error
-      
+      replaceUser(updated)
       setEditingUser(null)
       setEditForm({
         Username: '',
         GDPRConsent: false,
         role: 'user'
       })
-      fetchUsers()
+      setMessage({ type: 'success', text: 'Usuario actualizado exitosamente' })
     } catch (error) {
       console.error('Error updating user:', error)
-      alert('Error al actualizar el usuario')
+      setMessage({ type: 'error', text: errorMessage(error) })
     } finally {
       setSaving(false)
     }
   }
 
-  const clearUUID = async (userId: number) => {
+  const clearUUID = async (userId: string) => {
     if (!confirm('¿Estás seguro de que quieres limpiar el UUID de este usuario? Esto invalidará el UUID actual.')) {
       return
     }
 
     try {
       setClearingUUID(true)
-      
-      const { error } = await supabase
-        .from('users')
-        .update({
-          UUID: null
-        })
-        .eq('UserID', userId)
-
-      if (error) throw error
-      
-      fetchUsers()
-      alert('UUID limpiado exitosamente')
+      const updated = await usersApi.clearUuid(userId)
+      replaceUser(updated)
+      setMessage({ type: 'success', text: 'UUID limpiado exitosamente' })
     } catch (error) {
       console.error('Error clearing UUID:', error)
-      alert('Error al limpiar el UUID')
+      setMessage({ type: 'error', text: errorMessage(error) })
     } finally {
       setClearingUUID(false)
     }
   }
 
-  const updateUserRole = async (userId: number, newRole: string) => {
+  const updateUserRole = async (userId: string, newRole: string) => {
+    if (newRole !== 'admin' && newRole !== 'doctor' && newRole !== 'user') return
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          role: newRole
-        })
-        .eq('UserID', userId)
-
-      if (error) throw error
-      
-      fetchUsers()
+      const updated = await usersApi.update(userId, { role: newRole })
+      replaceUser(updated)
       setMessage({
         type: 'success',
         text: t.dashboard.roleUpdated
@@ -163,20 +144,20 @@ export default function UsersPage() {
       console.error('Error updating user role:', error)
       setMessage({
         type: 'error',
-        text: t.dashboard.errorOccurred
+        text: errorMessage(error)
       })
     }
   }
 
   const filteredUsers = users.filter(user =>
-    user.Username.toLowerCase().includes(searchTerm.toLowerCase())
+    getDisplayUsername(user).toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      alert('UUID copiado al portapapeles')
+      setMessage({ type: 'success', text: 'UUID copiado al portapapeles' })
     }).catch(() => {
-      alert('Error al copiar al portapapeles')
+      setMessage({ type: 'error', text: 'Error al copiar al portapapeles' })
     })
   }
 
@@ -192,39 +173,19 @@ export default function UsersPage() {
       setCreateLoading(true)
       setMessage(null)
 
-      // Obtener la sesión actual para el token
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setMessage({ type: 'error', text: 'No hay sesión activa' })
-        return
-      }
-
-      // Usar el backend para crear usuario
-      const response = await fetch(getBackendUrl('/admin/users'), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: createForm.username,
-          password: createForm.password,
-          role: createForm.role,
-        }),
+      await usersApi.create({
+        username: createForm.username.trim(),
+        password: createForm.password,
+        role: createForm.role,
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error creando usuario')
-      }
 
       setMessage({ type: 'success', text: 'Usuario creado exitosamente' })
       setCreateForm({ password: '', username: '', role: 'user' })
       setShowCreateForm(false)
-      fetchUsers() // Recargar la lista
+      fetchUsers()
     } catch (error) {
       console.error('Error:', error)
-      setMessage({ type: 'error', text: `Error creando usuario: ${error instanceof Error ? error.message : 'Error desconocido'}` })
+      setMessage({ type: 'error', text: `Error creando usuario: ${errorMessage(error)}` })
     } finally {
       setCreateLoading(false)
     }
@@ -268,13 +229,15 @@ export default function UsersPage() {
                     {users.length} usuarios registrados
                   </span>
                 </div>
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl"
-                >
-                  <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="font-semibold text-sm sm:text-lg">{t.dashboard.createUser}</span>
-                </button>
+                {canWrite && (
+                  <button
+                    onClick={() => setShowCreateForm(true)}
+                    className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl"
+                  >
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="font-semibold text-sm sm:text-lg">{t.dashboard.createUser}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -334,11 +297,11 @@ export default function UsersPage() {
                           <div className="flex items-center space-x-4">
                             <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-lg flex-shrink-0">
                               <span className="text-xl font-bold text-white">
-                                {user.Username.charAt(0).toUpperCase()}
+                                {getDisplayUsername(user).charAt(0).toUpperCase()}
                               </span>
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="text-lg font-bold text-gray-900 truncate">{user.Username}</h3>
+                              <h3 className="text-lg font-bold text-gray-900 truncate">{getDisplayUsername(user)}</h3>
                               <p className="text-sm text-gray-600">ID: {user.UserID}</p>
                             </div>
                           </div>
@@ -386,46 +349,54 @@ export default function UsersPage() {
                           </div>
                           <div className="flex items-center space-x-2">
                             <label className="text-sm font-semibold text-gray-700">Rol:</label>
-                            <select
-                              value={user.role || 'user'}
-                              onChange={(e) => updateUserRole(user.UserID, e.target.value)}
-                              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
-                            >
-                              <option value="admin">{t.dashboard.admin}</option>
-                              <option value="doctor">{t.dashboard.doctor}</option>
-                              <option value="user">{t.dashboard.user}</option>
-                            </select>
+                            {canWrite ? (
+                              <select
+                                value={user.role || 'user'}
+                                onChange={(e) => updateUserRole(user.UserID, e.target.value)}
+                                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
+                              >
+                                <option value="admin">{t.dashboard.admin}</option>
+                                <option value="doctor">{t.dashboard.doctor}</option>
+                                <option value="user">{t.dashboard.user}</option>
+                              </select>
+                            ) : (
+                              <span className="px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 capitalize">
+                                {user.role}
+                              </span>
+                            )}
                           </div>
                         </div>
 
                         {/* Botones de acción */}
-                        <div className="flex items-center justify-center sm:justify-end space-x-3 pt-2 border-t border-gray-200">
-                          <button
-                            onClick={() => startEditing(user)}
-                            className="flex items-center justify-center px-4 py-2 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
-                            title={t.dashboard.edit}
-                          >
-                            <Edit className="h-4 w-4 text-white" />
-                            <span className="text-sm font-medium text-white hidden sm:block ml-2">Editar</span>
-                          </button>
-                          <button
-                            onClick={() => clearUUID(user.UserID)}
-                            disabled={clearingUUID}
-                            className="flex items-center justify-center px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:transform-none shadow-lg"
-                            title={t.users.clearUUID}
-                          >
-                            <RefreshCw className={`h-4 w-4 text-white ${clearingUUID ? 'animate-spin' : ''}`} />
-                            <span className="text-sm font-medium text-white hidden sm:block ml-2">Limpiar</span>
-                          </button>
-                          <button
-                            onClick={() => deleteUser(user.UserID)}
-                            className="flex items-center justify-center px-4 py-2 bg-gradient-to-br from-red-600 to-rose-600 rounded-lg hover:from-red-500 hover:to-rose-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
-                            title={t.dashboard.delete}
-                          >
-                            <Trash2 className="h-4 w-4 text-white" />
-                            <span className="text-sm font-medium text-white hidden sm:block ml-2">Eliminar</span>
-                          </button>
-                        </div>
+                        {canWrite && (
+                          <div className="flex items-center justify-center sm:justify-end space-x-3 pt-2 border-t border-gray-200">
+                            <button
+                              onClick={() => startEditing(user)}
+                              className="flex items-center justify-center px-4 py-2 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                              title={t.dashboard.edit}
+                            >
+                              <Edit className="h-4 w-4 text-white" />
+                              <span className="text-sm font-medium text-white hidden sm:block ml-2">Editar</span>
+                            </button>
+                            <button
+                              onClick={() => clearUUID(user.UserID)}
+                              disabled={clearingUUID}
+                              className="flex items-center justify-center px-4 py-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:transform-none shadow-lg"
+                              title={t.users.clearUUID}
+                            >
+                              <RefreshCw className={`h-4 w-4 text-white ${clearingUUID ? 'animate-spin' : ''}`} />
+                              <span className="text-sm font-medium text-white hidden sm:block ml-2">Limpiar</span>
+                            </button>
+                            <button
+                              onClick={() => deleteUser(user.UserID)}
+                              className="flex items-center justify-center px-4 py-2 bg-gradient-to-br from-red-600 to-rose-600 rounded-lg hover:from-red-500 hover:to-rose-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                              title={t.dashboard.delete}
+                            >
+                              <Trash2 className="h-4 w-4 text-white" />
+                              <span className="text-sm font-medium text-white hidden sm:block ml-2">Eliminar</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -460,13 +431,13 @@ export default function UsersPage() {
                                 <div className="flex-shrink-0">
                                   <div className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 xl:h-14 xl:w-14 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-lg">
                                     <span className="text-xs sm:text-sm lg:text-base xl:text-xl font-bold text-white">
-                                      {user.Username.charAt(0).toUpperCase()}
+                                      {getDisplayUsername(user).charAt(0).toUpperCase()}
                                     </span>
                                   </div>
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="text-xs sm:text-sm lg:text-base xl:text-xl font-bold text-gray-900 truncate">
-                                    {user.Username}
+                                    {getDisplayUsername(user)}
                                   </div>
                                   <div className="text-xs sm:text-sm text-gray-600">
                                     ID: {user.UserID}
@@ -516,41 +487,49 @@ export default function UsersPage() {
                             <td className="px-3 sm:px-4 lg:px-6 xl:px-8 py-3 sm:py-4 lg:py-6 xl:py-8 text-right">
                               <div className="flex flex-col items-end space-y-2 sm:space-y-3">
                                 {/* Selector de rol */}
-                                <select
-                                  value={user.role || 'user'}
-                                  onChange={(e) => updateUserRole(user.UserID, e.target.value)}
-                                  className="px-2 sm:px-3 py-1 sm:py-2 bg-white border border-gray-300 rounded-lg text-xs sm:text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 w-full sm:w-auto"
-                                >
-                                  <option value="admin">{t.dashboard.admin}</option>
-                                  <option value="doctor">{t.dashboard.doctor}</option>
-                                  <option value="user">{t.dashboard.user}</option>
-                                </select>
+                                {canWrite ? (
+                                  <select
+                                    value={user.role || 'user'}
+                                    onChange={(e) => updateUserRole(user.UserID, e.target.value)}
+                                    className="px-2 sm:px-3 py-1 sm:py-2 bg-white border border-gray-300 rounded-lg text-xs sm:text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 w-full sm:w-auto"
+                                  >
+                                    <option value="admin">{t.dashboard.admin}</option>
+                                    <option value="doctor">{t.dashboard.doctor}</option>
+                                    <option value="user">{t.dashboard.user}</option>
+                                  </select>
+                                ) : (
+                                  <span className="px-2 sm:px-3 py-1 sm:py-2 bg-gray-100 border border-gray-200 rounded-lg text-xs sm:text-sm font-medium text-gray-700 capitalize">
+                                    {user.role}
+                                  </span>
+                                )}
                                 
                                 {/* Botones de acción */}
-                                <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 lg:space-x-3">
-                                  <button
-                                    onClick={() => startEditing(user)}
-                                    className="p-2 sm:p-3 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
-                                    title={t.dashboard.edit}
-                                  >
-                                    <Edit className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-white" />
-                                  </button>
-                                  <button
-                                    onClick={() => clearUUID(user.UserID)}
-                                    disabled={clearingUUID}
-                                    className="p-2 sm:p-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:transform-none shadow-lg"
-                                    title={t.users.clearUUID}
-                                  >
-                                    <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-white ${clearingUUID ? 'animate-spin' : ''}`} />
-                                  </button>
-                                  <button
-                                    onClick={() => deleteUser(user.UserID)}
-                                    className="p-2 sm:p-3 bg-gradient-to-br from-red-600 to-rose-600 rounded-lg hover:from-red-500 hover:to-rose-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
-                                    title={t.dashboard.delete}
-                                  >
-                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-white" />
-                                  </button>
-                                </div>
+                                {canWrite && (
+                                  <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 lg:space-x-3">
+                                    <button
+                                      onClick={() => startEditing(user)}
+                                      className="p-2 sm:p-3 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                                      title={t.dashboard.edit}
+                                    >
+                                      <Edit className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-white" />
+                                    </button>
+                                    <button
+                                      onClick={() => clearUUID(user.UserID)}
+                                      disabled={clearingUUID}
+                                      className="p-2 sm:p-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:transform-none shadow-lg"
+                                      title={t.users.clearUUID}
+                                    >
+                                      <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-white ${clearingUUID ? 'animate-spin' : ''}`} />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteUser(user.UserID)}
+                                      className="p-2 sm:p-3 bg-gradient-to-br from-red-600 to-rose-600 rounded-lg hover:from-red-500 hover:to-rose-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                                      title={t.dashboard.delete}
+                                    >
+                                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-white" />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -705,7 +684,12 @@ export default function UsersPage() {
                     </label>
                     <select
                       value={createForm.role}
-                      onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+                      onChange={(e) => {
+                        const role = e.target.value
+                        if (role === 'admin' || role === 'doctor' || role === 'user') {
+                          setCreateForm({ ...createForm, role })
+                        }
+                      }}
                       className="w-full bg-white/50 border border-gray-200 rounded-xl px-3 sm:px-4 py-3 sm:py-4 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-white/70 text-sm sm:text-base"
                     >
                       <option value="user">{t.dashboard.user}</option>

@@ -1,16 +1,20 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/supabase'
+import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
+import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
+import { getDisplayUsername } from '@/lib/user-mapper'
 import { TrendingUp, TrendingDown, Activity, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
+import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
 
 export default function AnalyticsPage() {
   const { t } = useLanguage()
+  const { session } = useSession()
   const [insulinData, setInsulinData] = useState<InsulinData[]>([])
   const [foodData, setFoodData] = useState<FoodData[]>([])
   const [exerciseData, setExerciseData] = useState<ExerciseData[]>([])
@@ -18,67 +22,68 @@ export default function AnalyticsPage() {
   const [moodData, setMoodData] = useState<MoodData[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedUser, setSelectedUser] = useState<string>('all')
   const [timeRange, setTimeRange] = useState<string>('30d')
   const [selectedDataType, setSelectedDataType] = useState<string>('all')
 
+  const currentRole = session?.user.role ?? null
+  const currentUsername = session?.user.username ?? null
+  const isIndividualUser = currentRole === 'user'
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      
-      // Construir parámetros para la API
-      const params = new URLSearchParams({
-        selectedUser,
-        timeRange,
-        selectedDataType
-      })
+      setError(null)
 
-      // Llamar al endpoint que descifra los datos
-      const response = await fetch(`/api/decrypted-data?${params}`)
-      
-      if (!response.ok) {
-        throw new Error('Error al obtener datos descifrados')
+      const selected = isIndividualUser ? (currentUsername ?? '') : selectedUser
+      if (isIndividualUser && selected.length === 0) {
+        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
       }
 
-      const data = await response.json()
-      
-      // Los datos ya vienen descifrados del servidor
-      setInsulinData(data.insulinData || [])
-      setFoodData(data.foodData || [])
-      setExerciseData(data.exerciseData || [])
-      setPeriodData(data.periodData || [])
-      setMoodData(data.moodData || [])
-      
-    } catch (error) {
-      console.error('Error fetching data:', error)
+      const data = await dataApi.getDecrypted({
+        selectedUser: selected,
+        timeRange: timeRange as '7d' | '30d' | '90d' | 'all',
+        selectedDataType: selectedDataType as 'all' | 'insulin' | 'food' | 'exercise' | 'period' | 'mood',
+      })
+
+      setInsulinData(data.insulinData)
+      setFoodData(data.foodData)
+      setExerciseData(data.exerciseData)
+      setPeriodData(data.periodData)
+      setMoodData(data.moodData)
+    } catch (caught) {
+      console.error('Error fetching data:', caught)
+      setError(errorMessage(caught))
     } finally {
       setLoading(false)
     }
-  }, [selectedUser, timeRange, selectedDataType])
+  }, [selectedUser, timeRange, selectedDataType, isIndividualUser, currentUsername])
 
   const fetchUsers = useCallback(async () => {
     try {
-      const { data: result, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('Username')
-
-      if (error) throw error
-      setUsers(result || [])
-    } catch (error) {
-      console.error('Error fetching users:', error)
+      const result = await usersApi.listAll()
+      setUsers(result.users)
+    } catch (caught) {
+      console.error('Error fetching users:', caught)
+      setError(errorMessage(caught))
     }
   }, [])
 
   useEffect(() => {
+    if (!session) return
     fetchData()
     fetchUsers()
-  }, [fetchData, fetchUsers])
+  }, [session, fetchData, fetchUsers])
 
   // Función para agrupar datos por fecha
-  const groupDataByDate = (data: any[], dateField: string = 'date_time') => {
-    const grouped = data.reduce((acc, item) => {
-      const date = new Date(item[dateField]).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
+  const groupDataByDate = <T extends object>(
+    data: T[],
+    dateField: string = 'date_time',
+  ): Array<{ date: string; count: number }> => {
+    const grouped = data.reduce<Record<string, { date: string; count: number }>>((acc, item) => {
+      const rawDate = (item as Record<string, unknown>)[dateField]
+      const date = new Date(String(rawDate)).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
       if (!acc[date]) {
         acc[date] = { date, count: 0 }
       }
@@ -86,15 +91,18 @@ export default function AnalyticsPage() {
       return acc
     }, {})
 
-    return Object.values(grouped).sort((a: any, b: any) => 
+    return Object.values(grouped).sort((a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     )
   }
 
   // Función para agrupar datos por tipo
-  const groupDataByType = (data: any[], typeField: string) => {
-    const grouped = data.reduce((acc, item) => {
-      const type = item[typeField] || 'Sin especificar'
+  const groupDataByType = <T extends object>(
+    data: T[],
+    typeField: string,
+  ): Array<{ name: string; value: number }> => {
+    const grouped = data.reduce<Record<string, number>>((acc, item) => {
+      const type = String((item as Record<string, unknown>)[typeField] || 'Sin especificar')
       if (!acc[type]) {
         acc[type] = 0
       }
@@ -126,7 +134,7 @@ export default function AnalyticsPage() {
     
     // Promedio de estado de ánimo
     avgMood: moodData.length > 0 
-      ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(item.mood_value || '0'), 0) / moodData.length * 10) / 10 
+      ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(String(item.mood_value ?? 0)), 0) / moodData.length * 10) / 10
       : 0,
     
     // Última actividad
@@ -191,6 +199,11 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8 xl:py-12 relative z-10">
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          )}
           {/* Header - Oculto en móvil */}
           <div className="hidden sm:block relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-10 mb-6 sm:mb-12 overflow-hidden shadow-2xl">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-2xl sm:rounded-3xl"></div>
@@ -234,31 +247,33 @@ export default function AnalyticsPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center">
-                    <UserIcon className="h-4 w-4 mr-2" />
-                    {t.dashboard.user}
-                  </label>
-                  <select
-                    value={selectedUser}
-                    onChange={(e) => setSelectedUser(e.target.value)}
-                    className="w-full bg-white border-2 border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 shadow-lg hover:border-slate-400 transition-all duration-300 cursor-pointer appearance-none bg-gradient-to-r from-slate-50 to-blue-50"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: 'right 12px center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '16px'
-                    }}
-                  >
-                    <option value="all" className="bg-white text-slate-700 py-2">{t.dashboard.allUsers}</option>
-                    {users.map(user => (
-                      <option key={user.UserID} value={user.Username} className="bg-white text-slate-700">
-                        {user.Username}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 ${isIndividualUser ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
+                {!isIndividualUser && (
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center">
+                      <UserIcon className="h-4 w-4 mr-2" />
+                      {t.dashboard.user}
+                    </label>
+                    <select
+                      value={selectedUser}
+                      onChange={(e) => setSelectedUser(e.target.value)}
+                      className="w-full bg-white border-2 border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 shadow-lg hover:border-slate-400 transition-all duration-300 cursor-pointer appearance-none bg-gradient-to-r from-slate-50 to-blue-50"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 12px center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '16px'
+                      }}
+                    >
+                      <option value="all" className="bg-white text-slate-700 py-2">{t.dashboard.allUsers}</option>
+                      {users.filter(user => user.Username.length > 0).map(user => (
+                        <option key={user.UserID} value={user.Username} className="bg-white text-slate-700">
+                          {getDisplayUsername(user)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center">
@@ -567,8 +582,6 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            itemStyle={{ color: 'white' }}
-                            labelStyle={{ color: 'white' }}
                             formatter={(value, name) => [
                               `${value} registros`, 
                               'Tipo de Comida'

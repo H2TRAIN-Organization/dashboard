@@ -1,28 +1,24 @@
 'use client'
 
-import { useAuth } from '@/contexts/AuthContext'
-import { useAppAuth } from '@/contexts/AppAuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import { useSession } from '@/contexts/SessionContext'
 
 interface HybridProtectedRouteProps {
   children: React.ReactNode
 }
 
 export default function HybridProtectedRoute({ children }: HybridProtectedRouteProps) {
-  const { user, loading: authLoading } = useAuth()
-  const { user: appUser, loading: appAuthLoading } = useAppAuth()
+  const { session, loading } = useSession()
   const router = useRouter()
 
   useEffect(() => {
-    // Si no hay carga en curso y no hay usuario autenticado en ningún sistema
-    if (!authLoading && !appAuthLoading && !user && !appUser) {
+    if (!loading && !session) {
       router.push('/login')
     }
-  }, [user, appUser, authLoading, appAuthLoading, router])
+  }, [session, loading, router])
 
-  // Mostrar loading mientras se verifica la autenticación
-  if (authLoading || appAuthLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
         <div className="text-center">
@@ -33,11 +29,9 @@ export default function HybridProtectedRoute({ children }: HybridProtectedRouteP
     )
   }
 
-  // Si no hay usuario autenticado, no renderizar nada (el useEffect se encargará del redirect)
-  if (!user && !appUser) {
+  if (!session) {
     return null
   }
 
   return <>{children}</>
 }
-

@@ -6,19 +6,28 @@ import { Users, Activity, BarChart3, Home, Heart, Sparkles, Zap, Shield, Trendin
 import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleGuard from '@/components/RoleGuard'
 import Navigation from '@/components/Navigation'
+import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
+import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
 
 export default function DashboardPage() {
   const { t } = useLanguage()
+  const { session } = useSession()
   const [stats, setStats] = useState({
-    users: 0,
-    records: 0,
-    hrvUsers: 0,
-    accuracy: 0,
-    systemStatus: 100
+    users: null as number | null,
+    records: null as number | null,
+    hrvUsers: null as number | null,
+    accuracy: null as number | null,
+    systemStatus: null as number | null
   })
   const [loading, setLoading] = useState(true)
+  const [statsError, setStatsError] = useState<string | null>(null)
+
+  const formatCount = (value: number | null) =>
+    value === null ? 'No disponible' : value.toLocaleString()
+  const formatPercent = (value: number | null) =>
+    value === null ? 'No disponible' : `${value}%`
 
   // Componente de loading con puntos animados
   const LoadingDots = () => (
@@ -30,74 +39,65 @@ export default function DashboardPage() {
   )
 
   useEffect(() => {
+    if (!session) return
     loadDashboardStats()
-  }, [])
+  }, [session?.user.id, session?.user.role])
 
   const loadDashboardStats = async () => {
     try {
       setLoading(true)
-      
-      let userCount = 0
-      let totalRecords = 0
-      let hrvUserCount = 0
+      setStatsError(null)
 
-      // Cargar estadísticas de usuarios con manejo de errores
-      try {
-        const usersResponse = await fetch('/api/users/count')
-        if (usersResponse.ok) {
-          const usersData = await usersResponse.json()
-          userCount = usersData?.count || 0
-        }
-      } catch (error) {
-        console.warn('Error loading user count:', error)
+      const currentRole = session?.user.role
+      const selectedUser =
+        currentRole === 'user' ? (session?.user.username ?? '') : 'all'
+      if (currentRole === 'user' && selectedUser.length === 0) {
+        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
       }
 
-      // Cargar estadísticas de datos con manejo de errores
-      try {
-        const dataResponse = await fetch('/api/decrypted-data')
-        if (dataResponse.ok) {
-          const dataData = await dataResponse.json()
-          totalRecords = (dataData?.insulinData?.length || 0) + 
-                        (dataData?.foodData?.length || 0) + 
-                        (dataData?.exerciseData?.length || 0) + 
-                        (dataData?.periodData?.length || 0) + 
-                        (dataData?.moodData?.length || 0)
-        }
-      } catch (error) {
-        console.warn('Error loading data stats:', error)
-      }
+      const [usersResult, dataResult, hrvResult] = await Promise.allSettled([
+        usersApi.count(),
+        dataApi.getDecrypted({ selectedUser, timeRange: 'all' }),
+        fetch('/api/kubios/team-users').then(async (response) => {
+          if (!response.ok) return 0
+          const payload = (await response.json()) as { users?: unknown[] }
+          return Array.isArray(payload.users) ? payload.users.length : 0
+        }),
+      ])
 
-      // Cargar estadísticas de HRV con manejo de errores
-      try {
-        const hrvResponse = await fetch('/api/kubios/team-users')
-        if (hrvResponse.ok) {
-          const hrvData = await hrvResponse.json()
-          hrvUserCount = hrvData?.users?.length || 0
-        }
-      } catch (error) {
-        console.warn('Error loading HRV stats:', error)
-      }
-
-      // Calcular precisión basada en datos disponibles
-      const accuracy = totalRecords > 0 ? Math.min(95 + Math.floor(Math.random() * 5), 100) : 0
+      const userCount = usersResult.status === 'fulfilled' ? usersResult.value : null
+      const totalRecords =
+        dataResult.status === 'fulfilled'
+          ? dataResult.value.insulinData.length +
+            dataResult.value.foodData.length +
+            dataResult.value.exerciseData.length +
+            dataResult.value.periodData.length +
+            dataResult.value.moodData.length
+          : null
 
       setStats({
         users: userCount,
         records: totalRecords,
-        hrvUsers: hrvUserCount,
-        accuracy: accuracy,
-        systemStatus: 100
+        hrvUsers: hrvResult.status === 'fulfilled' ? hrvResult.value : 0,
+        accuracy: null,
+        systemStatus: null
       })
-    } catch (error) {
-      console.error('Error loading dashboard stats:', error)
-      // Mantener valores por defecto en caso de error
+
+      if (usersResult.status === 'rejected') {
+        setStatsError(errorMessage(usersResult.reason))
+      } else if (dataResult.status === 'rejected') {
+        setStatsError(errorMessage(dataResult.reason))
+      }
+    } catch (caught) {
+      console.error('Error loading dashboard stats:', caught)
       setStats({
-        users: 0,
-        records: 0,
-        hrvUsers: 0,
-        accuracy: 0,
-        systemStatus: 100
+        users: null,
+        records: null,
+        hrvUsers: null,
+        accuracy: null,
+        systemStatus: null
       })
+      setStatsError(errorMessage(caught))
     } finally {
       setLoading(false)
     }
@@ -123,6 +123,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+          {statsError && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {statsError}
+            </div>
+          )}
           {/* Hero Section */}
           <div className="text-center mb-20">
             <div className="inline-flex items-center space-x-3 bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-full px-8 py-4 mb-8 shadow-lg">
@@ -150,7 +155,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-blue-800 group-hover:text-blue-600 transition-colors">
-                        {loading ? <LoadingDots /> : stats.users}
+                        {loading ? <LoadingDots /> : formatCount(stats.users)}
                       </div>
                       <div className="text-xs text-blue-600/70">Total</div>
                     </div>
@@ -181,7 +186,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-blue-800 group-hover:text-blue-600 transition-colors">
-                        {loading ? <LoadingDots /> : stats.records.toLocaleString()}
+                        {loading ? <LoadingDots /> : formatCount(stats.records)}
                       </div>
                       <div className="text-xs text-blue-600/70">Registros</div>
                     </div>
@@ -212,7 +217,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-blue-800 group-hover:text-blue-600 transition-colors">
-                        {loading ? <LoadingDots /> : `${stats.accuracy}%`}
+                        {loading ? <LoadingDots /> : formatPercent(stats.accuracy)}
                       </div>
                       <div className="text-xs text-blue-600/70">Precisión</div>
                     </div>
@@ -242,7 +247,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-blue-800 group-hover:text-blue-600 transition-colors">
-                        {loading ? <LoadingDots /> : stats.hrvUsers}
+                        {loading ? <LoadingDots /> : formatCount(stats.hrvUsers)}
                       </div>
                       <div className="text-xs text-blue-600/70">Usuarios</div>
                     </div>
@@ -298,7 +303,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-blue-800 group-hover:text-blue-600 transition-colors">
-                        {loading ? <LoadingDots /> : `${stats.systemStatus}%`}
+                        {loading ? <LoadingDots /> : formatPercent(stats.systemStatus)}
                       </div>
                       <div className="text-xs text-blue-600/70">Sistema</div>
                     </div>
@@ -317,6 +322,7 @@ export default function DashboardPage() {
               </div>
             </Link>
 
+            <RoleGuard requiredRole="admin">
             <Link href="/admin" className="group">
               <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 hover:border-blue-300/70 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/10">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -343,6 +349,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </Link>
+            </RoleGuard>
           </div>
 
           {/* Segunda fila */}
