@@ -16,6 +16,7 @@ export default defineConfig({
       "tests/unit/**/*.test.ts",
       "tests/contracts/**/*.test.ts",
       "tests/auth/**/*.test.ts",
+      "tests/persistence/**/*.test.ts",
     ],
     exclude: [
       "**/node_modules/**",
