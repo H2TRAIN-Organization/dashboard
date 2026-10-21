@@ -18,7 +18,7 @@ Dashboard de administración para Diabetes Tracker, construido con Next.js, Reac
 - `pi-mqtt-agent/`
 - `kub-kubioscloud-demo/` y toda la integración Kubios: `src/app/kubios`, `src/app/api/kubios`, `src/lib/kubios-service.ts` y variables `KUBIOS_*`.
 - `Uploader/`
-- Publicación y despliegue: no deploy, no push a producción, no publicación de paquetes.
+- No se ejecutó deploy ni publicación en esta fase. La guía de despliegue está en `docs/despliegue.md`; no se declara publicado.
 
 **Reglas de diseño**
 
@@ -72,9 +72,9 @@ npm run test:e2e
 npm run check
 ```
 
-La existencia de estos scripts no implica que pasen. Los resultados y bloqueos se registran en `docs/registro-tareas.md`; este README no declara PASS.
+En `dev` `fcb2bda`, `npm run check` tiene 177 tests/27 archivos, lint full `src`+tests 0/0 y TypeScript server+app 0; `npm run build` pasa. La validación browser final está completa y no quedan pendientes locales. Los resultados se registran en `docs/registro-tareas.md`.
 
-`.gitignore` ya incluye la excepción `!.env.example`; la plantilla no está ignorada. No se ha staged ni commiteado. No se fuerza staging desde documentación.
+`.gitignore` ya incluye la excepción `!.env.example`; la plantilla está versionada. No editar `.env.example` con valores reales ni forzar staging desde documentación.
 
 ## Variables de entorno
 
@@ -84,7 +84,7 @@ No se copian valores reales en este README ni en `.env.example`. La plantilla co
 | --- | --- | --- |
 | `SUPABASE_URL` | Servidor (preferido) | URL del proyecto Supabase. No se duplica como `NEXT_PUBLIC_SUPABASE_URL` si todo el acceso pasa por servidor. |
 | `SUPABASE_PUBLISHABLE_KEY` | Público/servidor | Clave publicable; no es un secreto, pero exige RLS y grants correctos. |
-| `SUPABASE_SERVICE_ROLE_KEY` o `SUPABASE_SECRET_KEY` | Solo servidor | Clave privada para operaciones administrativas. Preferir `SUPABASE_SERVICE_ROLE_KEY`; `SUPABASE_SECRET_KEY` solo se acepta si su claim es `service_role`. Una clave `anon` no habilita OpenAPI. Nunca exponerla ni prefijarla con `NEXT_PUBLIC_`. |
+| `SUPABASE_SERVICE_ROLE_KEY` o `SUPABASE_SECRET_KEY` | Solo servidor | Clave privada para operaciones administrativas. Preferir `SUPABASE_SERVICE_ROLE_KEY`; el código acepta JWT `service_role` o `sb_secret_` opaco válido y rechaza `anon`. Nunca exponerla ni prefijarla con `NEXT_PUBLIC_`. |
 | `ENCRYPTION_SECRET_KEY` | Solo servidor | Clave de cifrado actual. El algoritmo, los IV y el esquema real no están verificados. |
 | `ENCRYPTION_SECRET_KEY0` | Solo servidor | Clave anterior, solo si se aplica rotación. No verificada. |
 | `AUTH_SESSION_SECRET` | Solo servidor | Secreto de firma de sesiones; obligatorio en producción (32+ bytes aleatorios). No generar ni escribir claves reales en este repositorio. |
@@ -104,11 +104,12 @@ Notas:
 
 - PostgREST usa por defecto el perfil `api`. Para las tablas del proyecto, fijar explícitamente `Accept-Profile: public`; sin ese header, una consulta a `users` puede devolver 404.
 - Nombres físicos observados en el esquema `public`: `users`, `insulindata`, `fooddata`, `exercisedata`, `periodrecords`, `mooddata` y `polar_data`. No usar los alias con guion bajo sin verificarlos.
-- Tipos, nulabilidad, defaults, PK/FK, unique, índices y políticas RLS no están verificados. Requieren SQL read-only o una clave `service_role` real; OpenAPI no es accesible solo con la publishable.
+- Tipos, nulabilidad, defaults, PK/FK, unique, índices y políticas RLS remotos no están verificados. Los fixtures SQL locales sí prueban roles y políticas en PostgreSQL local; eso no equivale a la DB remota. OpenAPI no es accesible solo con la publishable.
 - RLS y grants deben impedir que la clave publishable lea `users.PasswordHash`; se observó lectura permitida y es un riesgo a corregir. No se copian hashes.
 - No asumir algoritmo, IV, encoding ni rotación del cifrado; el esquema real sigue pendiente.
 - Borrar un usuario con registros de salud asociados debe devolver 409 y no borrar datos ni identidad de Auth.
-- Prerrequisitos conocidos y pendientes de migraciones/vinculación Auth: `docs/supabase-setup.md`. No se declaran aplicados.
+- M4 privatiza las 6 tablas de salud para anon/authenticated/PUBLIC. Los ingestores legacy con anon necesitan identidad/política dedicada; no usar service key en clientes. Su código queda fuera de alcance.
+- Prerrequisitos conocidos, checklist y pendientes de migraciones/vinculación Auth: `docs/supabase-setup.md`. No se declaran aplicados.
 
 Consultas de inspección, solo lectura y en staging:
 
@@ -155,17 +156,21 @@ El código legado no es referencia de autenticación; sus riesgos y el estado de
 - `codex/feature/<slug>`: una rama por frente, creada desde `dev`.
 - `codex/release/<version>`: rama de release, creada desde `dev`.
 - Base autorizada: `dev`. No se incorpora `main` ni los endpoints heredados `fix-ids`/`sync-auth`.
-- El trabajo paralelo se organiza en worktrees aislados con propiedad de archivos delimitada. Los frentes no commitean hasta validación; solo foundation tiene permiso de commit de sus propios archivos.
+- El trabajo paralelo se organiza en worktrees aislados con propiedad de archivos delimitada. Los frentes no commitean; el integrador es el único operador git y serializa commits/merges tras validación.
 - Los commits y merges se serializan. El merge se hace con `git merge --no-ff` una vez validado el cambio.
 - No se permite commit directo a `dev` o `main`.
 - Commits con Conventional Commits: `feat(scope): ...`, `fix(scope): ...`, `docs(scope): ...`, `test(scope): ...`, `chore(scope): ...`.
-- Este alcance no incluye publicación ni deploy.
+- No se ejecutó deploy en esta fase; la guía está en `docs/despliegue.md`.
 
 El documentador no ejecuta `git checkout`, `add`, `commit`, `merge` ni `push`.
 
 ## Estado y evidencia
 
-El estado por tarea, las sesiones, los commits, las evidencias readonly, los límites y los bloqueos se mantienen en `docs/registro-tareas.md`. Los prerrequisitos y pendientes de Supabase están en `docs/supabase-setup.md`. No se declara terminada la implementación ni se afirma que las pruebas hayan pasado.
+Estado actual: `dev` `fcb2bda`, BUILD_ID `ktSETdnx6ZkFPtJqM5Gf9`; **código local validado**. `npm run check` 177/27, lint 0/0, TS server+app 0, build PASS; launcher portable en producción: calendario 1/1 + 12 browser PASS (2 real + 10 mock), 0 fail/skip. SQL local 65/65 y visual 20 PASS/2 skip/12 pixel PASS/6 REVIEW de contenido. Supabase remoto sigue pendiente: SQL/Auth no aplicados. El detalle está en `docs/registro-tareas.md`; setup en `docs/supabase-setup.md`; guía en `docs/despliegue.md`.
+
+## Despliegue
+
+La guía ejecutable de Vercel está en `docs/despliegue.md`: Node 24.x, `npm ci`, `npm run check && npm run build`, salida `.next`, variables de Preview/Producción separadas y SQL manual en staging. No se ha desplegado: falta aplicar SQL/Auth remoto. La entrega local queda para `codex/release/0.2.0`, que preparará el integrador tras el commit documental; no hay promoción automática a producción/main.
 
 ## Estructura
 
@@ -174,7 +179,8 @@ dashboard/
 ├── contracts/               # contrato OpenAPI
 ├── docs/
 │   ├── registro-tareas.md
-│   └── supabase-setup.md
+│   ├── supabase-setup.md
+│   └── despliegue.md
 ├── public/
 ├── scripts/                 # scripts manuales
 ├── src/
@@ -185,12 +191,14 @@ dashboard/
 │   ├── lib/
 │   └── server/              # domain/application/infrastructure/http/composition
 ├── tests/                   # pruebas en frentes paralelos
-├── .env.example             # plantilla de entorno; sin staging
+├── .env.example             # plantilla de entorno versionada
 ├── package.json
 └── README.md
 ```
 
 Directorios excluidos y no editados en este alcance: `pi-mqtt-agent/`, `kub-kubioscloud-demo/` y `Uploader/`.
+
+`AGENTS.md` es un archivo auto-generado por `next dev` cuando se ejecuta; no es documentación del proyecto y debe quedar fuera del cierre y del commit documental.
 
 ## Licencia
 
