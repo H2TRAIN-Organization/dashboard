@@ -1,16 +1,228 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Download, Activity, Heart, Calendar, User as UserIcon, Filter, TrendingUp, TrendingDown, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Download, Activity, Calendar, User as UserIcon, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
+
+function formatDateForInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getDaysInMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+}
+
+function getFirstDayOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+}
+
+function navigateMonth(date: Date, direction: 'prev' | 'next') {
+  const newDate = new Date(date)
+  if (direction === 'prev') {
+    newDate.setMonth(newDate.getMonth() - 1)
+  } else {
+    newDate.setMonth(newDate.getMonth() + 1)
+  }
+  return newDate
+}
+
+function isToday(date: Date, today: Date) {
+  return date.toDateString() === today.toDateString()
+}
+
+// Portal simple para renderizar en document.body (evita clipping y stacking contexts)
+function Portal({ children }: { children: ReactNode }) {
+  if (typeof window === 'undefined') return null
+  return createPortal(children, document.body)
+}
+
+interface CustomCalendarProps {
+  isOpen: boolean
+  onClose: () => void
+  selectedDate: Date
+  selectedDateFilter: string
+  today: Date
+  onDateChange: (date: Date) => void
+  onSelectDate: (date: Date) => void
+  containerRef?: RefObject<HTMLDivElement | null>
+  position?: { top: number; left: number; width: number }
+}
+
+// Componente de calendario personalizado
+function CustomCalendar({
+  isOpen,
+  onClose,
+  selectedDate,
+  selectedDateFilter,
+  today,
+  onDateChange,
+  onSelectDate,
+  containerRef,
+  position,
+}: CustomCalendarProps) {
+  if (!isOpen) return null
+
+  const daysInMonth = getDaysInMonth(selectedDate)
+  const firstDay = getFirstDayOfMonth(selectedDate)
+  const monthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ]
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
+  const renderCalendarDays = () => {
+    const days = []
+
+    // Días del mes anterior
+    const prevMonth = navigateMonth(selectedDate, 'prev')
+    const daysInPrevMonth = getDaysInMonth(prevMonth)
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const day = daysInPrevMonth - i
+      const date = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), day)
+      days.push(
+        <button
+          key={`prev-${day}`}
+          className="w-10 h-10 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+          onClick={() => onDateChange(date)}
+        >
+          {day}
+        </button>
+      )
+    }
+
+    // Días del mes actual
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day)
+      const isSelectedDay = formatDateForInput(date) === selectedDateFilter
+      const isTodayDay = isToday(date, today)
+
+      days.push(
+        <button
+          key={day}
+          className={`w-10 h-10 rounded-lg transition-all duration-200 font-medium ${
+            isSelectedDay
+              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg transform scale-105'
+              : isTodayDay
+              ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+              : 'text-slate-700 hover:bg-slate-100 hover:scale-105'
+          }`}
+          onClick={() => onSelectDate(date)}
+        >
+          {day}
+        </button>
+      )
+    }
+
+    // Días del mes siguiente
+    const totalCells = 42 // 6 semanas x 7 días
+    const remainingCells = totalCells - days.length
+    const nextMonth = navigateMonth(selectedDate, 'next')
+    for (let day = 1; day <= remainingCells; day++) {
+      const date = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), day)
+      days.push(
+        <button
+          key={`next-${day}`}
+          className="w-10 h-10 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+          onClick={() => onDateChange(date)}
+        >
+          {day}
+        </button>
+      )
+    }
+
+    return days
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="fixed top-0 left-0 right-0 bottom-0"
+      style={{ zIndex: 9999999 }}
+    >
+      <div
+        className="bg-white border-2 border-slate-200/60 rounded-2xl shadow-2xl overflow-hidden w-80 relative"
+        style={position ? {
+          position: 'fixed',
+          top: position.top,
+          left: position.left,
+          width: Math.max(position.width, 320),
+          zIndex: 9999999
+        } : {
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '320px',
+          zIndex: 9999999
+        }}
+      >
+      <div className="p-6">
+        {/* Header del calendario */}
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={() => onDateChange(navigateMonth(selectedDate, 'prev'))}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+          >
+            <ChevronLeft className="h-5 w-5 text-slate-600" />
+          </button>
+
+          <h3 className="text-lg font-bold text-slate-800">
+            {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+          </h3>
+
+          <button
+            onClick={() => onDateChange(navigateMonth(selectedDate, 'next'))}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+          >
+            <ChevronRight className="h-5 w-5 text-slate-600" />
+          </button>
+        </div>
+
+        {/* Días de la semana */}
+        <div className="grid grid-cols-7 gap-2 mb-4">
+          {dayNames.map((day) => (
+            <div key={day} className="text-center text-sm font-medium text-slate-500 py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Días del calendario */}
+        <div className="grid grid-cols-7 gap-2">
+          {renderCalendarDays()}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
+          <button
+            onClick={() => onSelectDate(new Date())}
+            className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
+          >
+            Hoy
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+      </div>
+    </div>
+  )
+}
 
 export default function DataPage() {
   const { session } = useSession()
@@ -40,9 +252,10 @@ export default function DataPage() {
   
   // Estados para el timepicker personalizado
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
-  const [datePicker, setDatePicker] = useState(new Date())
+  const [datePicker, setDatePicker] = useState(() => new Date())
+  const [today] = useState(() => new Date())
   const datePickerRef = useRef<HTMLButtonElement>(null)
-  const datePickerPortalRef = useRef<HTMLDivElement>(null as unknown as HTMLDivElement)
+  const datePickerPortalRef = useRef<HTMLDivElement | null>(null)
   const [datePickerPosition, setDatePickerPosition] = useState<{ top: number; left: number; width: number } | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -103,8 +316,17 @@ export default function DataPage() {
 
   useEffect(() => {
     if (!session) return
-    fetchData()
-    fetchUsers()
+    let cancelled = false
+    const load = async () => {
+      // Yield once so the effect body does not synchronously set state.
+      await Promise.resolve()
+      if (cancelled) return
+      await Promise.all([fetchData(), fetchUsers()])
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [session, fetchData, fetchUsers])
 
   // Cerrar calendario al hacer click fuera y recalcular posición al hacer scroll/resize
@@ -173,14 +395,6 @@ export default function DataPage() {
     setSelectedDataType('all')
   }
 
-  // Funciones para el calendario personalizado
-  const formatDateForInput = (date: Date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
-
   const formatDisplayDate = (date: Date) => {
     return date.toLocaleDateString('es-ES', {
       year: 'numeric',
@@ -196,213 +410,10 @@ export default function DataPage() {
     setDateFilter(formatDateForInput(localDate))
   }
 
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
-  }
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
-  }
-
-  const navigateMonth = (date: Date, direction: 'prev' | 'next') => {
-    const newDate = new Date(date)
-    if (direction === 'prev') {
-      newDate.setMonth(newDate.getMonth() - 1)
-    } else {
-      newDate.setMonth(newDate.getMonth() + 1)
-    }
-    return newDate
-  }
-
   const selectDate = (date: Date) => {
     const dateString = formatDateForInput(date)
     setDateFilter(dateString)
     setIsDatePickerOpen(false)
-  }
-
-  const isToday = (date: Date) => {
-    const today = new Date()
-    return date.toDateString() === today.toDateString()
-  }
-
-  const isSelected = (date: Date) => {
-    const dateString = formatDateForInput(date)
-    return dateFilter === dateString
-  }
-
-  // Portal simple para renderizar en document.body (evita clipping y stacking contexts)
-  const Portal = ({ children }: { children: any }) => {
-    if (typeof window === 'undefined') return null
-    return createPortal(children, document.body)
-  }
-
-  // Componente de calendario personalizado
-  const CustomCalendar = ({ 
-    isOpen, 
-    onClose, 
-    selectedDate, 
-    onDateChange, 
-    containerRef,
-    position 
-  }: {
-    isOpen: boolean
-    onClose: () => void
-    selectedDate: Date
-    onDateChange: (date: Date) => void
-    containerRef?: React.RefObject<HTMLDivElement>
-    position?: { top: number; left: number; width: number }
-  }) => {
-    if (!isOpen) return null
-
-    const daysInMonth = getDaysInMonth(selectedDate)
-    const firstDay = getFirstDayOfMonth(selectedDate)
-    const monthNames = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ]
-    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-
-    const renderCalendarDays = () => {
-      const days = []
-      
-      // Días del mes anterior
-      const prevMonth = navigateMonth(selectedDate, 'prev')
-      const daysInPrevMonth = getDaysInMonth(prevMonth)
-      for (let i = firstDay - 1; i >= 0; i--) {
-        const day = daysInPrevMonth - i
-        const date = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), day)
-        days.push(
-          <button
-            key={`prev-${day}`}
-            className="w-10 h-10 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-            onClick={() => onDateChange(date)}
-          >
-            {day}
-          </button>
-        )
-      }
-
-      // Días del mes actual
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day)
-        const isSelectedDay = isSelected(date)
-        const isTodayDay = isToday(date)
-        
-        days.push(
-          <button
-            key={day}
-            className={`w-10 h-10 rounded-lg transition-all duration-200 font-medium ${
-              isSelectedDay
-                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg transform scale-105'
-                : isTodayDay
-                ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                : 'text-slate-700 hover:bg-slate-100 hover:scale-105'
-            }`}
-            onClick={() => selectDate(date)}
-          >
-            {day}
-          </button>
-        )
-      }
-
-      // Días del mes siguiente
-      const totalCells = 42 // 6 semanas x 7 días
-      const remainingCells = totalCells - days.length
-      const nextMonth = navigateMonth(selectedDate, 'next')
-      for (let day = 1; day <= remainingCells; day++) {
-        const date = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), day)
-        days.push(
-          <button
-            key={`next-${day}`}
-            className="w-10 h-10 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-            onClick={() => onDateChange(date)}
-          >
-            {day}
-          </button>
-        )
-      }
-
-      return days
-    }
-
-    return (
-      <div 
-        ref={containerRef}
-        className="fixed top-0 left-0 right-0 bottom-0"
-        style={{ zIndex: 9999999 }}
-      >
-        <div 
-          className="bg-white border-2 border-slate-200/60 rounded-2xl shadow-2xl overflow-hidden w-80 relative"
-          style={position ? {
-            position: 'fixed',
-            top: position.top,
-            left: position.left,
-            width: Math.max(position.width, 320),
-            zIndex: 9999999
-          } : {
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '320px',
-            zIndex: 9999999
-          }}
-        >
-        <div className="p-6">
-          {/* Header del calendario */}
-          <div className="flex items-center justify-between mb-6">
-            <button
-              onClick={() => onDateChange(navigateMonth(selectedDate, 'prev'))}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-            >
-              <ChevronLeft className="h-5 w-5 text-slate-600" />
-            </button>
-            
-            <h3 className="text-lg font-bold text-slate-800">
-              {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
-            </h3>
-            
-            <button
-              onClick={() => onDateChange(navigateMonth(selectedDate, 'next'))}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-            >
-              <ChevronRight className="h-5 w-5 text-slate-600" />
-            </button>
-          </div>
-
-          {/* Días de la semana */}
-          <div className="grid grid-cols-7 gap-2 mb-4">
-            {dayNames.map((day) => (
-              <div key={day} className="text-center text-sm font-medium text-slate-500 py-2">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Días del calendario */}
-          <div className="grid grid-cols-7 gap-2">
-            {renderCalendarDays()}
-          </div>
-
-          {/* Footer */}
-          <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
-            <button
-              onClick={() => selectDate(new Date())}
-              className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
-            >
-              Hoy
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-        </div>
-      </div>
-    )
   }
 
   const exportData = () => {
@@ -410,7 +421,7 @@ export default function DataPage() {
     let filename = 'datos_usuarios.csv'
 
     // Función para escapar valores CSV
-    const escapeCsvValue = (value: any) => {
+    const escapeCsvValue = (value: unknown) => {
       if (value === null || value === undefined) return ''
       const stringValue = String(value).trim()
       // Solo escapar si contiene punto y coma, comillas o saltos de línea
@@ -654,18 +665,11 @@ export default function DataPage() {
     }
   }
 
-  const getDataTypeColor = (type: string) => {
-    switch (type) {
-      case 'insulin': return 'text-blue-600 bg-blue-100'
-      case 'food': return 'text-green-600 bg-green-100'
-      case 'exercise': return 'text-orange-600 bg-orange-100'
-      case 'period': return 'text-purple-600 bg-purple-100'
-      case 'mood': return 'text-pink-600 bg-pink-100'
-      default: return 'text-black bg-gray-100'
-    }
-  }
-
-  const renderDataRecords = (data: any[], type: string, maxRecords: number = 2) => {
+  const renderDataRecords = (
+    data: Array<InsulinData | FoodData | ExerciseData | PeriodRecord | MoodData>,
+    type: string,
+    maxRecords: number = 2,
+  ) => {
     const recordsToShow = showAllRecords.has(type) ? data : data.slice(0, maxRecords)
     
     const getTypeColors = (type: string) => {
@@ -696,38 +700,38 @@ export default function DataPage() {
                 </span>
               </span>
               <span className="text-sm text-gray-600">
-                {new Date(item.date_time || item.startDate).toLocaleDateString('es-ES')}
+                {new Date(item.date_time || ('startDate' in item ? item.startDate : '')).toLocaleDateString('es-ES')}
               </span>
             </div>
             <div className="text-sm text-gray-800">
-              {type === 'insulin' && (
+              {type === 'insulin' && 'insulinType' in item && (
                 <>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.type}:</strong> <span className="text-gray-700">{item.insulinType}</span></p>
                   <p><strong className="text-gray-900">{t.dashboard.dose}:</strong> <span className="text-gray-700">{item.dose}</span></p>
                 </>
               )}
-              {type === 'food' && (
+              {type === 'food' && 'food_type' in item && (
                 <>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.type}:</strong> <span className="text-gray-700">{item.food_type}</span></p>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.quantity}:</strong> <span className="text-gray-700">{item.quantity}</span></p>
                   <p><strong className="text-gray-900">{t.dashboard.carbs}:</strong> <span className="text-gray-700">{item.carbs}</span></p>
                 </>
               )}
-              {type === 'exercise' && (
+              {type === 'exercise' && 'exercise_type' in item && (
                 <>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.type}:</strong> <span className="text-gray-700">{item.exercise_type}</span></p>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.intensity}:</strong> <span className="text-gray-700">{item.intensity}</span></p>
                   <p><strong className="text-gray-900">{t.dashboard.description}:</strong> <span className="text-gray-700">{item.exercise_description}</span></p>
                 </>
               )}
-              {type === 'period' && (
+              {type === 'period' && 'symptoms' in item && (
                 <>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.intensity}:</strong> <span className="text-gray-700">{item.intensity}</span></p>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.symptoms}:</strong> <span className="text-gray-700">{Array.isArray(item.symptoms) ? item.symptoms.join(', ') : item.symptoms}</span></p>
                   <p><strong className="text-gray-900">{t.dashboard.notes}:</strong> <span className="text-gray-700">{item.notes}</span></p>
                 </>
               )}
-              {type === 'mood' && (
+              {type === 'mood' && 'emotions' in item && (
                 <>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.value}:</strong> <span className="text-gray-700">{item.mood_value}/10</span></p>
                   <p className="mb-1"><strong className="text-gray-900">{t.dashboard.outOfRoutine}:</strong> <span className="text-gray-700">{item.out_of_routine ? t.dashboard.yes : t.dashboard.no}</span></p>
@@ -1041,7 +1045,10 @@ export default function DataPage() {
                       isOpen={isDatePickerOpen}
                       onClose={() => setIsDatePickerOpen(false)}
                       selectedDate={datePicker}
+                      selectedDateFilter={dateFilter}
+                      today={today}
                       onDateChange={handleDateChange}
+                      onSelectDate={selectDate}
                       containerRef={datePickerPortalRef}
                       position={datePickerPosition || undefined}
                     />
