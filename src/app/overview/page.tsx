@@ -119,8 +119,8 @@ export default function OverviewPage() {
         avgCarbs: foodData.length > 0 
           ? Math.round(foodData.reduce((sum, item) => sum + parseFloat(item.carbs || '0'), 0) / foodData.length * 10) / 10 
           : 0,
-        avgMood: moodData.length > 0
-          ? Math.round(moodData.reduce((sum, item) => sum + Number(item.mood_value ?? 0), 0) / moodData.length * 10) / 10
+        avgMood: moodData.length > 0 
+          ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(item.mood_value || '0'), 0) / moodData.length * 10) / 10 
           : 0,
         
         // Última actividad del sistema
@@ -174,8 +174,8 @@ export default function OverviewPage() {
       exerciseCount: userExercise.length,
       periodCount: userPeriods.length,
       moodCount: userMood.length,
-      lastActivity: allUserData.length > 0 ?
-        new Date(Math.max(...allUserData.map(d => new Date(d.date_time || ('startDate' in d ? d.startDate : '')).getTime()))) :
+      lastActivity: allUserData.length > 0 ? 
+        new Date(Math.max(...allUserData.map(d => new Date(d.date_time || d.startDate).getTime()))) : 
         null,
       isActive: isRecentlyActive(allUserData)
     }

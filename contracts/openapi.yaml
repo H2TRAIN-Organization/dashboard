@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Diabetes Tracker Dashboard API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Contrato autoritativo del backend del dashboard. Las rutas están montadas
     en Next.js 16 y delegan en un runtime inyectado; si los adaptadores de
@@ -22,7 +22,10 @@ info:
     El token nunca se devuelve en JSON. Las mutaciones exigen `Origin` permitido
     o `Sec-Fetch-Site: same-origin|none`; no se usan tokens CSRF en el cuerpo.
     Ningún esquema público contiene hashes, verificadores, claves ni material
-    cifrado.
+    cifrado. Todos los endpoints de usuario usan envelopes estables:
+    `{ user }` para POST/GET/PATCH/limpieza de UUID y `{ users, total }` para
+    listados. Un cliente puede ignorar la envoltura solo si su adaptador la
+    desenvuelve explícitamente; el contrato no devuelve entidades desnudas.
 servers:
   - url: /
 security:
@@ -551,6 +554,7 @@ components:
           format: date-time
     UserResponse:
       type: object
+      description: Envelope estable con el usuario; nunca devuelve entidad desnuda.
       additionalProperties: false
       required: [user]
       properties:
@@ -558,6 +562,7 @@ components:
           $ref: "#/components/schemas/User"
     UserListResponse:
       type: object
+      description: Envelope estable de listado `{ users, total }`.
       additionalProperties: false
       required: [users, total]
       properties:

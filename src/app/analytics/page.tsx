@@ -77,8 +77,7 @@ export default function AnalyticsPage() {
 
   // Función para agrupar datos por fecha
   const groupDataByDate = (data: any[], dateField: string = 'date_time') => {
-    type DateGroup = { date: string; count: number }
-    const grouped = data.reduce<Record<string, DateGroup>>((acc, item) => {
+    const grouped = data.reduce((acc, item) => {
       const date = new Date(item[dateField]).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
       if (!acc[date]) {
         acc[date] = { date, count: 0 }
@@ -87,14 +86,14 @@ export default function AnalyticsPage() {
       return acc
     }, {})
 
-    return Object.values(grouped).sort((a, b) =>
+    return Object.values(grouped).sort((a: any, b: any) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     )
   }
 
   // Función para agrupar datos por tipo
   const groupDataByType = (data: any[], typeField: string) => {
-    const grouped = data.reduce<Record<string, number>>((acc, item) => {
+    const grouped = data.reduce((acc, item) => {
       const type = item[typeField] || 'Sin especificar'
       if (!acc[type]) {
         acc[type] = 0
@@ -126,8 +125,8 @@ export default function AnalyticsPage() {
       : 0,
     
     // Promedio de estado de ánimo
-    avgMood: moodData.length > 0
-      ? Math.round(moodData.reduce((sum, item) => sum + Number(item.mood_value ?? 0), 0) / moodData.length * 10) / 10
+    avgMood: moodData.length > 0 
+      ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(item.mood_value || '0'), 0) / moodData.length * 10) / 10 
       : 0,
     
     // Última actividad
@@ -159,7 +158,7 @@ export default function AnalyticsPage() {
   const moodByValue = groupDataByType(moodData, 'mood_value')
 
   // Datos combinados para gráfico de actividad general
-  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce<Array<{ date: string; count: number }>>((acc, item) => {
+  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce((acc, item) => {
     const existing = acc.find(x => x.date === item.date)
     if (existing) {
       existing.count += item.count
@@ -167,7 +166,7 @@ export default function AnalyticsPage() {
       acc.push({ ...item })
     }
     return acc
-  }, []).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, [] as any[]).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   // Colores para gráficos
   const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16']
@@ -568,6 +567,8 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
+                            itemStyle={{ color: 'white' }}
+                            labelStyle={{ color: 'white' }}
                             formatter={(value, name) => [
                               `${value} registros`, 
                               'Tipo de Comida'

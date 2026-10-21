@@ -12,7 +12,11 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/unit/**/*.test.ts", "tests/contracts/**/*.test.ts"],
+    include: [
+      "tests/unit/**/*.test.ts",
+      "tests/contracts/**/*.test.ts",
+      "tests/auth/**/*.test.ts",
+    ],
     exclude: [
       "**/node_modules/**",
       "**/.next/**",
