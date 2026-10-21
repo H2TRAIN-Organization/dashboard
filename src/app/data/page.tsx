@@ -350,14 +350,17 @@ export default function DataPage() {
       const target = event.target as Node
       // Calendario (portal)
       if (isDatePickerOpen && datePickerPortalRef.current?.contains(target)) return
-      if (isDatePickerOpen) setIsDatePickerOpen(false)
+      if (isDatePickerOpen) {
+        setIsDatePickerOpen(false)
+        setDatePickerPosition(null)
+      }
     }
 
     const updateDatePickerPosition = () => {
       if (!datePickerRef.current || !isDatePickerOpen) return
 
       const trigger = datePickerRef.current.getBoundingClientRect()
-      const popup = datePickerPopupRef.current?.getBoundingClientRect()
+      const popup = datePickerPopupRef.current
       if (!popup) return
       const viewportWidth = window.innerWidth
       const viewportHeight = window.innerHeight
@@ -368,7 +371,18 @@ export default function DataPage() {
         Math.max(trigger.width, 320),
         Math.max(0, viewportWidth - padding * 2),
       )
-      const height = Math.min(popup.height, maxHeight)
+
+      // scrollHeight is the natural content height even when the previous
+      // maxHeight capped the popup. Apply the new width first so wrapping is
+      // measured at the width that will be used, then add the borders because
+      // scrollHeight includes padding but not borders.
+      popup.style.width = `${width}px`
+      const popupStyle = window.getComputedStyle(popup)
+      const borders =
+        (Number.parseFloat(popupStyle.borderTopWidth) || 0) +
+        (Number.parseFloat(popupStyle.borderBottomWidth) || 0)
+      const naturalHeight = popup.scrollHeight + borders
+      const height = Math.min(naturalHeight, maxHeight)
       const left = Math.max(
         padding,
         Math.min(trigger.left, viewportWidth - padding - width),
@@ -455,6 +469,7 @@ export default function DataPage() {
     const dateString = formatDateForInput(date)
     setDateFilter(dateString)
     setIsDatePickerOpen(false)
+    setDatePickerPosition(null)
   }
 
   const exportData = () => {
@@ -1072,7 +1087,10 @@ export default function DataPage() {
                   </label>
                   <button
                     ref={datePickerRef}
-                    onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                    onClick={() => {
+                      setIsDatePickerOpen(!isDatePickerOpen)
+                      setDatePickerPosition(null)
+                    }}
                     className="w-full bg-white border border-blue-200 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-blue-900 text-left hover:bg-blue-50 transition-all duration-300 flex items-center justify-between text-sm sm:text-base"
                   >
                     <span className={dateFilter ? 'text-blue-900' : 'text-gray-500'}>
@@ -1084,7 +1102,10 @@ export default function DataPage() {
                   <Portal>
                     <CustomCalendar
                       isOpen={isDatePickerOpen}
-                      onClose={() => setIsDatePickerOpen(false)}
+                      onClose={() => {
+                        setIsDatePickerOpen(false)
+                        setDatePickerPosition(null)
+                      }}
                       selectedDate={datePicker}
                       selectedDateFilter={dateFilter}
                       today={today}
