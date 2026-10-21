@@ -27,7 +27,7 @@ export function createAuthUseCases(auth: AuthGateway): AuthUseCases {
       if (session === null) {
         throw new UnauthorizedError("Credenciales inválidas");
       }
-      return session;
+      return { ...session, method: command.kind };
     },
 
     async getSession(token: string): Promise<Session> {

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import {
   AppError,
-  UnauthorizedError,
   ValidationError,
 } from "@/server/domain/errors";
+import type { HttpCookie } from "./cookies";
 
 export interface ProblemBody {
   readonly error: {
@@ -17,14 +17,21 @@ export interface HttpResult {
   readonly status: number;
   readonly body?: unknown;
   readonly headers?: Readonly<Record<string, string>>;
+  readonly cookies?: readonly HttpCookie[];
 }
 
 export function jsonResult(
   status: number,
   body?: unknown,
   headers?: Readonly<Record<string, string>>,
+  cookies?: readonly HttpCookie[],
 ): HttpResult {
-  return { status, body, headers };
+  return {
+    status,
+    ...(body === undefined ? {} : { body }),
+    ...(headers === undefined ? {} : { headers }),
+    ...(cookies === undefined ? {} : { cookies }),
+  };
 }
 
 export function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -39,22 +46,6 @@ export function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
   return result.data;
 }
 
-export function getBearerToken(authorization: string | undefined): string {
-  if (authorization === undefined) {
-    throw new UnauthorizedError();
-  }
-  const [scheme, token, ...rest] = authorization.trim().split(/\s+/);
-  if (
-    scheme?.toLocaleLowerCase() !== "bearer" ||
-    token === undefined ||
-    token.length === 0 ||
-    rest.length > 0
-  ) {
-    throw new UnauthorizedError("Cabecera Authorization inválida");
-  }
-  return token;
-}
-
 export function toProblem(error: unknown): HttpResult {
   if (error instanceof AppError) {
     const body: ProblemBody = {
@@ -64,13 +55,9 @@ export function toProblem(error: unknown): HttpResult {
         ...(error.details === undefined ? {} : { details: error.details }),
       },
     };
-    const headers: Record<string, string> = {
+    return jsonResult(error.statusCode, body, {
       "Content-Type": "application/problem+json",
-    };
-    if (error.statusCode === 401) {
-      headers["WWW-Authenticate"] = "Bearer";
-    }
-    return jsonResult(error.statusCode, body, headers);
+    });
   }
 
   // Never expose stack traces, database errors or secret values to clients.

@@ -51,16 +51,64 @@ describe("health data use cases", () => {
     expect(repository.lastDecryptedQuery?.to).toBe(now.toISOString());
   });
 
-  it("uses dateFilter as the inclusive lower bound and lets all range mean no bound", async () => {
+  it("treats dateFilter as a full UTC day and intersects it with timeRange", async () => {
     const { repository, useCases } = setup();
 
     await useCases.getDecryptedData(doctorActor, {
       selectedUser: "alice",
       timeRange: "90d",
       selectedDataType: "insulin",
-      dateFilter: "2025-12-01T00:00:00.000Z",
+      dateFilter: "2025-12-15",
     });
-    expect(repository.lastDecryptedQuery?.from).toBe("2025-12-01T00:00:00.000Z");
+    expect(repository.lastDecryptedQuery).toMatchObject({
+      dateFilter: "2025-12-15",
+      from: "2025-12-15T00:00:00.000Z",
+      to: "2025-12-16T00:00:00.000Z",
+    });
+
+    await useCases.getDecryptedData(doctorActor, {
+      selectedUser: "all",
+      timeRange: "all",
+      selectedDataType: "all",
+      dateFilter: "2026-01-15",
+    });
+    expect(repository.lastDecryptedQuery).toMatchObject({
+      from: "2026-01-15T00:00:00.000Z",
+      to: "2026-01-16T00:00:00.000Z",
+    });
+  });
+
+  it("clips the selected day to the timeRange window", async () => {
+    const { repository, useCases } = setup();
+
+    // 30d starts at 2026-01-01T12:00Z; the day starts earlier, so the
+    // intersection uses the timeRange lower bound.
+    await useCases.getDecryptedData(doctorActor, {
+      selectedUser: "all",
+      timeRange: "30d",
+      selectedDataType: "all",
+      dateFilter: "2026-01-01",
+    });
+    expect(repository.lastDecryptedQuery).toMatchObject({
+      from: "2026-01-01T12:00:00.000Z",
+      to: "2026-01-02T00:00:00.000Z",
+    });
+
+    // Today's full day is clipped to "now" by the range upper bound.
+    await useCases.getDecryptedData(doctorActor, {
+      selectedUser: "all",
+      timeRange: "30d",
+      selectedDataType: "all",
+      dateFilter: "2026-01-31",
+    });
+    expect(repository.lastDecryptedQuery).toMatchObject({
+      from: "2026-01-31T00:00:00.000Z",
+      to: "2026-01-31T12:00:00.000Z",
+    });
+  });
+
+  it("keeps all-range without dateFilter unbounded on the lower side", async () => {
+    const { repository, useCases } = setup();
 
     await useCases.getDecryptedData(doctorActor, {
       selectedUser: "all",
@@ -69,28 +117,37 @@ describe("health data use cases", () => {
       dateFilter: null,
     });
     expect(repository.lastDecryptedQuery?.from).toBeNull();
+    expect(repository.lastDecryptedQuery?.to).toBe(now.toISOString());
   });
 
-  it("prevents regular users from reading all data or another user's data", async () => {
-    const { useCases } = setup();
+  it("normalizes a regular user's selectedUser to their own username", async () => {
+    const { repository, useCases } = setup();
     const base = {
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: null,
     } as const;
 
-    await expect(
-      useCases.getDecryptedData(userActor, { ...base, selectedUser: "all" }),
-    ).rejects.toMatchObject({ statusCode: 403 });
-    await expect(
-      useCases.getDecryptedData(userActor, { ...base, selectedUser: "bob" }),
-    ).rejects.toMatchObject({ statusCode: 403 });
+    for (const selectedUser of ["all", "bob", "alice"]) {
+      const own = await useCases.getDecryptedData(userActor, {
+        ...base,
+        selectedUser,
+      });
+      expect(own.insulinData).toHaveLength(1);
+      expect(repository.lastDecryptedQuery?.selectedUser).toBe("alice");
+    }
+  });
 
-    const own = await useCases.getDecryptedData(userActor, {
-      ...base,
-      selectedUser: "alice",
-    });
-    expect(own.insulinData).toHaveLength(1);
+  it("rejects invalid calendar days", async () => {
+    const { useCases } = setup();
+    await expect(
+      useCases.getDecryptedData(userActor, {
+        selectedUser: "alice",
+        timeRange: "30d",
+        selectedDataType: "all",
+        dateFilter: "2026-02-30",
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("scopes legacy access for users and keeps admin access unscoped", async () => {

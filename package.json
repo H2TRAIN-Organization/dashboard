@@ -7,7 +7,7 @@
     "dev:https": "next dev --turbopack --experimental-https --experimental-https-key ../ssl/localhost.key --experimental-https-cert ../ssl/localhost.crt",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint \"src/server/**/*.ts\" \"tests/**/*.ts\" scripts/check-layers.mjs vitest.config.mts playwright.config.ts --max-warnings=0",
+    "lint": "eslint \"src/server/**/*.ts\" \"src/app/api/**/*.ts\" \"tests/**/*.ts\" scripts/check-layers.mjs vitest.config.mts playwright.config.ts --max-warnings=0",
     "typecheck": "tsc -p tsconfig.server.json --noEmit",
     "typecheck:app": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

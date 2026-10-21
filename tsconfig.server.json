@@ -9,6 +9,11 @@
   },
   "include": [
     "src/server/**/*.ts",
+    "src/app/api/auth/**/*.ts",
+    "src/app/api/users/**/*.ts",
+    "src/app/api/data/route.ts",
+    "src/app/api/decrypted-data/route.ts",
+    "src/app/api/admin/database/**/*.ts",
     "tests/**/*.ts",
     "vitest.config.mts",
     "playwright.config.ts"

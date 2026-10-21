@@ -1,24 +1,40 @@
 import type { AuthUseCases } from "@/server/application/auth/auth-use-cases";
+import { toActiveActor, toPublicSession } from "@/server/domain/session";
 import type { ActiveActor } from "@/server/domain/user";
-import { toActiveActor } from "@/server/domain/session";
-import { getBearerToken, handle, jsonResult, parseInput, type HttpResult } from "../problem";
+import { UnauthorizedError } from "@/server/domain/errors";
+import { buildClearedSessionCookie, buildSessionCookie } from "../cookies";
+import { handle, jsonResult, parseInput, type HttpResult } from "../problem";
 import { loginBodySchema } from "../schemas/auth";
+
+export interface AuthHttpOptions {
+  readonly secureCookies: boolean;
+}
 
 export interface AuthHttpHandlers {
   login(input: { body: unknown }): Promise<HttpResult>;
-  session(input: { authorization: string | undefined }): Promise<HttpResult>;
-  logout(input: { authorization: string | undefined }): Promise<HttpResult>;
+  session(input: { sessionToken: string | undefined }): Promise<HttpResult>;
+  logout(input: { sessionToken: string | undefined }): Promise<HttpResult>;
+}
+
+function requireToken(sessionToken: string | undefined): string {
+  if (sessionToken === undefined || sessionToken.length === 0) {
+    throw new UnauthorizedError();
+  }
+  return sessionToken;
 }
 
 export async function requireActor(
   auth: AuthUseCases,
-  authorization: string | undefined,
+  sessionToken: string | undefined,
 ): Promise<ActiveActor> {
-  const session = await auth.getSession(getBearerToken(authorization));
+  const session = await auth.getSession(requireToken(sessionToken));
   return toActiveActor(session);
 }
 
-export function createAuthHttpHandlers(auth: AuthUseCases): AuthHttpHandlers {
+export function createAuthHttpHandlers(
+  auth: AuthUseCases,
+  options: AuthHttpOptions,
+): AuthHttpHandlers {
   return {
     async login(input): Promise<HttpResult> {
       return handle(async () => {
@@ -32,23 +48,40 @@ export function createAuthHttpHandlers(auth: AuthUseCases): AuthHttpHandlers {
                 password: body.password,
               } as const);
         const session = await auth.login(command);
-        return jsonResult(200, session);
+        return jsonResult(
+          200,
+          toPublicSession(session),
+          undefined,
+          [buildSessionCookie(session.token, session.expiresAt, options.secureCookies)],
+        );
       });
     },
 
     async session(input): Promise<HttpResult> {
       return handle(async () => {
-        const token = getBearerToken(input.authorization);
-        const session = await auth.getSession(token);
-        return jsonResult(200, session);
+        const session = await auth.getSession(requireToken(input.sessionToken));
+        return jsonResult(
+          200,
+          toPublicSession(session),
+          undefined,
+          [buildSessionCookie(session.token, session.expiresAt, options.secureCookies)],
+        );
       });
     },
 
     async logout(input): Promise<HttpResult> {
       return handle(async () => {
-        const token = getBearerToken(input.authorization);
-        await auth.logout(token);
-        return jsonResult(204);
+        if (input.sessionToken !== undefined && input.sessionToken.length > 0) {
+          try {
+            await auth.logout(input.sessionToken);
+          } catch {
+            // Logout is idempotent: an invalid/expired session still clears the
+            // browser cookie. No token or upstream error is exposed.
+          }
+        }
+        return jsonResult(204, undefined, undefined, [
+          buildClearedSessionCookie(options.secureCookies),
+        ]);
       });
     },
   };

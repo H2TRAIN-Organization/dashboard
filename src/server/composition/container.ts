@@ -52,6 +52,8 @@ export function composeServerApplication(
 
   return {
     useCases,
-    http: createHttpApi(useCases),
+    http: createHttpApi(useCases, {
+      secureCookies: process.env.NODE_ENV === "production",
+    }),
   };
 }

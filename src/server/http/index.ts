@@ -24,9 +24,16 @@ export interface HttpApiDependencies {
   readonly adminDatabase: AdminDatabaseUseCases;
 }
 
-export function createHttpApi(dependencies: HttpApiDependencies): HttpApi {
+export interface HttpApiConfig {
+  readonly secureCookies: boolean;
+}
+
+export function createHttpApi(
+  dependencies: HttpApiDependencies,
+  config: HttpApiConfig = { secureCookies: false },
+): HttpApi {
   return {
-    auth: createAuthHttpHandlers(dependencies.auth),
+    auth: createAuthHttpHandlers(dependencies.auth, config),
     users: createUsersHttpHandlers(dependencies.auth, dependencies.users),
     data: createDataHttpHandlers(dependencies.auth, dependencies.data),
     adminDatabase: createAdminDatabaseHttpHandlers(

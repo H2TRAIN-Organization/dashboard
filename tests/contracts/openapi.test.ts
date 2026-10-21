@@ -103,6 +103,23 @@ describe("authoritative OpenAPI contract", () => {
     expect(legacy).toContain("LegacyRecordList");
   });
 
+  it("uses an HttpOnly cookie session and never a bearer token in JSON", async () => {
+    const spec = await loadSpec();
+    const serialized = JSON.stringify(spec);
+    expect(serialized.toLocaleLowerCase()).not.toContain("bearer");
+    expect(recordAt(spec, "components", "securitySchemes", "cookieAuth")).toMatchObject({
+      type: "apiKey",
+      in: "cookie",
+      name: "dashboard_session",
+    });
+
+    const session = recordAt(spec, "components", "schemas", "SessionResponse");
+    expect(session.required).toEqual(["user", "method", "expiresAt"]);
+    expect(session).not.toHaveProperty("token");
+    const method = recordAt(session, "properties", "method");
+    expect(method.enum).toEqual(["email", "username"]);
+  });
+
   it("documents the user-with-data conflict and the role model", async () => {
     const spec = await loadSpec();
     const deleteUser = recordAt(
@@ -136,6 +153,12 @@ describe("authoritative OpenAPI contract", () => {
       "selectedDataType",
       "dateFilter",
     ]);
-    expect(String(operation.description)).toContain("selectedUser=all");
+    const dateFilter = (parameters as Array<Record<string, unknown>>).find(
+      (parameter) => parameter.name === "dateFilter",
+    );
+    expect(recordAt(dateFilter, "schema")).toMatchObject({ format: "date" });
+    expect(String(operation.description)).toContain("normaliza siempre");
+    expect(String(operation.description)).toContain("completo UTC");
+    expect(String(operation.description)).toContain("YYYY-MM-DD");
   });
 });

@@ -28,7 +28,7 @@ export default function DataPage() {
   const [dateFilter, setDateFilter] = useState<string>('')
   const [timeRange, setTimeRange] = useState<string>('all')
   const [selectedDataType, setSelectedDataType] = useState<string>('all')
-  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())
+  const [expandedUsers, setExpandedUsers] = useState<Set<number>>(new Set())
   const [showAllRecords, setShowAllRecords] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState<string>('')
   
@@ -178,7 +178,7 @@ export default function DataPage() {
     return username || 'Usuario desconocido'
   }
 
-  const toggleUserExpansion = (userId: string) => {
+  const toggleUserExpansion = (userId: number) => {
     const newExpanded = new Set(expandedUsers)
     if (newExpanded.has(userId)) {
       newExpanded.delete(userId)

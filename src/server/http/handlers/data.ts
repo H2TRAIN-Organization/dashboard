@@ -7,11 +7,11 @@ import { requireActor } from "./auth";
 
 export interface DataHttpHandlers {
   decrypted(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     query: unknown;
   }): Promise<HttpResult>;
   legacy(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     query: unknown;
   }): Promise<HttpResult>;
 }
@@ -38,7 +38,7 @@ export function createDataHttpHandlers(
   return {
     async decrypted(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const query = parseInput(decryptedDataQuerySchema, input.query);
         const data = await dataUseCases.getDecryptedData(actor, {
           selectedUser: query.selectedUser,
@@ -59,7 +59,7 @@ export function createDataHttpHandlers(
 
     async legacy(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const query = parseInput(legacyDataQuerySchema, input.query);
         const data = await dataUseCases.getLegacyData(actor, {
           type: query.type,

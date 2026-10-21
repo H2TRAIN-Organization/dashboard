@@ -6,6 +6,7 @@ export interface TestAccount {
   readonly user: User;
   readonly password: string;
   readonly token: string;
+  readonly method: "email" | "username";
   readonly expiresAt: string;
 }
 
@@ -22,26 +23,30 @@ export class TestAuthGateway implements AuthGateway {
     this.accounts = accounts;
   }
 
-  private sessionFor(account: TestAccount): Session {
+  private sessionFor(account: TestAccount, method: "email" | "username"): Session {
     return {
       user: account.user,
       token: account.token,
+      method,
       expiresAt: account.expiresAt,
     };
   }
 
   async authenticateByEmail(email: string, password: string): Promise<Session | null> {
-    return this.authenticate({ email, password });
+    return this.authenticate({ email, password }, "email");
   }
 
   async authenticateByUsername(
     username: string,
     password: string,
   ): Promise<Session | null> {
-    return this.authenticate({ username, password });
+    return this.authenticate({ username, password }, "username");
   }
 
-  private async authenticate(credentials: LoginCredentials): Promise<Session | null> {
+  private async authenticate(
+    credentials: LoginCredentials,
+    method: "email" | "username",
+  ): Promise<Session | null> {
     const account = this.accounts.find((candidate) => {
       const matchesIdentifier =
         (credentials.email !== undefined && candidate.user.email === credentials.email) ||
@@ -49,7 +54,7 @@ export class TestAuthGateway implements AuthGateway {
           candidate.user.username === credentials.username);
       return matchesIdentifier && candidate.password === credentials.password;
     });
-    return account === undefined ? null : this.sessionFor(account);
+    return account === undefined ? null : this.sessionFor(account, method);
   }
 
   async getSession(token: string): Promise<Session | null> {
@@ -57,7 +62,9 @@ export class TestAuthGateway implements AuthGateway {
       return null;
     }
     const account = this.accounts.find((candidate) => candidate.token === token);
-    return account === undefined ? null : this.sessionFor(account);
+    return account === undefined
+      ? null
+      : this.sessionFor(account, account.method);
   }
 
   async revokeSession(token: string): Promise<void> {

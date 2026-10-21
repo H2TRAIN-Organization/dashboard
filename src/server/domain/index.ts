@@ -5,7 +5,7 @@ export { AppError, BadRequestError, ConflictError, ForbiddenError, isAppError, N
 export type { ErrorCode } from "./errors";
 export { DATA_TYPES, LEGACY_DATA_TYPES, TIME_RANGES, daysForTimeRange } from "./health-data";
 export type { DataQuery, DataType, DecryptedData, HealthRecord, LegacyData, LegacyDataQuery, LegacyDataType, ResolvedDataQuery, TimeRange } from "./health-data";
-export { toActiveActor } from "./session";
-export type { Session } from "./session";
+export { toActiveActor, toPublicSession, AUTH_METHODS } from "./session";
+export type { AuthMethod, PublicSession, Session } from "./session";
 export { USER_ROLES, isUserRole } from "./user";
 export type { ActiveActor, UpdateUserPatch, User, UserListFilter, UserPage, UserRole } from "./user";

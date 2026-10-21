@@ -55,7 +55,7 @@ export interface DataQuery {
 export interface ResolvedDataQuery extends DataQuery {
   /** Inclusive lower bound, ISO-8601, or null for no lower bound. */
   readonly from: string | null;
-  /** Inclusive upper bound, ISO-8601. */
+  /** Exclusive upper bound, ISO-8601. Repositories must use `< to`. */
   readonly to: string;
 }
 

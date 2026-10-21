@@ -5,9 +5,9 @@ import { databaseTableQuerySchema } from "../schemas/admin-database";
 import { requireActor } from "./auth";
 
 export interface AdminDatabaseHttpHandlers {
-  tables(input: { authorization: string | undefined }): Promise<HttpResult>;
+  tables(input: { sessionToken: string | undefined }): Promise<HttpResult>;
   tableData(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     query: unknown;
   }): Promise<HttpResult>;
 }
@@ -19,7 +19,7 @@ export function createAdminDatabaseHttpHandlers(
   return {
     async tables(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const result = await adminDatabase.listTables(actor);
         return jsonResult(200, { success: true, ...result });
       });
@@ -27,7 +27,7 @@ export function createAdminDatabaseHttpHandlers(
 
     async tableData(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const query = parseInput(databaseTableQuerySchema, input.query);
         const result = await adminDatabase.getTableData(actor, query.table, query.limit);
         return jsonResult(200, { success: true, ...result });

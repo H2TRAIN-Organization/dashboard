@@ -11,32 +11,32 @@ import {
 
 export interface UsersHttpHandlers {
   list(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     query: unknown;
   }): Promise<HttpResult>;
   create(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     body: unknown;
   }): Promise<HttpResult>;
   get(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     id: string;
   }): Promise<HttpResult>;
   update(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     id: string;
     body: unknown;
   }): Promise<HttpResult>;
   clearUuid(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     id: string;
   }): Promise<HttpResult>;
   delete(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
     id: string;
   }): Promise<HttpResult>;
   count(input: {
-    authorization: string | undefined;
+    sessionToken: string | undefined;
   }): Promise<HttpResult>;
 }
 
@@ -47,7 +47,7 @@ export function createUsersHttpHandlers(
   return {
     async list(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const query = parseInput(userListQuerySchema, input.query);
         const page = await users.list(actor, query);
         return jsonResult(200, page);
@@ -56,7 +56,7 @@ export function createUsersHttpHandlers(
 
     async create(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const body = parseInput(createUserBodySchema, input.body);
         const user = await users.create(actor, {
           username: body.username,
@@ -71,7 +71,7 @@ export function createUsersHttpHandlers(
 
     async get(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const id = parseInput(userIdSchema, input.id);
         const user = await users.get(actor, id);
         return jsonResult(200, { user });
@@ -80,7 +80,7 @@ export function createUsersHttpHandlers(
 
     async update(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const id = parseInput(userIdSchema, input.id);
         const body = parseInput(updateUserBodySchema, input.body);
         const user = await users.update(actor, id, body);
@@ -90,7 +90,7 @@ export function createUsersHttpHandlers(
 
     async clearUuid(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const id = parseInput(userIdSchema, input.id);
         const user = await users.clearUuid(actor, id);
         return jsonResult(200, { user });
@@ -99,7 +99,7 @@ export function createUsersHttpHandlers(
 
     async delete(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const id = parseInput(userIdSchema, input.id);
         await users.delete(actor, id);
         return jsonResult(204);
@@ -108,7 +108,7 @@ export function createUsersHttpHandlers(
 
     async count(input): Promise<HttpResult> {
       return handle(async () => {
-        const actor = await requireActor(auth, input.authorization);
+        const actor = await requireActor(auth, input.sessionToken);
         const count = await users.count(actor);
         return jsonResult(200, { count });
       });

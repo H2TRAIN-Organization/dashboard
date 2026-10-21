@@ -8,7 +8,7 @@ import { InMemoryAdminDatabaseRepository } from "@/server/infrastructure/testing
 import { InMemoryHealthDataRepository } from "@/server/infrastructure/testing/in-memory-health-data-repository";
 import { InMemoryUserDataPresence } from "@/server/infrastructure/testing/in-memory-user-data-presence";
 import { InMemoryUserRepository } from "@/server/infrastructure/testing/in-memory-user-repository";
-import { TestAuthGateway } from "@/server/infrastructure/testing/test-auth-gateway";
+import { TestAuthGateway, type TestAccount } from "@/server/infrastructure/testing/test-auth-gateway";
 import { makeUser } from "../helpers/fixtures";
 
 const admin = makeUser({
@@ -31,23 +31,26 @@ const user = makeUser({
 });
 
 function setup() {
-  const accounts = [
+  const accounts: TestAccount[] = [
     {
       user: admin,
       password: "admin-secret",
       token: "admin-token",
+      method: "username",
       expiresAt: "2026-12-31T23:59:59.000Z",
     },
     {
       user: doctor,
       password: "doctor-secret",
       token: "doctor-token",
+      method: "username",
       expiresAt: "2026-12-31T23:59:59.000Z",
     },
     {
       user,
       password: "user-secret",
       token: "user-token",
+      method: "email",
       expiresAt: "2026-12-31T23:59:59.000Z",
     },
   ];
@@ -82,10 +85,27 @@ describe("HTTP auth handlers", () => {
 
     expect(result.status).toBe(200);
     const body = bodyOf(result);
-    expect(body.token).toBe("user-token");
+    expect(body).toMatchObject({ method: "email" });
+    expect(body).not.toHaveProperty("token");
     expect(JSON.stringify(body)).not.toContain("user-secret");
     expect(JSON.stringify(body)).not.toContain("password");
     expect(JSON.stringify(body)).not.toContain("hash");
+
+    const cookie = result.cookies?.[0];
+    expect(cookie).toMatchObject({
+      name: "dashboard_session",
+      value: "user-token",
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    const byUsername = await api.auth.login({
+      body: { username: "alice", password: "user-secret" },
+    });
+    expect(byUsername.status).toBe(200);
+    expect(bodyOf(byUsername).method).toBe("username");
+    expect(byUsername.body).not.toHaveProperty("token");
   });
 
   it("returns 401 for bad credentials and 400 without echoing request secrets", async () => {
@@ -108,24 +128,39 @@ describe("HTTP auth handlers", () => {
     expect(JSON.stringify(invalid.body)).not.toContain("do-not-echo-this");
   });
 
-  it("requires a bearer token and revokes it on logout", async () => {
+  it("requires the session cookie, refreshes it, and clears it on logout", async () => {
     const { api } = setup();
 
-    const missing = await api.auth.session({ authorization: undefined });
+    const missing = await api.auth.session({ sessionToken: undefined });
     expect(missing.status).toBe(401);
-    expect(missing.headers?.["WWW-Authenticate"]).toBe("Bearer");
+    expect(missing.headers?.["WWW-Authenticate"]).toBeUndefined();
 
-    const session = await api.auth.session({ authorization: "Bearer user-token" });
+    const session = await api.auth.session({ sessionToken: "user-token" });
     expect(session.status).toBe(200);
+    expect(bodyOf(session)).toMatchObject({ method: "email" });
+    expect(session.cookies?.[0]).toMatchObject({
+      name: "dashboard_session",
+      value: "user-token",
+      httpOnly: true,
+    });
 
-    expect(
-      await api.auth.logout({ authorization: "Bearer user-token" }),
-    ).toMatchObject({ status: 204 });
+    const logout = await api.auth.logout({ sessionToken: "user-token" });
+    expect(logout.status).toBe(204);
+    expect(logout.cookies?.[0]).toMatchObject({
+      name: "dashboard_session",
+      value: "",
+      maxAge: 0,
+      httpOnly: true,
+    });
 
     const afterLogout = await api.auth.session({
-      authorization: "Bearer user-token",
+      sessionToken: "user-token",
     });
     expect(afterLogout.status).toBe(401);
+
+    const invalidLogout = await api.auth.logout({ sessionToken: "unknown-token" });
+    expect(invalidLogout.status).toBe(204);
+    expect(invalidLogout.cookies?.[0]?.maxAge).toBe(0);
   });
 });
 
@@ -134,7 +169,7 @@ describe("HTTP user handlers", () => {
     const { api } = setup();
 
     const list = await api.users.list({
-      authorization: "Bearer user-token",
+      sessionToken: "user-token",
       query: {},
     });
     expect(list.status).toBe(200);
@@ -143,7 +178,7 @@ describe("HTTP user handlers", () => {
     expect(listed.map((entry) => entry.username)).toEqual(["alice"]);
 
     const forbidden = await api.users.create({
-      authorization: "Bearer doctor-token",
+      sessionToken: "doctor-token",
       body: { username: "new-user", password: "new-secret" },
     });
     expect(forbidden.status).toBe(403);
@@ -153,7 +188,7 @@ describe("HTTP user handlers", () => {
     const { api } = setup();
 
     const created = await api.users.create({
-      authorization: "Bearer admin-token",
+      sessionToken: "admin-token",
       body: {
         username: "new-user",
         email: "new@example.com",
@@ -168,7 +203,7 @@ describe("HTTP user handlers", () => {
 
     const createdBody = bodyOf(created).user as { id: string };
     const cleared = await api.users.clearUuid({
-      authorization: "Bearer admin-token",
+      sessionToken: "admin-token",
       id: createdBody.id,
     });
     expect(cleared.status).toBe(200);
@@ -177,17 +212,17 @@ describe("HTTP user handlers", () => {
 });
 
 describe("HTTP data and admin handlers", () => {
-  it("rejects user access to all data and returns all five arrays for self", async () => {
+  it("normalizes user selectedUser=all to self and returns five arrays", async () => {
     const { api } = setup();
 
-    const forbidden = await api.data.decrypted({
-      authorization: "Bearer user-token",
+    const normalized = await api.data.decrypted({
+      sessionToken: "user-token",
       query: { selectedUser: "all" },
     });
-    expect(forbidden.status).toBe(403);
+    expect(normalized.status).toBe(200);
 
     const own = await api.data.decrypted({
-      authorization: "Bearer user-token",
+      sessionToken: "user-token",
       query: { selectedUser: "alice", selectedDataType: "all" },
     });
     expect(own.status).toBe(200);
@@ -204,25 +239,25 @@ describe("HTTP data and admin handlers", () => {
     const { api } = setup();
 
     const legacy = await api.data.legacy({
-      authorization: "Bearer user-token",
+      sessionToken: "user-token",
       query: { type: "insulin", range: "30" },
     });
     expect(legacy.status).toBe(200);
     expect(Array.isArray(legacy.body)).toBe(true);
 
     const doctor = await api.adminDatabase.tables({
-      authorization: "Bearer doctor-token",
+      sessionToken: "doctor-token",
     });
     expect(doctor.status).toBe(403);
 
     const adminTables = await api.adminDatabase.tables({
-      authorization: "Bearer admin-token",
+      sessionToken: "admin-token",
     });
     expect(adminTables.status).toBe(200);
     expect(bodyOf(adminTables).success).toBe(true);
 
     const badTable = await api.adminDatabase.tableData({
-      authorization: "Bearer admin-token",
+      sessionToken: "admin-token",
       query: { table: "users;drop", limit: "10" },
     });
     expect(badTable.status).toBe(400);
