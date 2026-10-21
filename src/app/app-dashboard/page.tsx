@@ -1,31 +1,48 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { useAppAuth } from '@/contexts/AppAuthContext'
 import AppProtectedRoute from '@/components/AppProtectedRoute'
 import AppRoleGuard from '@/components/AppRoleGuard'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { 
-  Users, 
-  BarChart3, 
-  Activity, 
-  FileText, 
-  Settings, 
-  Database,
+import {
+  Users,
+  BarChart3,
+  Activity,
+  FileText,
+  Settings,
   Shield,
   User as UserIcon,
   UserCheck,
   LogOut,
   Zap,
   Sparkles,
-  Home,
   Heart,
-  TrendingUp
+  TrendingUp,
 } from 'lucide-react'
-import Link from 'next/link'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
+
+function LoadingDots() {
+  return (
+    <span className="flex space-x-1">
+      <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></span>
+      <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></span>
+      <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+    </span>
+  )
+}
+
+function formatCount(value: number | null) {
+  return value === null ? 'No disponible' : value.toLocaleString()
+}
+
+function formatPercent(value: number | null) {
+  return value === null ? 'No disponible' : `${value}%`
+}
 
 export default function AppDashboardPage() {
   const { t } = useLanguage()
@@ -39,90 +56,75 @@ export default function AppDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [statsError, setStatsError] = useState<string | null>(null)
 
+  const currentUserId = user?.UserID ?? null
+  const currentUsername = user?.Username ?? ''
+
   useEffect(() => {
-    if (!user) return
-    loadDashboardStats()
-  }, [user?.UserID, user?.role])
+    if (currentUserId === null) return
+    let cancelled = false
 
-  const loadDashboardStats = async () => {
-    try {
-      setLoading(true)
-      setStatsError(null)
+    const loadDashboardStats = async () => {
+      await Promise.resolve()
+      if (cancelled) return
 
-      const selectedUser = user?.role === 'user' ? user.Username : 'all'
-      if (user?.role === 'user' && selectedUser.length === 0) {
-        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
+      try {
+        setLoading(true)
+        setStatsError(null)
+
+        const selectedUser = userRole === 'user' ? currentUsername : 'all'
+        if (userRole === 'user' && selectedUser.length === 0) {
+          throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
+        }
+
+        const [usersResult, dataResult] = await Promise.allSettled([
+          usersApi.count(),
+          dataApi.getDecrypted({ selectedUser, timeRange: 'all' }),
+        ])
+
+        if (cancelled) return
+
+        const userCount = usersResult.status === 'fulfilled' ? usersResult.value : null
+        const totalRecords =
+          dataResult.status === 'fulfilled'
+            ? dataResult.value.insulinData.length +
+              dataResult.value.foodData.length +
+              dataResult.value.exerciseData.length +
+              dataResult.value.periodData.length +
+              dataResult.value.moodData.length
+            : null
+
+        setStats({
+          users: userCount,
+          totalRecords,
+          hrvUsers: null,
+          systemAccuracy: null
+        })
+
+        if (usersResult.status === 'rejected') {
+          setStatsError(errorMessage(usersResult.reason))
+        } else if (dataResult.status === 'rejected') {
+          setStatsError(errorMessage(dataResult.reason))
+        }
+      } catch (caught) {
+        if (cancelled) return
+        console.error('Error loading dashboard stats:', caught)
+        setStats({
+          users: null,
+          totalRecords: null,
+          hrvUsers: null,
+          systemAccuracy: null
+        })
+        setStatsError(errorMessage(caught))
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-
-      const [usersResult, dataResult] = await Promise.allSettled([
-        usersApi.count(),
-        dataApi.getDecrypted({ selectedUser, timeRange: 'all' }),
-      ])
-
-      const userCount = usersResult.status === 'fulfilled' ? usersResult.value : null
-      const totalRecords =
-        dataResult.status === 'fulfilled'
-          ? dataResult.value.insulinData.length +
-            dataResult.value.foodData.length +
-            dataResult.value.exerciseData.length +
-            dataResult.value.periodData.length +
-            dataResult.value.moodData.length
-          : null
-
-      setStats({
-        users: userCount,
-        totalRecords,
-        hrvUsers: null,
-        systemAccuracy: null
-      })
-
-      if (usersResult.status === 'rejected') {
-        setStatsError(errorMessage(usersResult.reason))
-      } else if (dataResult.status === 'rejected') {
-        setStatsError(errorMessage(dataResult.reason))
-      }
-    } catch (caught) {
-      console.error('Error loading dashboard stats:', caught)
-      setStats({
-        users: null,
-        totalRecords: null,
-        hrvUsers: null,
-        systemAccuracy: null
-      })
-      setStatsError(errorMessage(caught))
-    } finally {
-      setLoading(false)
     }
-  }
 
-  const formatCount = (value: number | null) =>
-    value === null ? 'No disponible' : value.toLocaleString()
-  const formatPercent = (value: number | null) =>
-    value === null ? 'No disponible' : `${value}%`
-
-  const LoadingDots = () => (
-    <span className="flex space-x-1">
-      <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></span>
-      <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></span>
-      <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
-    </span>
-  )
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'admin': return <Shield className="h-4 w-4 text-yellow-500" />
-      case 'doctor': return <UserCheck className="h-4 w-4 text-green-500" />
-      default: return <UserIcon className="h-4 w-4 text-blue-500" />
+    void loadDashboardStats()
+    return () => {
+      cancelled = true
     }
-  }
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'admin': return 'text-yellow-700 bg-yellow-100'
-      case 'doctor': return 'text-green-700 bg-green-100'
-      default: return 'text-blue-700 bg-blue-100'
-    }
-  }
+  }, [currentUserId, currentUsername, userRole])
 
   return (
     <AppProtectedRoute>
@@ -152,9 +154,12 @@ export default function AppDashboardPage() {
               <div className="flex items-center space-x-6">
                 <div className="flex items-center space-x-6">
                   {/* Logo H2TRAIN - Logo horizontal, muy grande */}
-                  <img 
-                    src="/logo-horizontal.png" 
-                    alt="H2TRAIN Logo" 
+                  <Image
+                    src="/logo-horizontal.png"
+                    alt="H2TRAIN Logo"
+                    width={1050}
+                    height={425}
+                    preload
                     className="h-16 w-auto rounded-xl shadow-xl"
                     style={{ maxWidth: '300px', maxHeight: '64px' }}
                   />

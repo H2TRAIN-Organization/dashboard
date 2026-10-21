@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { User, UserRole } from '@/lib/api-types'
 import { errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Edit, Trash2, Search, Save, X, RefreshCw, User as UserIcon, Key, Shield, CheckCircle, AlertCircle, Users, Sparkles, Zap, Plus, Mail, Lock } from 'lucide-react'
+import { Edit, Trash2, Search, Save, X, RefreshCw, User as UserIcon, Key, Shield, CheckCircle, AlertCircle, Users, Plus, Lock } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { useSession } from '@/contexts/SessionContext'
@@ -34,12 +34,8 @@ export default function UsersPage() {
   const [createLoading, setCreateLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  useEffect(() => {
-    if (!session) return
-    fetchUsers()
-  }, [session])
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    await Promise.resolve()
     try {
       setLoading(true)
       const result = await usersApi.listAll()
@@ -50,7 +46,34 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!session) return
+    let cancelled = false
+
+    const loadUsers = async () => {
+      await Promise.resolve()
+      if (cancelled) return
+      try {
+        setLoading(true)
+        const result = await usersApi.listAll()
+        if (cancelled) return
+        setUsers(result.users)
+      } catch (error) {
+        if (cancelled) return
+        console.error('Error fetching users:', error)
+        setMessage({ type: 'error', text: errorMessage(error) })
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void loadUsers()
+    return () => {
+      cancelled = true
+    }
+  }, [session])
 
   const deleteUser = async (userId: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar este usuario? Esta acción no se puede deshacer.')) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Users, Activity, BarChart3, Home, Heart, Sparkles, Zap, Shield, TrendingUp, Brain, Settings } from 'lucide-react'
+import { Users, Activity, BarChart3, Home, Heart, Sparkles, Zap, Shield, TrendingUp, Settings } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleGuard from '@/components/RoleGuard'
 import Navigation from '@/components/Navigation'
@@ -10,6 +10,24 @@ import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
+
+function LoadingDots() {
+  return (
+    <div className="flex items-center space-x-1">
+      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+    </div>
+  )
+}
+
+function formatCount(value: number | null) {
+  return value === null ? 'No disponible' : value.toLocaleString()
+}
+
+function formatPercent(value: number | null) {
+  return value === null ? '—' : `${value}%`
+}
 
 export default function DashboardPage() {
   const { t } = useLanguage()
@@ -24,84 +42,83 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [statsError, setStatsError] = useState<string | null>(null)
 
-  const formatCount = (value: number | null) =>
-    value === null ? 'No disponible' : value.toLocaleString()
-  const formatPercent = (value: number | null) =>
-    value === null ? '—' : `${value}%`
-
-  // Componente de loading con puntos animados
-  const LoadingDots = () => (
-    <div className="flex items-center space-x-1">
-      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-    </div>
-  )
+  const sessionUserId = session?.user.id ?? null
+  const sessionRole = session?.user.role
+  const sessionUsername = session?.user.username ?? ''
 
   useEffect(() => {
-    if (!session) return
-    loadDashboardStats()
-  }, [session?.user.id, session?.user.role])
+    if (sessionUserId === null) return
+    let cancelled = false
 
-  const loadDashboardStats = async () => {
-    try {
-      setLoading(true)
-      setStatsError(null)
+    const loadDashboardStats = async () => {
+      await Promise.resolve()
+      if (cancelled) return
 
-      const currentRole = session?.user.role
-      const selectedUser =
-        currentRole === 'user' ? (session?.user.username ?? '') : 'all'
-      if (currentRole === 'user' && selectedUser.length === 0) {
-        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
+      try {
+        setLoading(true)
+        setStatsError(null)
+
+        const selectedUser = sessionRole === 'user' ? sessionUsername : 'all'
+        if (sessionRole === 'user' && selectedUser.length === 0) {
+          throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
+        }
+
+        const [usersResult, dataResult, hrvResult] = await Promise.allSettled([
+          usersApi.count(),
+          dataApi.getDecrypted({ selectedUser, timeRange: 'all' }),
+          fetch('/api/kubios/team-users').then(async (response) => {
+            if (!response.ok) return 0
+            const payload = (await response.json()) as { users?: unknown[] }
+            return Array.isArray(payload.users) ? payload.users.length : 0
+          }),
+        ])
+
+        if (cancelled) return
+
+        const userCount = usersResult.status === 'fulfilled' ? usersResult.value : null
+        const totalRecords =
+          dataResult.status === 'fulfilled'
+            ? dataResult.value.insulinData.length +
+              dataResult.value.foodData.length +
+              dataResult.value.exerciseData.length +
+              dataResult.value.periodData.length +
+              dataResult.value.moodData.length
+            : null
+
+        setStats({
+          users: userCount,
+          records: totalRecords,
+          hrvUsers: hrvResult.status === 'fulfilled' ? hrvResult.value : 0,
+          accuracy: null,
+          systemStatus: null
+        })
+
+        if (usersResult.status === 'rejected') {
+          setStatsError(errorMessage(usersResult.reason))
+        } else if (dataResult.status === 'rejected') {
+          setStatsError(errorMessage(dataResult.reason))
+        }
+      } catch (caught) {
+        if (cancelled) return
+        console.error('Error loading dashboard stats:', caught)
+        setStats({
+          users: null,
+          records: null,
+          hrvUsers: null,
+          accuracy: null,
+          systemStatus: null
+        })
+        setStatsError(errorMessage(caught))
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-
-      const [usersResult, dataResult, hrvResult] = await Promise.allSettled([
-        usersApi.count(),
-        dataApi.getDecrypted({ selectedUser, timeRange: 'all' }),
-        fetch('/api/kubios/team-users').then(async (response) => {
-          if (!response.ok) return 0
-          const payload = (await response.json()) as { users?: unknown[] }
-          return Array.isArray(payload.users) ? payload.users.length : 0
-        }),
-      ])
-
-      const userCount = usersResult.status === 'fulfilled' ? usersResult.value : null
-      const totalRecords =
-        dataResult.status === 'fulfilled'
-          ? dataResult.value.insulinData.length +
-            dataResult.value.foodData.length +
-            dataResult.value.exerciseData.length +
-            dataResult.value.periodData.length +
-            dataResult.value.moodData.length
-          : null
-
-      setStats({
-        users: userCount,
-        records: totalRecords,
-        hrvUsers: hrvResult.status === 'fulfilled' ? hrvResult.value : 0,
-        accuracy: null,
-        systemStatus: null
-      })
-
-      if (usersResult.status === 'rejected') {
-        setStatsError(errorMessage(usersResult.reason))
-      } else if (dataResult.status === 'rejected') {
-        setStatsError(errorMessage(dataResult.reason))
-      }
-    } catch (caught) {
-      console.error('Error loading dashboard stats:', caught)
-      setStats({
-        users: null,
-        records: null,
-        hrvUsers: null,
-        accuracy: null,
-        systemStatus: null
-      })
-      setStatsError(errorMessage(caught))
-    } finally {
-      setLoading(false)
     }
-  }
+
+    void loadDashboardStats()
+    return () => {
+      cancelled = true
+    }
+  }, [sessionRole, sessionUserId, sessionUsername])
 
   return (
     <ProtectedRoute>
