@@ -1,40 +1,83 @@
-require('dotenv').config({ path: '.env.local' })
+'use strict'
 
-console.log('🔍 Verificando variables de entorno...\n')
+const {
+  requireNode24,
+  parseArgs,
+  loadEnvFile,
+  projectRefFromUrl,
+  validateSupabaseUrl,
+  validatePublicKey,
+  validatePrivateKey,
+  validateHex64,
+  validateAuthSessionSecret,
+  printStatus,
+  printResult,
+} = require('./lib/diagnostics')
 
-const requiredVars = [
-  'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  'ENCRYPTION_SECRET_KEY'
-]
+function usage() {
+  console.log('Uso: node scripts/check_env.js [--env .env.local]')
+  console.log('Comprueba configuración sin imprimir valores, claves ni PII.')
+}
 
-let allConfigured = true
+function main() {
+  requireNode24()
+  const args = parseArgs(process.argv.slice(2))
 
-requiredVars.forEach(varName => {
-  const value = process.env[varName]
-  if (value) {
-    console.log(`✅ ${varName}: Configurada`)
-    if (varName === 'ENCRYPTION_SECRET_KEY') {
-      console.log(`   Longitud: ${value.length} caracteres`)
-      console.log(`   Formato: ${value.length === 64 ? 'Hex válido (32 bytes)' : 'Formato incorrecto'}`)
-    }
-  } else {
-    console.log(`❌ ${varName}: NO CONFIGURADA`)
-    allConfigured = false
+  if (args.unknown.length > 0) {
+    console.error('CHECK_ENV: opción no válida')
+    usage()
+    process.exitCode = 1
+    return
   }
-})
+  if (args.help) {
+    usage()
+    return
+  }
 
-console.log('\n' + '='.repeat(50))
+  const env = loadEnvFile(args.envFile)
+  console.log('CHECK_ENV: diagnóstico de configuración (sin valores)')
+  console.log(`ENV_FILE: ${env.reason}`)
 
-if (allConfigured) {
-  console.log('🎉 Todas las variables de entorno están configuradas correctamente')
-  console.log('💡 Puedes ejecutar el dashboard con: npm run dev')
-} else {
-  console.log('⚠️  Faltan variables de entorno requeridas')
-  console.log('📝 Asegúrate de tener un archivo .env.local con las siguientes variables:')
-  console.log('   NEXT_PUBLIC_SUPABASE_URL=tu_url_de_supabase')
-  console.log('   NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase')
-  console.log('   ENCRYPTION_SECRET_KEY=tu_clave_de_cifrado_hex_32_bytes')
-  console.log('\n🔑 Para generar una clave de cifrado:')
-  console.log('   node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"')
-} 
+  const url = process.env.SUPABASE_URL
+  const projectRef = projectRefFromUrl(url)
+  const urlStatus = validateSupabaseUrl(url)
+  const publicStatus = validatePublicKey(process.env.SUPABASE_PUBLISHABLE_KEY, projectRef)
+  const serviceStatus = validatePrivateKey(process.env.SUPABASE_SERVICE_ROLE_KEY, projectRef)
+  const secretStatus = validatePrivateKey(process.env.SUPABASE_SECRET_KEY, projectRef)
+  const encryptionStatus = validateHex64(process.env.ENCRYPTION_SECRET_KEY)
+  const authStatus = validateAuthSessionSecret(process.env.AUTH_SESSION_SECRET)
+
+  const privateOk = serviceStatus.ok || secretStatus.ok
+
+  printStatus('SUPABASE_URL', urlStatus, false, false)
+  printStatus('SUPABASE_PUBLISHABLE_KEY', publicStatus, false, false)
+  printStatus('SUPABASE_SERVICE_ROLE_KEY', serviceStatus, !serviceStatus.ok && secretStatus.ok, false)
+  printStatus(
+    'SUPABASE_SECRET_KEY',
+    secretStatus,
+    true,
+    serviceStatus.ok && !secretStatus.ok,
+  )
+  printStatus('ENCRYPTION_SECRET_KEY', encryptionStatus, false, false)
+
+  if (process.env.ENCRYPTION_SECRET_KEY0 !== undefined) {
+    printStatus('ENCRYPTION_SECRET_KEY0', validateHex64(process.env.ENCRYPTION_SECRET_KEY0), true, true)
+  }
+
+  printStatus('AUTH_SESSION_SECRET', authStatus, false, false)
+
+  printResult(
+    urlStatus.ok &&
+      publicStatus.ok &&
+      privateOk &&
+      encryptionStatus.ok &&
+      authStatus.ok,
+  )
+}
+
+try {
+  main()
+} catch {
+  console.error('CHECK_ENV: error inesperado durante el diagnóstico')
+  process.exitCode = 1
+}
