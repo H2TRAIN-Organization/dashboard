@@ -1,16 +1,33 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Users, Activity, TrendingUp, AlertTriangle, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Database, Shield, Zap, Target } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
+import { Users, Activity, TrendingUp, AlertTriangle, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Database, Target } from 'lucide-react'
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridNavigation from '@/components/HybridNavigation'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
+
+interface ActivityRecord {
+  date_time?: string
+  startDate?: string
+}
+
+// Función para calcular actividad reciente (últimos 7 días)
+function isRecentlyActive(userData: readonly ActivityRecord[], now: number) {
+  if (userData.length === 0) return false
+  const lastRecord = [...userData].sort((a, b) =>
+    new Date(b.date_time || b.startDate || 0).getTime() - new Date(a.date_time || a.startDate || 0).getTime()
+  )[0]
+  const lastDate = lastRecord?.date_time || lastRecord?.startDate
+  if (!lastDate) return false
+  const daysSinceLastRecord = (now - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24)
+  return daysSinceLastRecord <= 7
+}
 
 export default function OverviewPage() {
   const { t } = useLanguage()
@@ -23,20 +40,7 @@ export default function OverviewPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [systemStats, setSystemStats] = useState({
-    totalUsers: 0,
-    totalRecords: 0,
-    totalInsulin: 0,
-    totalFood: 0,
-    totalExercise: 0,
-    totalPeriods: 0,
-    totalMood: 0,
-    activeUsers: 0,
-    avgInsulinDose: 0,
-    avgCarbs: 0,
-    avgMood: 0,
-    lastActivity: null as Date | null
-  })
+  const [now] = useState(() => Date.now())
 
   const currentRole = session?.user.role ?? null
   const currentUsername = session?.user.username ?? null
@@ -82,84 +86,72 @@ export default function OverviewPage() {
 
   useEffect(() => {
     if (!session) return
-    fetchData()
-    fetchUsers()
+    let cancelled = false
+    const load = async () => {
+      // Yield once so the effect body does not synchronously set state.
+      await Promise.resolve()
+      if (cancelled) return
+      await Promise.all([fetchData(), fetchUsers()])
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [session, fetchData, fetchUsers])
 
-  // Calcular estadísticas cuando los datos cambien
-  useEffect(() => {
-    console.log('useEffect ejecutándose con datos:', {
-      insulinData: insulinData.length,
-      foodData: foodData.length,
-      exerciseData: exerciseData.length,
-      periodData: periodData.length,
-      moodData: moodData.length,
-      users: users.length
-    })
-    
-    // Siempre calcular estadísticas, incluso si no hay datos
-      const stats = {
-        totalUsers: users.length,
-        totalRecords: insulinData.length + foodData.length + exerciseData.length + periodData.length + moodData.length,
-        totalInsulin: insulinData.length,
-        totalFood: foodData.length,
-        totalExercise: exerciseData.length,
-        totalPeriods: periodData.length,
-        totalMood: moodData.length,
-        
-        // Usuarios activos (con actividad en los últimos 7 días)
-        activeUsers: users.filter(user => {
-          const userInsulin = insulinData.filter(d => d.username === user.Username)
-          const userFood = foodData.filter(d => d.username === user.Username)
-          const userExercise = exerciseData.filter(d => d.username === user.Username)
-          const userPeriods = periodData.filter(d => d.username === user.Username)
-          const userMood = moodData.filter(d => d.username === user.Username)
-          
-          const allUserData = [...userInsulin, ...userFood, ...userExercise, ...userPeriods, ...userMood]
-          return isRecentlyActive(allUserData)
-        }).length,
-        
-        // Promedios
-        avgInsulinDose: insulinData.length > 0 
-          ? Math.round(insulinData.reduce((sum, item) => sum + parseFloat(item.dose || '0'), 0) / insulinData.length * 10) / 10 
-          : 0,
-        avgCarbs: foodData.length > 0 
-          ? Math.round(foodData.reduce((sum, item) => sum + parseFloat(item.carbs || '0'), 0) / foodData.length * 10) / 10 
-          : 0,
-        avgMood: moodData.length > 0 
-          ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(String(item.mood_value ?? 0)), 0) / moodData.length * 10) / 10
-          : 0,
-        
-        // Última actividad del sistema
-        lastActivity: null as Date | null
-      }
+  // Calcular estadísticas derivadas sin estado/effect adicional
+  const systemStats = useMemo(() => {
+    const stats = {
+      totalUsers: users.length,
+      totalRecords: insulinData.length + foodData.length + exerciseData.length + periodData.length + moodData.length,
+      totalInsulin: insulinData.length,
+      totalFood: foodData.length,
+      totalExercise: exerciseData.length,
+      totalPeriods: periodData.length,
+      totalMood: moodData.length,
 
-      // Encontrar la actividad más reciente
-      const allDates = [
-        ...insulinData.map(d => new Date(d.date_time)),
-        ...foodData.map(d => new Date(d.date_time)),
-        ...exerciseData.map(d => new Date(d.date_time)),
-        ...periodData.map(d => new Date(d.startDate)),
-        ...moodData.map(d => new Date(d.date_time))
-      ]
+      // Usuarios activos (con actividad en los últimos 7 días)
+      activeUsers: users.filter(user => {
+        const userInsulin = insulinData.filter(d => d.username === user.Username)
+        const userFood = foodData.filter(d => d.username === user.Username)
+        const userExercise = exerciseData.filter(d => d.username === user.Username)
+        const userPeriods = periodData.filter(d => d.username === user.Username)
+        const userMood = moodData.filter(d => d.username === user.Username)
 
-      if (allDates.length > 0) {
-        stats.lastActivity = new Date(Math.max(...allDates.map(d => d.getTime())))
-      }
+        const allUserData = [...userInsulin, ...userFood, ...userExercise, ...userPeriods, ...userMood]
+        return isRecentlyActive(allUserData, now)
+      }).length,
 
-      setSystemStats(stats)
-      console.log('Estadísticas actualizadas:', stats)
-  }, [insulinData, foodData, exerciseData, periodData, moodData, users])
+      // Promedios
+      avgInsulinDose: insulinData.length > 0
+        ? Math.round(insulinData.reduce((sum, item) => sum + parseFloat(item.dose || '0'), 0) / insulinData.length * 10) / 10
+        : 0,
+      avgCarbs: foodData.length > 0
+        ? Math.round(foodData.reduce((sum, item) => sum + parseFloat(item.carbs || '0'), 0) / foodData.length * 10) / 10
+        : 0,
+      avgMood: moodData.length > 0
+        ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(String(item.mood_value ?? 0)), 0) / moodData.length * 10) / 10
+        : 0,
 
-  // Función para calcular actividad reciente (últimos 7 días)
-  const isRecentlyActive = (userData: any[]) => {
-    if (userData.length === 0) return false
-    const lastRecord = userData.sort((a, b) => 
-      new Date(b.date_time || b.startDate).getTime() - new Date(a.date_time || a.startDate).getTime()
-    )[0]
-    const daysSinceLastRecord = (Date.now() - new Date(lastRecord.date_time || lastRecord.startDate).getTime()) / (1000 * 60 * 60 * 24)
-    return daysSinceLastRecord <= 7
-  }
+      // Última actividad del sistema
+      lastActivity: null as Date | null
+    }
+
+    // Encontrar la actividad más reciente
+    const allDates = [
+      ...insulinData.map(d => new Date(d.date_time)),
+      ...foodData.map(d => new Date(d.date_time)),
+      ...exerciseData.map(d => new Date(d.date_time)),
+      ...periodData.map(d => new Date(d.startDate)),
+      ...moodData.map(d => new Date(d.date_time))
+    ]
+
+    if (allDates.length > 0) {
+      stats.lastActivity = new Date(Math.max(...allDates.map(d => d.getTime())))
+    }
+
+    return stats
+  }, [insulinData, foodData, exerciseData, periodData, moodData, users, now])
 
 
   // Usuarios más activos
@@ -187,7 +179,7 @@ export default function OverviewPage() {
           return new Date(record.date_time || record.startDate || 0).getTime()
         }))) :
         null,
-      isActive: isRecentlyActive(allUserData)
+      isActive: isRecentlyActive(allUserData, now)
     }
   }).sort((a, b) => b.recordCount - a.recordCount).slice(0, 5)
 
@@ -213,7 +205,7 @@ export default function OverviewPage() {
   }
 
   // Alerta si no hay datos recientes
-  if (systemStats.lastActivity && (Date.now() - systemStats.lastActivity.getTime()) > 7 * 24 * 60 * 60 * 1000) {
+  if (systemStats.lastActivity && (now - systemStats.lastActivity.getTime()) > 7 * 24 * 60 * 60 * 1000) {
     systemAlerts.push({
       type: 'danger',
       message: t.overview.noRecentActivity,
@@ -677,8 +669,8 @@ export default function OverviewPage() {
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-purple-600">
-                  {systemStats.lastActivity ? 
-                    Math.ceil((Date.now() - systemStats.lastActivity.getTime()) / (1000 * 60 * 60 * 24)) : 
+                  {systemStats.lastActivity ?
+                    Math.ceil((now - systemStats.lastActivity.getTime()) / (1000 * 60 * 60 * 24)) :
                     0
                   }
                 </p>

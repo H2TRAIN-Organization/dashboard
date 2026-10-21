@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { TrendingUp, TrendingDown, Activity, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
+import { TrendingUp, Activity, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, LineChart as LineChartIcon } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { useSession } from '@/contexts/SessionContext'
@@ -72,8 +72,17 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (!session) return
-    fetchData()
-    fetchUsers()
+    let cancelled = false
+    const load = async () => {
+      // Yield once so the effect body does not synchronously set state.
+      await Promise.resolve()
+      if (cancelled) return
+      await Promise.all([fetchData(), fetchUsers()])
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [session, fetchData, fetchUsers])
 
   // Función para agrupar datos por fecha
@@ -162,11 +171,10 @@ export default function AnalyticsPage() {
 
   const insulinByType = groupDataByType(insulinData, 'insulinType')
   const foodByType = groupDataByType(foodData, 'food_type')
-  const exerciseByType = groupDataByType(exerciseData, 'exercise_type')
   const moodByValue = groupDataByType(moodData, 'mood_value')
 
   // Datos combinados para gráfico de actividad general
-  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce((acc, item) => {
+  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce<Array<{ date: string; count: number }>>((acc, item) => {
     const existing = acc.find(x => x.date === item.date)
     if (existing) {
       existing.count += item.count
@@ -174,7 +182,7 @@ export default function AnalyticsPage() {
       acc.push({ ...item })
     }
     return acc
-  }, [] as any[]).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, []).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   // Colores para gráficos
   const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16']
@@ -529,7 +537,7 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            formatter={(value, name) => [
+                            formatter={(value) => [
                               `${value} ${t.analytics.injections}`, 
                               t.analytics.insulinType
                             ]}
@@ -582,7 +590,7 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            formatter={(value, name) => [
+                            formatter={(value) => [
                               `${value} registros`, 
                               'Tipo de Comida'
                             ]}
@@ -636,7 +644,7 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            formatter={(value, name) => [
+                            formatter={(value) => [
                               `${value} inyecciones`, 
                               'Cantidad'
                             ]}
@@ -691,7 +699,7 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            formatter={(value, name) => [
+                            formatter={(value) => [
                               `${value} ${t.analytics.records}`, 
                               t.analytics.mood
                             ]}
@@ -747,7 +755,7 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            formatter={(value, name) => [
+                            formatter={(value) => [
                               `${value} ${t.analytics.injections}`, 
                               t.analytics.insulin
                             ]}
@@ -801,7 +809,7 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            formatter={(value, name) => [
+                            formatter={(value) => [
                               `${value} ${t.analytics.meals}`, 
                               t.analytics.records
                             ]}
@@ -855,7 +863,7 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            formatter={(value, name) => [
+                            formatter={(value) => [
                               `${value} ${t.analytics.sessions}`, 
                               t.analytics.exercise
                             ]}
@@ -909,7 +917,7 @@ export default function AnalyticsPage() {
                             }}
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
-                            formatter={(value, name) => [
+                            formatter={(value) => [
                               `${value} ${t.analytics.records}`, 
                               t.analytics.mood
                             ]}
