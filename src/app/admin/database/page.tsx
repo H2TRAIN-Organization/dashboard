@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Database, Table, Download, Upload, RefreshCw, BarChart3, FileText, HardDrive, Activity, TrendingUp, CheckCircle, AlertTriangle, Clock, Users, Database as DatabaseIcon } from 'lucide-react'
+import { Database, Table, Download, Upload, RefreshCw, FileText, HardDrive, Activity, TrendingUp, CheckCircle, Clock, Database as DatabaseIcon } from 'lucide-react'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
 import HybridNavigation from '@/components/HybridNavigation'
