@@ -70,14 +70,14 @@ export interface CountResponse {
 export interface UserCreateInput {
   username: string
   password: string
-  email?: string | null
+  email?: null
   role?: UserRole
   gdprConsent?: boolean
 }
 
 export interface UserUpdateInput {
   username?: string
-  email?: string | null
+  email?: null
   role?: UserRole
   gdprConsent?: boolean
 }
