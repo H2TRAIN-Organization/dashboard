@@ -1,22 +1,22 @@
 'use client'
 
-import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import { useSession } from '@/contexts/SessionContext'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth()
+  const { session, loading } = useSession()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !session) {
       router.push('/login')
     }
-  }, [user, loading, router])
+  }, [session, loading, router])
 
   if (loading) {
     return (
@@ -29,9 +29,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     )
   }
 
-  if (!user) {
+  if (!session) {
     return null
   }
 
   return <>{children}</>
-} 
+}

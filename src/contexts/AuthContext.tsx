@@ -1,12 +1,14 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
-import { User, Session } from '@supabase/supabase-js'
-import { supabase, UserRole } from '@/lib/supabase'
+import { createContext, useContext } from 'react'
+import { errorFrom } from '@/lib/api-client'
+import type { ClientSession, SessionUser, UserRole } from '@/lib/api-types'
+import { useSession } from './SessionContext'
 
 interface AuthContextType {
-  user: User | null
-  session: Session | null
+  /** Only populated when the verified backend session used the email method. */
+  user: SessionUser | null
+  session: ClientSession | null
   loading: boolean
   userRole: UserRole | null
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
@@ -17,92 +19,39 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [userRole, setUserRole] = useState<UserRole | null>(null)
+  const { session, loading, login, logout } = useSession()
+  const emailSession = session?.method === 'email' ? session : null
+  const user = emailSession?.user ?? null
+  const userRole = user?.role ?? null
 
-  // Función para obtener el rol del usuario
-  const fetchUserRole = async (userId: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 Obteniendo rol para usuario:', userId)
-      
-      // MODO DESARROLLO: Siempre asignar rol de administrador
-      console.log('✅ MODO DESARROLLO: Asignando rol de administrador a todos los usuarios autenticados')
-      return 'admin' as UserRole
-      
-    } catch (error) {
-      console.error('Error fetching user role:', error)
-      console.log('⚠️ Error, usando rol de administrador por defecto')
-      return 'admin' as UserRole
+      const next = await login({ email, password })
+      if (next.method !== 'email') {
+        await logout()
+        return { error: new Error('La sesión no corresponde al acceso por email') }
+      }
+      return { error: null }
+    } catch (caught) {
+      return { error: errorFrom(caught) }
     }
   }
 
-  useEffect(() => {
-    // Obtener sesión inicial
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        console.log('🔐 Usuario autenticado encontrado:', session.user.email)
-        const role = await fetchUserRole(session.user.id)
-        console.log('🎭 Rol asignado:', role)
-        setUserRole(role)
-      } else {
-        console.log('❌ No hay usuario autenticado')
-        setUserRole(null)
-      }
-      
-      setLoading(false)
-    })
-
-    // Escuchar cambios en la autenticación
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        console.log('🔄 Cambio de autenticación - Usuario:', session.user.email)
-        const role = await fetchUserRole(session.user.id)
-        console.log('🎭 Rol actualizado:', role)
-        setUserRole(role)
-      } else {
-        console.log('🚪 Usuario cerró sesión')
-        setUserRole(null)
-      }
-      
-      setLoading(false)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    return { error }
-  }
-
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-    return { error }
+  const signUp = async (_email: string, _password: string) => {
+    return {
+      error: new Error(
+        'El registro público no está disponible. Contacta con un administrador para crear la cuenta.',
+      ),
+    }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    await logout()
   }
 
   const value = {
     user,
-    session,
+    session: emailSession,
     loading,
     userRole,
     signIn,
@@ -119,4 +68,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
-} 
+}

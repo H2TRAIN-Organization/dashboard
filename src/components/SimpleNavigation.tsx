@@ -1,7 +1,6 @@
 'use client'
 
-import { useAuth } from '@/contexts/AuthContext'
-import { useAppAuth } from '@/contexts/AppAuthContext'
+import { useSession } from '@/contexts/SessionContext'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, LogOut, User, Sparkles, Shield, Stethoscope, UserIcon } from 'lucide-react'
 import Link from 'next/link'
@@ -14,22 +13,18 @@ interface SimpleNavigationProps {
 
 export default function SimpleNavigation({ title, showBackButton = true }: SimpleNavigationProps) {
   const { t } = useLanguage()
-  const { user, signOut } = useAuth()
-  const { user: appUser, signOut: appSignOut } = useAppAuth()
+  const { session, logout } = useSession()
+  const user = session?.user ?? null
+  const userRole = user?.role ?? null
   const router = useRouter()
 
   const handleSignOut = async () => {
-    if (user) {
-      await signOut()
-      router.push('/login')
-    } else if (appUser) {
-      await appSignOut()
-      router.push('/app-login')
-    }
+    const destination = session?.method === 'username' ? '/app-login' : '/login'
+    await logout()
+    router.push(destination)
   }
 
-  const currentUser = user || appUser
-  const userRole = user ? 'admin' : (appUser?.role || 'user') // Simplificado para demo
+  const backHref = session?.method === 'username' ? '/app-dashboard' : '/'
 
   return (
     <div className="relative bg-gradient-to-r from-blue-600/95 via-blue-700/95 to-blue-800/95 backdrop-blur-xl border-b border-blue-200/30">
@@ -41,7 +36,7 @@ export default function SimpleNavigation({ title, showBackButton = true }: Simpl
         <div className="flex justify-between items-center py-6">
           <div className="flex items-center space-x-6">
             {showBackButton && (
-              <Link href={user ? "/" : "/app-dashboard"} className="group">
+              <Link href={backHref} className="group">
                 <div className="relative bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-2xl shadow-lg group-hover:shadow-blue-500/50 transition-all duration-300 transform group-hover:scale-110">
                   <ArrowLeft className="h-6 w-6 text-white group-hover:h-7 group-hover:w-7 transition-all duration-300 relative z-10" />
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-400/30 to-blue-500/30 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -78,7 +73,7 @@ export default function SimpleNavigation({ title, showBackButton = true }: Simpl
               </div>
               <div className="text-sm">
                 <p className="font-semibold text-white">
-                  {user?.email || appUser?.Username}
+                  {user?.email || user?.username}
                 </p>
                 <div className="flex items-center space-x-1">
                   {userRole === 'admin' && <Shield className="h-3 w-3 text-yellow-300" />}

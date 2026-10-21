@@ -1,8 +1,9 @@
 'use client'
 
 import { ReactNode } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { UserRole, ROLE_PERMISSIONS } from '@/lib/supabase'
+import { useSession } from '@/contexts/SessionContext'
+import type { UserRole } from '@/lib/api-types'
+import { ROLE_PERMISSIONS, hasPermission, hasRoleAtLeast } from '@/lib/permissions'
 import { Shield, AlertCircle } from 'lucide-react'
 
 interface RoleGuardProps {
@@ -13,20 +14,52 @@ interface RoleGuardProps {
   showError?: boolean
 }
 
-export default function RoleGuard({ 
-  children, 
-  requiredRole, 
-  requiredPermission, 
+export function RoleDenied({
+  requiredRole,
+  requiredPermission,
+  currentRole,
+}: {
+  requiredRole?: UserRole
+  requiredPermission?: string
+  currentRole: UserRole
+}) {
+  return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="text-center">
+        <Shield className="h-16 w-16 text-orange-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Permisos Insuficientes</h2>
+        <p className="text-gray-600 mb-4">
+          {requiredRole
+            ? `Necesitas el rol ${requiredRole} para acceder a esta sección.`
+            : 'No tienes permisos para acceder a esta sección.'}
+        </p>
+        <p className="text-sm text-gray-500">
+          Tu rol actual: <span className="font-semibold">{currentRole}</span>
+          {requiredPermission ? ` · Permiso requerido: ${requiredPermission}` : ''}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default function RoleGuard({
+  children,
+  requiredRole,
+  requiredPermission,
   fallback,
-  showError = true 
+  showError = true,
 }: RoleGuardProps) {
-  const { user, userRole } = useAuth()
+  const { session, loading } = useSession()
 
-  // Debug logging
-  console.log('🛡️ RoleGuard - Usuario:', user?.email, 'Rol:', userRole, 'Permiso requerido:', requiredPermission, 'Rol requerido:', requiredRole)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
 
-  // Si no hay usuario autenticado
-  if (!user) {
+  if (!session) {
     return showError ? (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -35,94 +68,55 @@ export default function RoleGuard({
           <p className="text-gray-600">Debes iniciar sesión para acceder a esta sección.</p>
         </div>
       </div>
-    ) : null
+    ) : fallback ?? null
   }
 
-  // Obtener el rol del usuario del contexto (por defecto 'user' si no está definido)
-  const currentUserRole: UserRole = userRole || 'user'
+  const currentUserRole = session.user.role
 
-  // Verificar rol requerido
-  if (requiredRole) {
-    const roleHierarchy: Record<UserRole, number> = {
-      'user': 1,
-      'doctor': 2,
-      'admin': 3
-    }
-
-    if (roleHierarchy[currentUserRole] < roleHierarchy[requiredRole]) {
-      return showError ? (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Shield className="h-16 w-16 text-orange-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Permisos Insuficientes</h2>
-            <p className="text-gray-600 mb-4">
-              Necesitas el rol <span className="font-semibold text-blue-600">{requiredRole}</span> para acceder a esta sección.
-            </p>
-            <p className="text-sm text-gray-500">
-              Tu rol actual: <span className="font-semibold">{currentUserRole}</span>
-            </p>
-          </div>
-        </div>
-      ) : fallback || null
-    }
+  if (requiredRole && !hasRoleAtLeast(currentUserRole, requiredRole)) {
+    return showError ? (
+      <RoleDenied
+        requiredRole={requiredRole}
+        requiredPermission={requiredPermission}
+        currentRole={currentUserRole}
+      />
+    ) : fallback ?? null
   }
 
-  // Verificar permiso específico
-  if (requiredPermission) {
-    const userPermissions = ROLE_PERMISSIONS[currentUserRole] || []
-    
-    if (!userPermissions.includes(requiredPermission as any)) {
-      return showError ? (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Shield className="h-16 w-16 text-orange-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Permiso Denegado</h2>
-            <p className="text-gray-600 mb-4">
-              No tienes permisos para realizar esta acción.
-            </p>
-            <p className="text-sm text-gray-500">
-              Permiso requerido: <span className="font-semibold">{requiredPermission}</span>
-            </p>
-          </div>
-        </div>
-      ) : fallback || null
-    }
+  if (requiredPermission && !hasPermission(currentUserRole, requiredPermission)) {
+    return showError ? (
+      <RoleDenied
+        requiredRole={requiredRole}
+        requiredPermission={requiredPermission}
+        currentRole={currentUserRole}
+      />
+    ) : fallback ?? null
   }
 
-  // Si pasa todas las verificaciones, mostrar el contenido
   return <>{children}</>
 }
 
-// Hook para verificar permisos
 export function usePermissions() {
-  const { user, userRole } = useAuth()
-  const currentUserRole: UserRole = userRole || 'user'
-  const permissions = ROLE_PERMISSIONS[currentUserRole] || []
+  const { session } = useSession()
+  const currentUserRole: UserRole = session?.user.role ?? 'user'
+  const permissions = ROLE_PERMISSIONS[currentUserRole]
 
-  const hasPermission = (permission: string) => {
-    return permissions.includes(permission as any)
-  }
+  const hasPermissionForRole = (permission: string) =>
+    permissions.includes(permission)
 
-  const hasRole = (role: UserRole) => {
-    const roleHierarchy: Record<UserRole, number> = {
-      'user': 1,
-      'doctor': 2,
-      'admin': 3
-    }
-    return roleHierarchy[currentUserRole] >= roleHierarchy[role]
-  }
+  const hasRole = (role: UserRole) => hasRoleAtLeast(currentUserRole, role)
 
   const canAccess = (requiredRole?: UserRole, requiredPermission?: string) => {
     if (requiredRole && !hasRole(requiredRole)) return false
-    if (requiredPermission && !hasPermission(requiredPermission)) return false
+    if (requiredPermission && !hasPermissionForRole(requiredPermission)) return false
     return true
   }
 
   return {
     userRole: currentUserRole,
     permissions,
-    hasPermission,
+    hasPermission: hasPermissionForRole,
     hasRole,
-    canAccess
+    canAccess,
   }
 }

@@ -1,16 +1,20 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/supabase'
+import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
+import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
+import { getDisplayUsername } from '@/lib/user-mapper'
 import { Users, Activity, TrendingUp, AlertTriangle, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Database, Shield, Zap, Target } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridNavigation from '@/components/HybridNavigation'
+import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
 
 export default function OverviewPage() {
   const { t } = useLanguage()
+  const { session } = useSession()
   const [insulinData, setInsulinData] = useState<InsulinData[]>([])
   const [foodData, setFoodData] = useState<FoodData[]>([])
   const [exerciseData, setExerciseData] = useState<ExerciseData[]>([])
@@ -18,6 +22,7 @@ export default function OverviewPage() {
   const [moodData, setMoodData] = useState<MoodData[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [systemStats, setSystemStats] = useState({
     totalUsers: 0,
     totalRecords: 0,
@@ -33,51 +38,53 @@ export default function OverviewPage() {
     lastActivity: null as Date | null
   })
 
+  const currentRole = session?.user.role ?? null
+  const currentUsername = session?.user.username ?? null
+  const isIndividualUser = currentRole === 'user'
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      
-      // Llamar al endpoint que descifra los datos
-      const response = await fetch('/api/decrypted-data')
-      
-      if (!response.ok) {
-        throw new Error('Error al obtener datos descifrados')
+      setError(null)
+
+      const selected = isIndividualUser ? (currentUsername ?? '') : 'all'
+      if (isIndividualUser && selected.length === 0) {
+        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
       }
 
-      const data = await response.json()
-      
-      // Los datos ya vienen descifrados del servidor
-      setInsulinData(data.insulinData || [])
-      setFoodData(data.foodData || [])
-      setExerciseData(data.exerciseData || [])
-      setPeriodData(data.periodData || [])
-      setMoodData(data.moodData || [])
-      
-    } catch (error) {
-      console.error('Error fetching data:', error)
+      const data = await dataApi.getDecrypted({
+        selectedUser: selected,
+        timeRange: 'all',
+      })
+
+      setInsulinData(data.insulinData)
+      setFoodData(data.foodData)
+      setExerciseData(data.exerciseData)
+      setPeriodData(data.periodData)
+      setMoodData(data.moodData)
+    } catch (caught) {
+      console.error('Error fetching data:', caught)
+      setError(errorMessage(caught))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isIndividualUser, currentUsername])
 
   const fetchUsers = useCallback(async () => {
     try {
-      const { data: result, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('Username')
-
-      if (error) throw error
-      setUsers(result || [])
-    } catch (error) {
-      console.error('Error fetching users:', error)
+      const result = await usersApi.listAll()
+      setUsers(result.users)
+    } catch (caught) {
+      console.error('Error fetching users:', caught)
+      setError(errorMessage(caught))
     }
   }, [])
 
   useEffect(() => {
+    if (!session) return
     fetchData()
     fetchUsers()
-  }, [fetchData, fetchUsers])
+  }, [session, fetchData, fetchUsers])
 
   // Calcular estadísticas cuando los datos cambien
   useEffect(() => {
@@ -120,7 +127,7 @@ export default function OverviewPage() {
           ? Math.round(foodData.reduce((sum, item) => sum + parseFloat(item.carbs || '0'), 0) / foodData.length * 10) / 10 
           : 0,
         avgMood: moodData.length > 0 
-          ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(item.mood_value || '0'), 0) / moodData.length * 10) / 10 
+          ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(String(item.mood_value ?? 0)), 0) / moodData.length * 10) / 10
           : 0,
         
         // Última actividad del sistema
@@ -175,7 +182,10 @@ export default function OverviewPage() {
       periodCount: userPeriods.length,
       moodCount: userMood.length,
       lastActivity: allUserData.length > 0 ? 
-        new Date(Math.max(...allUserData.map(d => new Date(d.date_time || d.startDate).getTime()))) : 
+        new Date(Math.max(...allUserData.map(d => {
+          const record = d as { date_time?: string; startDate?: string }
+          return new Date(record.date_time || record.startDate || 0).getTime()
+        }))) :
         null,
       isActive: isRecentlyActive(allUserData)
     }
@@ -308,6 +318,11 @@ export default function OverviewPage() {
         <HybridNavigation title={t.dashboard.generalSummary} showBackButton={true} />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          )}
           {/* Header */}
           <div className="mb-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -577,7 +592,7 @@ export default function OverviewPage() {
                           <span className="text-sm font-medium text-blue-600">{index + 1}</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-black">{user.Username}</p>
+                          <p className="text-sm font-medium text-black">{getDisplayUsername(user)}</p>
                           <p className="text-xs text-gray-600">
                             {user.recordCount} registros totales
                           </p>

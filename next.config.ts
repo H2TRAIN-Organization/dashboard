@@ -4,6 +4,13 @@ const nextConfig: NextConfig = {
   // TypeScript and ESLint are checked by their own commands (see package.json).
   // Builds must not hide diagnostics from either tool.
 
+  images: {
+    localPatterns: [
+      { pathname: '/**', search: '' },
+      { pathname: '/logo-horizontal.png', search: '?v=10' },
+    ],
+  },
+
   // Configuración de seguridad
   async headers() {
     return [

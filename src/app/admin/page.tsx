@@ -3,52 +3,67 @@
 import { useState, useEffect } from 'react'
 import { Database, Shield, Users, Settings, BarChart3, Activity, TrendingUp, CheckCircle, Sparkles, Zap } from 'lucide-react'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
+import HybridRoleGuard from '@/components/HybridRoleGuard'
 import HybridNavigation from '@/components/HybridNavigation'
-import { useAuth } from '@/contexts/AuthContext'
-import { useAppAuth } from '@/contexts/AppAuthContext'
+import { adminApi, errorMessage, usersApi } from '@/lib/api-client'
+import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'
 import Link from 'next/link'
 
 export default function AdminNewPage() {
-  const { user } = useAuth()
-  const { user: appUser } = useAppAuth()
   const { t } = useLanguage()
+  const { session } = useSession()
   
   const [loading, setLoading] = useState(true)
+  const [statsError, setStatsError] = useState<string | null>(null)
   const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalRecords: 0,
-    databaseSize: 0,
-    systemUptime: 0
+    totalUsers: null as number | null,
+    totalRecords: null as number | null,
+    databaseSize: null as number | null,
+    systemUptime: null as number | null
   })
 
-  // Determinar si es un usuario individual o administrador
-  const isIndividualUser = appUser && !user
-
   useEffect(() => {
+    if (session?.user.role !== 'admin') return
     const loadStats = async () => {
       try {
         setLoading(true)
-        
-        // Simular carga de estadísticas
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
+        setStatsError(null)
+
+        const [usersResult, tablesResult] = await Promise.allSettled([
+          usersApi.count(),
+          adminApi.listTables(),
+        ])
+
         setStats({
-          totalUsers: 15,
-          totalRecords: 2847,
-          databaseSize: 2.4,
-          systemUptime: 99.8
+          totalUsers: usersResult.status === 'fulfilled' ? usersResult.value : null,
+          totalRecords: tablesResult.status === 'fulfilled' ? tablesResult.value.totalRecords : null,
+          databaseSize: null,
+          systemUptime: null
         })
-      } catch (error) {
-        console.error('Error loading stats:', error)
+
+        if (usersResult.status === 'rejected') {
+          setStatsError(errorMessage(usersResult.reason))
+        } else if (tablesResult.status === 'rejected') {
+          setStatsError(errorMessage(tablesResult.reason))
+        }
+      } catch (caught) {
+        console.error('Error loading stats:', caught)
+        setStats({
+          totalUsers: null,
+          totalRecords: null,
+          databaseSize: null,
+          systemUptime: null
+        })
+        setStatsError(errorMessage(caught))
       } finally {
         setLoading(false)
       }
     }
 
     loadStats()
-  }, [])
+  }, [session])
 
   const adminFeatures = [
     {
@@ -57,12 +72,18 @@ export default function AdminNewPage() {
       icon: Database,
       href: '/admin/database',
       color: 'from-green-500 to-emerald-500',
-      stats: `${stats.databaseSize} GB`
+      stats: stats.totalRecords === null
+        ? 'No disponible'
+        : `${stats.totalRecords.toLocaleString()} ${t.admin.records}`
      }
   ]
 
+  const formatCount = (value: number | null) =>
+    value === null ? 'No disponible' : value.toLocaleString()
+
   return (
     <HybridProtectedRoute>
+      <HybridRoleGuard requiredRole="admin">
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden" style={{ colorScheme: 'light' }}>
         {/* Elementos decorativos de fondo */}
         <div className="absolute inset-0 overflow-hidden">
@@ -79,6 +100,11 @@ export default function AdminNewPage() {
         </div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+          {statsError && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {statsError}
+            </div>
+          )}
           {/* Header con estadísticas generales */}
           <div className="mb-12">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">
@@ -102,7 +128,7 @@ export default function AdminNewPage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">{t.admin.usersLabel}</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatCount(stats.totalUsers)}</p>
                     </div>
                   </div>
                 </div>
@@ -114,7 +140,7 @@ export default function AdminNewPage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">{t.admin.recordsLabel}</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.totalRecords.toLocaleString()}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatCount(stats.totalRecords)}</p>
                     </div>
                   </div>
                 </div>
@@ -126,7 +152,7 @@ export default function AdminNewPage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">{t.admin.uptimeLabel}</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.systemUptime}%</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.systemUptime === null ? 'No disponible' : `${stats.systemUptime}%`}</p>
                     </div>
                   </div>
                 </div>
@@ -185,8 +211,10 @@ export default function AdminNewPage() {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-600 font-semibold">{t.admin.operational}</span>
+                <div className={`w-3 h-3 rounded-full animate-pulse ${statsError ? 'bg-gray-400' : 'bg-green-500'}`}></div>
+                <span className={`font-semibold ${statsError ? 'text-gray-500' : 'text-green-600'}`}>
+                  {statsError ? 'No disponible' : t.admin.operational}
+                </span>
               </div>
             </div>
             
@@ -196,7 +224,7 @@ export default function AdminNewPage() {
                   <div className="p-2 bg-blue-500 rounded-lg">
                     <Database className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-blue-600">{stats.databaseSize} GB</span>
+                <span className="text-2xl font-bold text-blue-600">{stats.databaseSize === null ? 'No disponible' : `${stats.databaseSize} GB`}</span>
                 </div>
                 <p className="text-blue-700 font-medium">{t.admin.databaseSize}</p>
               </div>
@@ -206,7 +234,7 @@ export default function AdminNewPage() {
                   <div className="p-2 bg-green-500 rounded-lg">
                     <Activity className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-green-600">{stats.systemUptime}%</span>
+                  <span className="text-2xl font-bold text-green-600">{stats.systemUptime === null ? 'No disponible' : `${stats.systemUptime}%`}</span>
                 </div>
                 <p className="text-green-700 font-medium">{t.admin.uptime}</p>
               </div>
@@ -216,7 +244,7 @@ export default function AdminNewPage() {
                   <div className="p-2 bg-purple-500 rounded-lg">
                     <TrendingUp className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-2xl font-bold text-purple-600">{stats.totalRecords.toLocaleString()}</span>
+                  <span className="text-2xl font-bold text-purple-600">{formatCount(stats.totalRecords)}</span>
                 </div>
                 <p className="text-purple-700 font-medium">{t.admin.totalRecords}</p>
               </div>
@@ -224,6 +252,7 @@ export default function AdminNewPage() {
           </div>
         </div>
       </div>
+      </HybridRoleGuard>
     </HybridProtectedRoute>
   )
 }

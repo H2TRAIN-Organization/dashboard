@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useAuth } from '@/contexts/AuthContext'
+import { useSession } from '@/contexts/SessionContext'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, LogOut, User, Sparkles, Zap, Shield, Stethoscope, Menu, X } from 'lucide-react'
 import { usePermissions } from '@/components/RoleGuard'
@@ -16,24 +16,26 @@ interface NavigationProps {
 
 export default function Navigation({ title, showBackButton = true }: NavigationProps) {
   const { t } = useLanguage()
-  const { user, signOut } = useAuth()
+  const { session, logout } = useSession()
+  const user = session?.user ?? null
   const { userRole, hasPermission } = usePermissions()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push('/login')
+    const destination = session?.method === 'username' ? '/app-login' : '/login'
+    await logout()
+    router.push(destination)
   }
 
   // Rutas de navegación
   const navigationRoutes = [
     { path: '/', label: t.navigation.dashboard, icon: '🏠' },
-    { path: '/users', label: t.navigation.users, icon: '👥', requiresPermission: 'admin' },
+    { path: '/users', label: t.navigation.users, icon: '👥', requiresPermission: 'view_users' },
     { path: '/data', label: t.navigation.data, icon: '📊' },
     { path: '/kubios', label: t.navigation.kubios, icon: '❤️' },
     { path: '/analytics', label: t.navigation.analytics, icon: '📈' },
-    { path: '/admin', label: t.navigation.admin, icon: '⚙️', requiresPermission: 'admin' },
+    { path: '/admin', label: t.navigation.admin, icon: '⚙️', requiresPermission: 'view_admin' },
   ].filter(route => !route.requiresPermission || hasPermission(route.requiresPermission))
 
   return (
@@ -103,7 +105,7 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-blue-300 to-blue-400 rounded-full border border-blue-600"></div>
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-gray-800">{user?.email}</p>
+                  <p className="font-semibold text-gray-800">{user?.email || user?.username}</p>
                   <div className="flex items-center space-x-1">
                     {userRole === 'admin' && <Shield className="h-3 w-3 text-yellow-500" />}
                     {userRole === 'doctor' && <Stethoscope className="h-3 w-3 text-green-500" />}
@@ -194,7 +196,7 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
                 <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-gradient-to-r from-blue-300 to-blue-400 rounded-full border border-blue-600"></div>
               </div>
               <div className="text-sm min-w-0 flex-1">
-                <p className="font-medium text-white truncate">{user?.email}</p>
+                <p className="font-medium text-white truncate">{user?.email || user?.username}</p>
                 <div className="flex items-center space-x-1">
                   {userRole === 'admin' && <Shield className="h-3 w-3 text-yellow-300 flex-shrink-0" />}
                   {userRole === 'doctor' && <Stethoscope className="h-3 w-3 text-green-300 flex-shrink-0" />}

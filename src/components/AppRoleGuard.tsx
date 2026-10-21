@@ -2,47 +2,39 @@
 
 import { useAppAuth } from '@/contexts/AppAuthContext'
 import { ReactNode } from 'react'
+import type { UserRole } from '@/lib/api-types'
+import { hasPermission, hasRoleAtLeast } from '@/lib/permissions'
 
 interface AppRoleGuardProps {
   children: ReactNode
-  requiredRole?: string
+  requiredRole?: UserRole
   requiredPermission?: string
   fallback?: ReactNode
 }
 
-export default function AppRoleGuard({ 
-  children, 
-  requiredRole, 
-  requiredPermission, 
-  fallback = null 
+export default function AppRoleGuard({
+  children,
+  requiredRole,
+  requiredPermission,
+  fallback = null,
 }: AppRoleGuardProps) {
   const { userRole } = useAppAuth()
 
-  // Si no se especifica rol o permiso, mostrar contenido
   if (!requiredRole && !requiredPermission) {
     return <>{children}</>
   }
 
-  // Verificar rol
-  if (requiredRole && userRole !== requiredRole) {
+  if (!userRole) {
     return <>{fallback}</>
   }
 
-  // Verificar permisos (simplificado para desarrollo)
-  if (requiredPermission) {
-    const permissions = {
-      admin: ['view_users', 'view_data', 'view_analytics', 'view_kubios', 'view_study', 'view_admin'],
-      doctor: ['view_data', 'view_analytics', 'view_kubios', 'view_study'],
-      user: ['view_data']
-    }
+  if (requiredRole && !hasRoleAtLeast(userRole, requiredRole)) {
+    return <>{fallback}</>
+  }
 
-    const userPermissions = permissions[userRole as keyof typeof permissions] || []
-    
-    if (!userPermissions.includes(requiredPermission)) {
-      return <>{fallback}</>
-    }
+  if (requiredPermission && !hasPermission(userRole, requiredPermission)) {
+    return <>{fallback}</>
   }
 
   return <>{children}</>
 }
-
