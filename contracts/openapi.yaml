@@ -1,0 +1,869 @@
+openapi: 3.1.0
+info:
+  title: Diabetes Tracker Dashboard API
+  version: 0.1.0
+  description: |
+    Contrato autoritativo para la base backend del dashboard. Las rutas todavía
+    no están montadas en Next.js: esta fase define la interfaz y las capas de
+    aplicación. Los adaptadores de persistencia y autenticación se implementarán
+    después de inspeccionar el esquema remoto y el formato de credenciales.
+
+    Matriz de acceso:
+    - `admin`: lectura y escritura de usuarios, lectura de todos los datos de
+      salud y exploración de la base de datos.
+    - `doctor`: lectura de todos los usuarios y de todos los datos de salud.
+      Ninguna escritura.
+    - `user`: lectura de su propio perfil y de sus propios datos de salud.
+      Ninguna escritura ni acceso a la base de datos administrativa.
+
+    La autenticación usa un token de sesión Bearer. Ningún esquema público
+    contiene hashes, verificadores, claves ni material cifrado.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+    description: Inicio, consulta y cierre de sesión.
+  - name: users
+    description: CRUD de usuarios y limpieza de su UUID externo.
+  - name: data
+    description: Acceso a datos de salud descifrados y compatibilidad legada.
+  - name: admin
+    description: Exploración de base de datos, solo administradores.
+paths:
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Iniciar sesión con email o nombre de usuario
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/EmailLoginRequest"
+                - $ref: "#/components/schemas/UsernameLoginRequest"
+            examples:
+              email:
+                value:
+                  email: user@example.com
+                  password: example-password
+              username:
+                value:
+                  username: example-user
+                  password: example-password
+      responses:
+        "200":
+          description: Sesión creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/auth/session:
+    get:
+      tags: [auth]
+      summary: Consultar la sesión actual
+      operationId: getSession
+      responses:
+        "200":
+          description: Sesión válida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: Cerrar la sesión actual
+      operationId: logout
+      responses:
+        "204":
+          description: Sesión revocada. La operación es idempotente.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/users:
+    get:
+      tags: [users]
+      summary: Listar usuarios
+      description: |
+        `admin` y `doctor` reciben todos los usuarios. `user` recibe únicamente
+        su propio perfil, independientemente de los filtros.
+      operationId: listUsers
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+        - name: role
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/UserRole"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Página de usuarios.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [users]
+      summary: Crear usuario
+      description: Solo `admin`.
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreateRequest"
+      responses:
+        "201":
+          description: Usuario creado. La respuesta nunca incluye credenciales.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/users/count:
+    get:
+      tags: [users]
+      summary: Contar usuarios
+      description: |
+        `admin` y `doctor` reciben el total. `user` recibe `1` (su propio perfil).
+      operationId: countUsers
+      responses:
+        "200":
+          description: Conteo de usuarios visibles.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [users]
+      summary: Obtener usuario
+      description: "`admin` y `doctor` pueden leer cualquiera; `user` solo su perfil."
+      operationId: getUser
+      responses:
+        "200":
+          description: Usuario encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [users]
+      summary: Actualizar usuario
+      description: Solo `admin`.
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+      responses:
+        "200":
+          description: Usuario actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [users]
+      summary: Eliminar usuario
+      description: |
+        Solo `admin`. Si el usuario todavía tiene datos de salud asociados, la
+        operación devuelve `409` con código `USER_HAS_DATA`.
+      operationId: deleteUser
+      responses:
+        "204":
+          description: Usuario eliminado.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/UserHasData"
+  /api/users/{id}/uuid:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    delete:
+      tags: [users]
+      summary: Limpiar el UUID externo del usuario
+      description: |
+        Solo `admin`. Pone el UUID en `null` y devuelve el usuario actualizado.
+        No elimina al usuario ni sus datos.
+      operationId: clearUserUuid
+      responses:
+        "200":
+          description: UUID limpiado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/decrypted-data:
+    get:
+      tags: [data]
+      summary: Obtener datos de salud descifrados
+      description: |
+        Devuelve exactamente cinco colecciones. `admin` y `doctor` pueden usar
+        `selectedUser=all` o cualquier nombre de usuario. `user` solo puede
+        solicitar su propio nombre de usuario; `all` y terceros producen `403`.
+
+        Si se envía `dateFilter`, se usa como cota inferior inclusiva y tiene
+        prioridad sobre `timeRange`.
+      operationId: getDecryptedData
+      parameters:
+        - name: selectedUser
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            default: all
+        - name: timeRange
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, all]
+            default: 30d
+        - name: selectedDataType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, insulin, food, exercise, period, mood]
+            default: all
+        - name: dateFilter
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Cota inferior inclusiva en ISO-8601. Tiene prioridad sobre timeRange.
+      responses:
+        "200":
+          description: Las cinco colecciones, siempre presentes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecryptedDataResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/data:
+    get:
+      tags: [data]
+      summary: Acceso compatible a datos de salud
+      description: |
+        Endpoint de compatibilidad. Con `type=all` devuelve un objeto con las
+        claves `exercise`, `mood`, `insulin` y `meal`; con un tipo concreto
+        devuelve el array correspondiente.
+
+        `admin` y `doctor` reciben todos los usuarios. `user` recibe únicamente
+        sus propios registros.
+      operationId: getLegacyData
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, exercise, mood, insulin, meal]
+            default: all
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+          description: Días hacia atrás desde ahora.
+      responses:
+        "200":
+          description: Objeto agregado o array para un tipo concreto.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/LegacyAllData"
+                  - $ref: "#/components/schemas/LegacyRecordList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/database/tables:
+    get:
+      tags: [admin]
+      summary: Listar tablas conocidas y su accesibilidad
+      description: Solo `admin`.
+      operationId: listAdminDatabaseTables
+      responses:
+        "200":
+          description: Tablas conocidas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTablesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/database/table-data:
+    get:
+      tags: [admin]
+      summary: Leer filas de una tabla
+      description: Solo `admin`. El nombre de tabla se valida con una allowlist de formato; el adaptador real debe imponer además su propia allowlist.
+      operationId: getAdminDatabaseTableData
+      parameters:
+        - name: table
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z][a-z0-9_]{0,62}$"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: Página de filas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTableDataResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-session-token
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      description: Identificador opaco del usuario. No se asume que sea un UUID.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  responses:
+    BadRequest:
+      description: Petición inválida o fuera de contrato.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthorized:
+      description: Falta la sesión o no es válida.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Forbidden:
+      description: La sesión es válida pero el rol no permite la operación.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: El recurso no existe.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: Conflicto con el estado actual.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UserHasData:
+      description: El usuario tiene datos asociados y no puede eliminarse.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            error:
+              code: USER_HAS_DATA
+              message: No se puede eliminar un usuario que todavía tiene datos asociados
+  schemas:
+    UserRole:
+      type: string
+      enum: [admin, doctor, user]
+    User:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - email
+        - role
+        - uuid
+        - gdprConsent
+        - gdprConsentAt
+        - createdAt
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: [string, "null"]
+          format: email
+        role:
+          $ref: "#/components/schemas/UserRole"
+        uuid:
+          type: [string, "null"]
+          description: Identificador externo del usuario; puede limpiarse.
+        gdprConsent:
+          type: boolean
+        gdprConsentAt:
+          type: [string, "null"]
+          format: date-time
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+    UserResponse:
+      type: object
+      additionalProperties: false
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+    UserListResponse:
+      type: object
+      additionalProperties: false
+      required: [users, total]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+          minimum: 0
+    CountResponse:
+      type: object
+      additionalProperties: false
+      required: [count]
+      properties:
+        count:
+          type: integer
+          minimum: 0
+    EmailLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+          maxLength: 1024
+    UsernameLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 128
+        password:
+          type: string
+          minLength: 1
+          maxLength: 1024
+    SessionResponse:
+      type: object
+      additionalProperties: false
+      required: [user, token, expiresAt]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+          description: Token opaco de sesión Bearer.
+        expiresAt:
+          type: string
+          format: date-time
+    UserCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 128
+        email:
+          type: [string, "null"]
+          format: email
+        password:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          writeOnly: true
+        role:
+          $ref: "#/components/schemas/UserRole"
+          default: user
+        gdprConsent:
+          type: boolean
+          default: false
+    UserUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 128
+        email:
+          type: [string, "null"]
+          format: email
+        role:
+          $ref: "#/components/schemas/UserRole"
+        gdprConsent:
+          type: boolean
+    HealthRecord:
+      type: object
+      additionalProperties: true
+      description: Registro ya descifrado. No debe contener campos de IV ni ciphertext.
+    InsulinRecord:
+      allOf:
+        - $ref: "#/components/schemas/HealthRecord"
+        - type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            insulinType:
+              type: string
+            dose:
+              type: string
+            date_time:
+              type: string
+              format: date-time
+    FoodRecord:
+      allOf:
+        - $ref: "#/components/schemas/HealthRecord"
+        - type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            food_type:
+              type: string
+            quantity:
+              type: string
+            carbs:
+              type: string
+            date_time:
+              type: string
+              format: date-time
+    ExerciseRecord:
+      allOf:
+        - $ref: "#/components/schemas/HealthRecord"
+        - type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            exercise_type:
+              type: string
+            intensity:
+              type: string
+            exercise_start_time:
+              type: string
+              format: date-time
+            exercise_end_time:
+              type: string
+              format: date-time
+            exercise_description:
+              type: string
+            date_time:
+              type: string
+              format: date-time
+    PeriodRecord:
+      allOf:
+        - $ref: "#/components/schemas/HealthRecord"
+        - type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+            intensity:
+              type: string
+            symptoms:
+              type: array
+              items:
+                type: string
+            notes:
+              type: string
+    MoodRecord:
+      allOf:
+        - $ref: "#/components/schemas/HealthRecord"
+        - type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            mood_value:
+              type: number
+            out_of_routine:
+              type: boolean
+            routine_description:
+              type: string
+            emotions:
+              type: array
+              items:
+                type: string
+            other_emotion:
+              type: string
+            date_time:
+              type: string
+              format: date-time
+    DecryptedDataResponse:
+      type: object
+      additionalProperties: false
+      required: [insulinData, foodData, exerciseData, periodData, moodData]
+      properties:
+        insulinData:
+          type: array
+          items:
+            $ref: "#/components/schemas/InsulinRecord"
+        foodData:
+          type: array
+          items:
+            $ref: "#/components/schemas/FoodRecord"
+        exerciseData:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExerciseRecord"
+        periodData:
+          type: array
+          items:
+            $ref: "#/components/schemas/PeriodRecord"
+        moodData:
+          type: array
+          items:
+            $ref: "#/components/schemas/MoodRecord"
+    LegacyRecord:
+      type: object
+      additionalProperties: true
+      description: Fila legada sin transformar. No contiene credenciales de usuario.
+    LegacyRecordList:
+      type: array
+      items:
+        $ref: "#/components/schemas/LegacyRecord"
+    LegacyAllData:
+      type: object
+      additionalProperties: false
+      required: [exercise, mood, insulin, meal]
+      properties:
+        exercise:
+          $ref: "#/components/schemas/LegacyRecordList"
+        mood:
+          $ref: "#/components/schemas/LegacyRecordList"
+        insulin:
+          $ref: "#/components/schemas/LegacyRecordList"
+        meal:
+          $ref: "#/components/schemas/LegacyRecordList"
+    DatabaseTableInfo:
+      type: object
+      additionalProperties: false
+      required: [name, recordCount, accessible]
+      properties:
+        name:
+          type: string
+        recordCount:
+          type: integer
+          minimum: 0
+        accessible:
+          type: boolean
+        error:
+          type: string
+    AdminTablesResponse:
+      type: object
+      additionalProperties: false
+      required: [success, tables, totalRecords, accessibleCount, totalCount]
+      properties:
+        success:
+          type: boolean
+          const: true
+        tables:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseTableInfo"
+        totalRecords:
+          type: integer
+          minimum: 0
+        accessibleCount:
+          type: integer
+          minimum: 0
+        totalCount:
+          type: integer
+          minimum: 0
+    AdminTableDataResponse:
+      type: object
+      additionalProperties: false
+      required: [success, tableName, data, totalRecords, returnedRecords, limit]
+      properties:
+        success:
+          type: boolean
+          const: true
+        tableName:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthRecord"
+        totalRecords:
+          type: integer
+          minimum: 0
+        returnedRecords:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - BAD_REQUEST
+                - VALIDATION_ERROR
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - USER_HAS_DATA
+                - TABLE_NOT_ALLOWED
+                - NOT_IMPLEMENTED
+                - SERVICE_UNAVAILABLE
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
