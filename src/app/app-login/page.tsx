@@ -33,7 +33,7 @@ export default function AppLoginPage() {
         // Redirigir al dashboard personalizado
         router.push('/app-dashboard')
       }
-    } catch (err) {
+    } catch {
       setError(t.auth.unexpectedError)
     } finally {
       setLoading(false)

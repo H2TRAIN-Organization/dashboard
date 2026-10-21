@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signUp = async (_email: string, _password: string) => {
+  const signUp = async () => {
     return {
       error: new Error(
         'El registro público no está disponible. Contacta con un administrador para crear la cuenta.',

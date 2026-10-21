@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Lock, Mail, Activity, Heart, TrendingUp, Shield, Users, BarChart3, Zap, CheckCircle, User, LogIn } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, Activity, Shield, Users, BarChart3, User, LogIn } from 'lucide-react'
 import Image from 'next/image'
 import { useLanguage } from '@/contexts/LanguageContext'
 import LanguageSelector from '@/components/LanguageSelector'

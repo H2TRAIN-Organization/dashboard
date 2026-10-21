@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Database, Shield, Users, Settings, BarChart3, Activity, TrendingUp, CheckCircle, Sparkles, Zap } from 'lucide-react'
+import { Database, Shield, Users, Activity, TrendingUp, CheckCircle } from 'lucide-react'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
 import HybridNavigation from '@/components/HybridNavigation'
@@ -15,7 +15,6 @@ export default function AdminNewPage() {
   const { t } = useLanguage()
   const { session } = useSession()
   
-  const [loading, setLoading] = useState(true)
   const [statsError, setStatsError] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalUsers: null as number | null,
@@ -28,7 +27,6 @@ export default function AdminNewPage() {
     if (session?.user.role !== 'admin') return
     const loadStats = async () => {
       try {
-        setLoading(true)
         setStatsError(null)
 
         const [usersResult, tablesResult] = await Promise.allSettled([
@@ -57,8 +55,6 @@ export default function AdminNewPage() {
           systemUptime: null
         })
         setStatsError(errorMessage(caught))
-      } finally {
-        setLoading(false)
       }
     }
 
