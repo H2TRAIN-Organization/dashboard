@@ -1,0 +1,22 @@
+$kind: http-request
+name: '05 doctor reads all health data'
+method: GET
+url: '{{baseUrl}}/api/decrypted-data?selectedUser=all&timeRange=all'
+order: 5000
+headers:
+  - key: Cookie
+    value: '{{doctor_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('doctor global data is 200', () => pm.response.to.have.status(200));
+      pm.test('five collections', () => {
+        pm.expect(Object.keys(body).sort()).to.eql([
+          'exerciseData', 'foodData', 'insulinData', 'moodData', 'periodData'
+        ]);
+      });
+    language: text/javascript
+
+settings:
+  disableCookies: true

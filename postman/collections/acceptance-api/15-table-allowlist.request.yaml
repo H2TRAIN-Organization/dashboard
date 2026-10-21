@@ -1,0 +1,17 @@
+$kind: http-request
+name: '15 table name outside allowlist is rejected'
+method: GET
+url: '{{baseUrl}}/api/admin/database/table-data?table=pg_catalog'
+order: 15000
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('not 200', () => pm.expect(pm.response.code).to.not.eql(200));
+      pm.test('400 or 404', () => pm.expect([400, 404]).to.include(pm.response.code));
+    language: text/javascript
+
+settings:
+  disableCookies: true

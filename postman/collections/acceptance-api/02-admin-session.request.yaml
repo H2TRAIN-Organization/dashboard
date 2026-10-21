@@ -1,0 +1,25 @@
+$kind: http-request
+name: '02 admin session (cookie only)'
+method: GET
+url: '{{baseUrl}}/api/auth/session'
+order: 2000
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('session is 200', () => pm.response.to.have.status(200));
+      pm.test('no JSON token', () => {
+        pm.expect(body).to.not.have.property('token');
+        pm.expect(body).to.not.have.property('access_token');
+      });
+      pm.test('same admin', () => {
+        pm.expect(body.user.id).to.eql(pm.collectionVariables.get('adminUserId'));
+        pm.expect(body.method).to.eql('email');
+      });
+    language: text/javascript
+
+settings:
+  disableCookies: true

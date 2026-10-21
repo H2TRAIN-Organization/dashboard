@@ -1,0 +1,13 @@
+$kind: http-request
+name: '21 old admin session is rejected'
+method: GET
+url: '{{baseUrl}}/api/auth/session'
+order: 21000
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('logged out session', () => pm.response.to.have.status(401));
+    language: text/javascript
+
+settings:
+  disableCookies: true

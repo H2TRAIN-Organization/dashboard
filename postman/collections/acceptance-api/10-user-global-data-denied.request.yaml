@@ -1,0 +1,23 @@
+$kind: http-request
+name: '10 user selectedUser is normalized to self'
+method: GET
+url: '{{baseUrl}}/api/decrypted-data?selectedUser=all&timeRange=all'
+order: 10000
+headers:
+  - key: Cookie
+    value: '{{user_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('normalized request is 200', () => pm.response.to.have.status(200));
+      pm.test('only own rows', () => {
+        const expected = `acceptance.user.${pm.collectionVariables.get('runId')}`;
+        for (const rows of Object.values(body)) {
+          for (const row of rows) pm.expect(row.username).to.eql(expected);
+        }
+      });
+    language: text/javascript
+
+settings:
+  disableCookies: true

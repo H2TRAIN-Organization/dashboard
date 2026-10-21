@@ -1,0 +1,22 @@
+$kind: http-request
+name: '11 user reads own health data'
+method: GET
+url: '{{baseUrl}}/api/decrypted-data?selectedUser=acceptance.user.{{runId}}&timeRange=all'
+order: 11000
+headers:
+  - key: Cookie
+    value: '{{user_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('own data is 200', () => pm.response.to.have.status(200));
+      pm.test('five collections', () => {
+        pm.expect(Object.keys(body).sort()).to.eql([
+          'exerciseData', 'foodData', 'insulinData', 'moodData', 'periodData'
+        ]);
+      });
+    language: text/javascript
+
+settings:
+  disableCookies: true

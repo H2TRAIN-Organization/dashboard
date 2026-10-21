@@ -1,0 +1,25 @@
+$kind: collection
+name: Acceptance API (cookie sessions)
+description: |
+  T-010 acceptance flow against the final dashboard contract: HttpOnly cookie
+  sessions, no JSON token, no bearer. Synthetic fixtures only. No request in
+  this collection touches a real database or production service.
+variables:
+  - key: baseUrl
+    value: 'http://127.0.0.1:3000'
+  - key: admin_cookie
+    value: ''
+  - key: doctor_cookie
+    value: ''
+  - key: user_cookie
+    value: ''
+  - key: adminUserId
+    value: ''
+  - key: doctorId
+    value: ''
+  - key: userId
+    value: ''
+  - key: hasDataId
+    value: ''
+  - key: runId
+    value: ''

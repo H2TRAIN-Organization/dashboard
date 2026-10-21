@@ -1,0 +1,18 @@
+$kind: http-request
+name: '06 doctor cannot read admin database'
+method: GET
+url: '{{baseUrl}}/api/admin/database/tables'
+order: 6000
+headers:
+  - key: Cookie
+    value: '{{doctor_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('doctor is forbidden', () => pm.response.to.have.status(403));
+      pm.test('problem code', () => pm.expect(body.error.code).to.eql('FORBIDDEN'));
+    language: text/javascript
+
+settings:
+  disableCookies: true

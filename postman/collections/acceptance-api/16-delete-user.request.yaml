@@ -1,0 +1,18 @@
+$kind: http-request
+name: '16 admin deletes synthetic user'
+method: DELETE
+url: '{{baseUrl}}/api/users/{{userId}}'
+order: 16000
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+  - key: Origin
+    value: '{{baseUrl}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('deleted', () => pm.response.to.have.status(204));
+    language: text/javascript
+
+settings:
+  disableCookies: true

@@ -1,0 +1,18 @@
+$kind: http-request
+name: '09 user cannot read doctor profile'
+method: GET
+url: '{{baseUrl}}/api/users/{{doctorId}}'
+order: 9000
+headers:
+  - key: Cookie
+    value: '{{user_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('IDOR is forbidden', () => pm.response.to.have.status(403));
+      pm.test('problem code', () => pm.expect(body.error.code).to.eql('FORBIDDEN'));
+    language: text/javascript
+
+settings:
+  disableCookies: true

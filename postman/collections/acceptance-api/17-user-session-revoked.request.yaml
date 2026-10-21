@@ -1,0 +1,16 @@
+$kind: http-request
+name: '17 deleted user session is rejected'
+method: GET
+url: '{{baseUrl}}/api/auth/session'
+order: 17000
+headers:
+  - key: Cookie
+    value: '{{user_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('revoked session', () => pm.response.to.have.status(401));
+    language: text/javascript
+
+settings:
+  disableCookies: true

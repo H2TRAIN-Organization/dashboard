@@ -1,0 +1,20 @@
+$kind: http-request
+name: '13 delete user with health data is 409'
+method: DELETE
+url: '{{baseUrl}}/api/users/{{hasDataId}}'
+order: 13000
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+  - key: Origin
+    value: '{{baseUrl}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('conflict', () => pm.response.to.have.status(409));
+      pm.test('USER_HAS_DATA', () => pm.expect(body.error.code).to.eql('USER_HAS_DATA'));
+    language: text/javascript
+
+settings:
+  disableCookies: true

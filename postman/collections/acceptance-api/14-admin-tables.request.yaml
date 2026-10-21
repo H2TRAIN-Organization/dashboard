@@ -1,0 +1,23 @@
+$kind: http-request
+name: '14 admin reads table metadata without hashes'
+method: GET
+url: '{{baseUrl}}/api/admin/database/table-data?table=users&limit=2'
+order: 14000
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      const body = pm.response.json();
+      pm.test('table data is 200', () => pm.response.to.have.status(200));
+      pm.test('no password material', () => {
+        for (const row of body.data || []) {
+          pm.expect(row).to.not.have.property('PasswordHash');
+          pm.expect(row).to.not.have.property('passwordHash');
+        }
+      });
+    language: text/javascript
+
+settings:
+  disableCookies: true
