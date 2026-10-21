@@ -557,7 +557,7 @@ export default function KubiosPage() {
 
           {/* Días de la semana */}
           <div className="grid grid-cols-7 gap-2 mb-4">
-            {dayNames.map((day) => (
+            {dayNames.map((day: string) => (
               <div key={day} className="text-center text-sm font-medium text-slate-500 py-2">
                 {day}
               </div>

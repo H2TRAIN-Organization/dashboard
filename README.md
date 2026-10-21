@@ -1,168 +1,197 @@
 # Diabetes Tracker Dashboard
 
-Este es un dashboard de administración para el sistema Diabetes Tracker, construido con Next.js, React y Tailwind CSS.
+Dashboard de administración para Diabetes Tracker, construido con Next.js, React, Tailwind CSS y Supabase. Este README describe alcance, puesta en marcha y convenciones de trabajo. El estado detallado, las evidencias y los bloqueos se mantienen en `docs/registro-tareas.md`. No certifica que la implementación esté terminada ni que las pruebas pasen.
 
-**Última actualización**: Enero 2025 - Deploy automático configurado ✅ - Monorepo configurado
+## Alcance
 
-## Características
+**Incluido (objetivo)**
 
-- **Gestión de Usuarios**: Ver, editar y eliminar usuarios del sistema
-- **Visualización de Datos**: Tabla con todos los datos de salud de los usuarios
-- **Análisis y Estadísticas**: Gráficos interactivos con Recharts
-- **Resumen General**: Vista general del sistema con métricas clave
-- **Filtros Avanzados**: Filtrar por usuario, fecha y rango de tiempo
-- **Exportación de Datos**: Exportar datos a formato CSV
-- **Diseño Responsivo**: Interfaz adaptada para diferentes dispositivos
+- Dashboard Next.js y su frontend actual.
+- Supabase como persistencia y autenticación.
+- Backend integrado en Next.js (App Router), con arquitectura y contratos verificables.
+- Administración completa: usuarios, roles y base de datos.
+- Dos accesos: email/password con Supabase Auth y usuario/password con verificación de hash en servidor.
+- Roles `admin`, `doctor` y `user`.
 
-## Tecnologías Utilizadas
+**Excluido estrictamente**
 
-- **Next.js 14** - Framework de React
-- **TypeScript** - Tipado estático
-- **Tailwind CSS** - Framework de CSS utilitario
-- **Supabase** - Base de datos y autenticación
-- **Recharts** - Biblioteca de gráficos
-- **Lucide React** - Iconos
+- `pi-mqtt-agent/`
+- `kub-kubioscloud-demo/` y toda la integración Kubios: `src/app/kubios`, `src/app/api/kubios`, `src/lib/kubios-service.ts` y variables `KUBIOS_*`.
+- `Uploader/`
+- Publicación y despliegue: no deploy, no push a producción, no publicación de paquetes.
 
-## Instalación
+**Reglas de diseño**
 
-1. **Clonar el repositorio**:
-   ```bash
-   git clone <tu-repositorio>
-   cd dashboard
-   ```
+- Preservar el diseño y la experiencia visual del frontend; adaptar solo conexiones, contratos y capa de datos.
+- `admin`: gestión completa de usuarios, roles y base de datos.
+- `doctor`: lectura global de usuarios y datos.
+- `user`: lectura de sus propios datos.
+- Borrado de usuario: bloquear con error explícito si existen registros asociados (409). El mecanismo exacto debe verificarse en Supabase; no se inventa.
 
-2. **Instalar dependencias**:
-   ```bash
-   npm install
-   ```
+Estas reglas son el objetivo de la reconstrucción, no comportamiento verificado del código legado.
 
-3. **Configurar variables de entorno**:
-   Crea un archivo `.env.local` en la raíz del proyecto con:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=tu_url_de_supabase
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase
-   ```
+## Requisitos y puesta en marcha
 
-4. **Ejecutar el proyecto**:
-   ```bash
-   npm run dev
-   ```
+Requisitos:
 
-5. **Abrir en el navegador**:
-   ```
-   http://localhost:3000
-   ```
+- Node.js y npm. No hay `engines` en `package.json`; verifica la compatibilidad con la versión de Next.js instalada.
+- Git.
+- Proyecto Supabase de desarrollo o staging. No uses producción para pruebas destructivas.
 
-## Configuración de Supabase
+```bash
+npm install
+```
 
-Para que el dashboard funcione correctamente, necesitas configurar Supabase con las siguientes tablas:
+Copia la plantilla de entorno y sustituye los placeholders:
 
-### Tabla `users`
+```bash
+# macOS/Linux
+cp .env.example .env.local
+
+# PowerShell
+Copy-Item .env.example .env.local
+```
+
+Edita `.env.local` con valores propios y ejecuta:
+
+```bash
+npm run dev
+```
+
+Abre `http://localhost:3000`.
+
+Scripts disponibles en `package.json`:
+
+```bash
+npm run build
+npm run typecheck
+npm run typecheck:app
+npm run lint
+npm run test
+npm run test:e2e
+npm run check
+```
+
+La existencia de estos scripts no implica que pasen. Los resultados y bloqueos se registran en `docs/registro-tareas.md`; este README no declara PASS.
+
+`.gitignore` ya incluye la excepción `!.env.example`; la plantilla no está ignorada. No se ha staged ni commiteado. No se fuerza staging desde documentación.
+
+## Variables de entorno
+
+No se copian valores reales en este README ni en `.env.example`. La plantilla contiene únicamente placeholders.
+
+| Variable | Ámbito | Uso |
+| --- | --- | --- |
+| `SUPABASE_URL` | Servidor (preferido) | URL del proyecto Supabase. No se duplica como `NEXT_PUBLIC_SUPABASE_URL` si todo el acceso pasa por servidor. |
+| `SUPABASE_PUBLISHABLE_KEY` | Público/servidor | Clave publicable; no es un secreto, pero exige RLS y grants correctos. |
+| `SUPABASE_SERVICE_ROLE_KEY` o `SUPABASE_SECRET_KEY` | Solo servidor | Clave privada para operaciones administrativas. Preferir `SUPABASE_SERVICE_ROLE_KEY`; `SUPABASE_SECRET_KEY` solo se acepta si su claim es `service_role`. Una clave `anon` no habilita OpenAPI. Nunca exponerla ni prefijarla con `NEXT_PUBLIC_`. |
+| `ENCRYPTION_SECRET_KEY` | Solo servidor | Clave de cifrado actual. El algoritmo, los IV y el esquema real no están verificados. |
+| `ENCRYPTION_SECRET_KEY0` | Solo servidor | Clave anterior, solo si se aplica rotación. No verificada. |
+| `AUTH_SESSION_SECRET` | Solo servidor | Secreto de firma de sesiones; obligatorio en producción (32+ bytes aleatorios). No generar ni escribir claves reales en este repositorio. |
+| `AUTH_SESSION_TTL_SECONDS` | Solo servidor | TTL de sesión en segundos; el runtime aplica un valor por defecto si falta o es inválido. |
+| `AUTH_LOGIN_WINDOW_SECONDS` | Solo servidor | Ventana del rate limit de login, en segundos. |
+| `AUTH_LOGIN_MAX_ATTEMPTS` | Solo servidor | Intentos máximos de login por ventana. |
+| `AUTH_LOGIN_BLOCK_SECONDS` | Solo servidor | Duración del bloqueo tras superar intentos. |
+
+Notas:
+
+- `.env.local` está ignorado por `.gitignore`.
+- No se incluye `NEXT_PUBLIC_BACKEND_URL`: es un endpoint heredado en retirada. Tampoco se incorporan los endpoints `fix-ids`/`sync-auth`.
+- No se verificó que estas variables sean suficientes ni que coincidan con el entorno real.
+- Los prerrequisitos y pendientes de Supabase están en `docs/supabase-setup.md`; no implican cambios remotos aplicados.
+
+## Supabase: acceso y datos
+
+- PostgREST usa por defecto el perfil `api`. Para las tablas del proyecto, fijar explícitamente `Accept-Profile: public`; sin ese header, una consulta a `users` puede devolver 404.
+- Nombres físicos observados en el esquema `public`: `users`, `insulindata`, `fooddata`, `exercisedata`, `periodrecords`, `mooddata` y `polar_data`. No usar los alias con guion bajo sin verificarlos.
+- Tipos, nulabilidad, defaults, PK/FK, unique, índices y políticas RLS no están verificados. Requieren SQL read-only o una clave `service_role` real; OpenAPI no es accesible solo con la publishable.
+- RLS y grants deben impedir que la clave publishable lea `users.PasswordHash`; se observó lectura permitida y es un riesgo a corregir. No se copian hashes.
+- No asumir algoritmo, IV, encoding ni rotación del cifrado; el esquema real sigue pendiente.
+- Borrar un usuario con registros de salud asociados debe devolver 409 y no borrar datos ni identidad de Auth.
+- Prerrequisitos conocidos y pendientes de migraciones/vinculación Auth: `docs/supabase-setup.md`. No se declaran aplicados.
+
+Consultas de inspección, solo lectura y en staging:
+
 ```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT UNIQUE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+select table_name
+from information_schema.tables
+where table_schema = 'public'
+order by table_name;
+
+select table_name, column_name, data_type, is_nullable, column_default
+from information_schema.columns
+where table_schema = 'public'
+order by table_name, ordinal_position;
+
+select relname as table_name, relrowsecurity as rls_enabled
+from pg_class
+where relnamespace = 'public'::regnamespace and relkind = 'r';
+
+select schemaname, tablename, policyname, cmd, roles, qual, with_check
+from pg_policies
+where schemaname = 'public';
 ```
 
-### Tabla `polar_data`
-```sql
-CREATE TABLE polar_data (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id),
-  glucose_level INTEGER NOT NULL,
-  heart_rate INTEGER NOT NULL,
-  steps INTEGER NOT NULL,
-  sleep_hours DECIMAL(3,1) NOT NULL,
-  mood_score INTEGER NOT NULL CHECK (mood_score >= 0 AND mood_score <= 5),
-  recorded_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+No ejecutes scripts de seed, borrado o escritura contra producción. Los scripts de `scripts/` son manuales y no constituyen una suite de regresión verificada.
 
-## Estructura del Proyecto
+## Autenticación y autorización
 
-```
+**Objetivo**
+
+- Mantener los dos accesos: email/password con Supabase Auth y usuario/password con verificación de hash en servidor.
+- El hash nunca debe salir del servidor ni llegar al navegador.
+- La sesión debe usar cookies `HttpOnly`, `Secure` y `SameSite` adecuadas, sin token JSON accesible desde JavaScript.
+- La identidad no debe confiarse desde `localStorage`.
+- Los roles y permisos deben aplicarse en el servidor en cada caso de uso, no solo en guards de UI.
+- `admin` gestiona usuarios y base de datos; `doctor` tiene lectura global; `user` solo accede a sus propios datos.
+- El borrado de usuarios con registros asociados debe bloquearse.
+
+El código legado no es referencia de autenticación; sus riesgos y el estado de corrección están en `docs/registro-tareas.md`.
+
+## Git Flow y trabajo paralelo
+
+- `main`: rama estable/producción. Solo recibe merges desde `codex/release/*` después de validación.
+- `dev`: rama de integración.
+- `codex/feature/<slug>`: una rama por frente, creada desde `dev`.
+- `codex/release/<version>`: rama de release, creada desde `dev`.
+- Base autorizada: `dev`. No se incorpora `main` ni los endpoints heredados `fix-ids`/`sync-auth`.
+- El trabajo paralelo se organiza en worktrees aislados con propiedad de archivos delimitada. Los frentes no commitean hasta validación; solo foundation tiene permiso de commit de sus propios archivos.
+- Los commits y merges se serializan. El merge se hace con `git merge --no-ff` una vez validado el cambio.
+- No se permite commit directo a `dev` o `main`.
+- Commits con Conventional Commits: `feat(scope): ...`, `fix(scope): ...`, `docs(scope): ...`, `test(scope): ...`, `chore(scope): ...`.
+- Este alcance no incluye publicación ni deploy.
+
+El documentador no ejecuta `git checkout`, `add`, `commit`, `merge` ni `push`.
+
+## Estado y evidencia
+
+El estado por tarea, las sesiones, los commits, las evidencias readonly, los límites y los bloqueos se mantienen en `docs/registro-tareas.md`. Los prerrequisitos y pendientes de Supabase están en `docs/supabase-setup.md`. No se declara terminada la implementación ni se afirma que las pruebas hayan pasado.
+
+## Estructura
+
+```text
 dashboard/
+├── contracts/               # contrato OpenAPI
+├── docs/
+│   ├── registro-tareas.md
+│   └── supabase-setup.md
+├── public/
+├── scripts/                 # scripts manuales
 ├── src/
-│   ├── app/
-│   │   ├── page.tsx              # Página principal
-│   │   ├── users/
-│   │   │   └── page.tsx          # Gestión de usuarios
-│   │   ├── data/
-│   │   │   └── page.tsx          # Visualización de datos
-│   │   ├── analytics/
-│   │   │   └── page.tsx          # Análisis y gráficos
-│   │   └── overview/
-│   │       └── page.tsx          # Resumen general
-│   └── lib/
-│       └── supabase.ts           # Configuración de Supabase
-├── public/                        # Archivos estáticos
-├── package.json                   # Dependencias del proyecto
-└── README.md                      # Este archivo
+│   ├── app/                 # páginas y rutas API de Next.js
+│   ├── components/
+│   ├── contexts/
+│   ├── hooks/
+│   ├── lib/
+│   └── server/              # domain/application/infrastructure/http/composition
+├── tests/                   # pruebas en frentes paralelos
+├── .env.example             # plantilla de entorno; sin staging
+├── package.json
+└── README.md
 ```
 
-## Uso
-
-### Página Principal
-- Dashboard con navegación a todas las secciones
-- Tarjetas informativas con acceso rápido
-
-### Gestión de Usuarios
-- Lista de todos los usuarios registrados
-- Búsqueda por email
-- Acciones de edición y eliminación
-- Información de fechas de creación y actualización
-
-### Datos de Usuarios
-- Tabla con todos los datos de salud
-- Filtros por usuario y fecha
-- Exportación a CSV
-- Indicadores visuales para niveles de glucosa y estado de ánimo
-
-### Análisis y Estadísticas
-- Gráficos de evolución temporal
-- Estadísticas generales del sistema
-- Filtros por usuario y rango de tiempo
-- Gráficos de líneas, barras y pastel
-
-### Resumen General
-- Métricas clave del sistema
-- Usuarios más activos
-- Alertas del sistema
-- Datos recientes
-
-## Personalización
-
-### Colores
-Los colores se pueden personalizar modificando las clases de Tailwind CSS en los componentes.
-
-### Gráficos
-Los gráficos se pueden personalizar modificando las opciones de Recharts en `src/app/analytics/page.tsx`.
-
-### Filtros
-Se pueden agregar más filtros modificando los componentes de filtrado en cada página.
-
-## Despliegue
-
-### Vercel (Recomendado)
-1. Conectar tu repositorio a Vercel
-2. Configurar las variables de entorno
-3. Desplegar automáticamente
-
-### Otros Proveedores
-El proyecto se puede desplegar en cualquier proveedor que soporte Next.js:
-- Netlify
-- Railway
-- Heroku
-- AWS Amplify
-
-## Soporte
-
-Para soporte técnico o preguntas sobre el dashboard, contacta al equipo de desarrollo.
+Directorios excluidos y no editados en este alcance: `pi-mqtt-agent/`, `kub-kubioscloud-demo/` y `Uploader/`.
 
 ## Licencia
 
-Este proyecto está bajo la licencia MIT.
+MIT, según la versión anterior de este README. No se localizó un archivo `LICENSE` en la raíz.

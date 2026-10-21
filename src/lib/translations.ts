@@ -131,6 +131,49 @@ export interface Translations {
     user: string
     selectRole: string
     roleUpdated: string
+    exportCSV: string
+    food: string
+    periods: string
+    mood: string
+    total: string
+    type: string
+    dose: string
+    quantity: string
+    carbs: string
+    intensity: string
+    description: string
+    symptoms: string
+    notes: string
+    value: string
+    outOfRoutine: string
+    emotions: string
+    yes: string
+    no: string
+    dataFilters: string
+    clearFilters: string
+    allUsers: string
+    dataType: string
+    allTypes: string
+    timeRange: string
+    allTime: string
+    specificDate: string
+    selectDate: string
+    lastActivity: string
+    records: string
+    showLess: string
+    viewAll: string
+    records2: string
+    insulin: string
+    insulinData: string
+    meals: string
+    exercise: string
+    loadingData: string
+    connectingServer: string
+    decryptingData: string
+    processingInfo: string
+    finalizing: string
+    noDataFound: string
+    noRecordsForFilters: string
     analyzingStudyData: string
     processingCorrelations: string
     // App Dashboard específico
@@ -211,7 +254,6 @@ export interface Translations {
     errorLoadingUsers: string
     hrvResults: string
     noHrvResults: string
-    charts: string
     showCharts: string
     hideCharts: string
     // Métricas HRV
@@ -334,7 +376,6 @@ export interface Translations {
     showsMealTypes: string
     xAxis: string
     yAxis: string
-    mealTypes: string
     numberOfRecords: string
     showsAverageInsulin: string
     numberOfInjections: string
@@ -344,7 +385,6 @@ export interface Translations {
     percentageRecords: string
     showsInsulinInjections: string
     showsMealRegistrations: string
-    numberOfMeals: string
     showsExerciseSessions: string
     numberOfSessions: string
     showsMoodRecords: string
@@ -354,7 +394,6 @@ export interface Translations {
     quantity: string
     mealType: string
     exerciseType: string
-    moodLevel: string
   }
   
   // Overview
@@ -498,9 +537,6 @@ export interface Translations {
     userInfo: string
     saving: string
     creating: string
-    cancel: string
-    save: string
-    create: string
     gdprConsent: string
     currentUUID: string
     noUUIDAssigned: string
@@ -663,10 +699,7 @@ export const translations: Record<Language, Translations> = {
       advancedSystem: 'Sistema Avanzado',
       logout: 'Cerrar sesión',
       adminPanel: 'Panel de Administración',
-      administration: 'Administración',
       adminDescription: 'Gestiona usuarios, configura el sistema y supervisa la seguridad. Herramientas avanzadas para el control total de la plataforma.',
-      userManagement: 'Gestión de Usuarios',
-      totalUsers: 'Usuarios Totales',
       createUser: 'Crear Usuario',
       searchUsers: 'Buscar usuarios...',
       username: 'Nombre de Usuario',
@@ -709,7 +742,6 @@ export const translations: Record<Language, Translations> = {
       no: 'No',
       dataFilters: 'Filtros de Datos',
       clearFilters: 'Limpiar filtros',
-      user: 'Usuario',
       allUsers: 'Todos los usuarios',
       dataType: 'Tipo de Dato',
       allTypes: 'Todos los tipos',
@@ -717,7 +749,6 @@ export const translations: Record<Language, Translations> = {
       allTime: 'Todo el tiempo',
       specificDate: 'Fecha Específica',
       selectDate: 'Seleccionar fecha',
-      totalRecords: 'registros totales',
       lastActivity: 'Última actividad',
       insulinData: 'Datos de Insulina',
       records: 'registros',
@@ -727,8 +758,6 @@ export const translations: Record<Language, Translations> = {
       insulin: 'Insulina',
       meals: 'Comidas',
       exercise: 'Ejercicio',
-      periods: 'Períodos',
-      mood: 'Estado de Ánimo',
       loadingData: 'Cargando datos...',
       connectingServer: 'Conectando al servidor...',
       decryptingData: 'Descifrando datos...',
@@ -812,7 +841,6 @@ export const translations: Record<Language, Translations> = {
       errorLoadingUsers: 'ERROR AL CARGAR USUARIOS',
       hrvResults: 'Resultados HRV',
       noHrvResults: 'No hay resultados HRV disponibles',
-      charts: 'Gráficos',
       showCharts: 'Mostrar Gráficos',
       hideCharts: 'Ocultar Gráficos',
       // Métricas HRV
@@ -933,7 +961,6 @@ export const translations: Record<Language, Translations> = {
       showsMealTypes: 'Muestra qué tipos de comida se registran más frecuentemente.',
       xAxis: 'Eje X',
       yAxis: 'Eje Y',
-      mealTypes: 'Tipos de Comida',
       numberOfRecords: 'Número de Registros',
       showsAverageInsulin: 'Muestra la cantidad promedio de insulina administrada cada día.',
       numberOfInjections: 'Número de inyecciones',
@@ -943,7 +970,6 @@ export const translations: Record<Language, Translations> = {
       percentageRecords: 'Porcentaje de registros con ese nivel',
       showsInsulinInjections: 'Muestra cuántas inyecciones de insulina se registraron cada día.',
       showsMealRegistrations: 'Muestra cuántas comidas se registraron cada día.',
-      numberOfMeals: 'Número de Comidas',
       showsExerciseSessions: 'Muestra cuántas sesiones de ejercicio se registraron cada día.',
       numberOfSessions: 'Número de Sesiones',
       showsMoodRecords: 'Muestra cuántos registros de estado de ánimo se hicieron cada día.',
@@ -952,8 +978,7 @@ export const translations: Record<Language, Translations> = {
       dates: 'Fechas',
       quantity: 'Cantidad',
       mealType: 'Tipo de Comida',
-      exerciseType: 'Tipo de Ejercicio',
-      moodLevel: 'Nivel de Estado de Ánimo'
+      exerciseType: 'Tipo de Ejercicio'
     },
     overview: {
       title: 'Resumen General del Sistema',
@@ -1131,7 +1156,6 @@ export const translations: Record<Language, Translations> = {
       yes: 'Sí',
       no: 'No',
       ok: 'OK',
-      close: 'Cerrar',
       found: 'encontrados',
       language: 'Idioma'
     },
@@ -1244,10 +1268,7 @@ export const translations: Record<Language, Translations> = {
       advancedSystem: 'Advanced System',
       logout: 'Logout',
       adminPanel: 'Administration Panel',
-      administration: 'Administration',
       adminDescription: 'Manage users, configure the system and monitor security. Advanced tools for total platform control.',
-      userManagement: 'User Management',
-      totalUsers: 'Total Users',
       createUser: 'Create User',
       searchUsers: 'Search users...',
       username: 'Username',
@@ -1290,7 +1311,6 @@ export const translations: Record<Language, Translations> = {
       no: 'No',
       dataFilters: 'Data Filters',
       clearFilters: 'Clear filters',
-      user: 'User',
       allUsers: 'All users',
       dataType: 'Data Type',
       allTypes: 'All types',
@@ -1298,7 +1318,6 @@ export const translations: Record<Language, Translations> = {
       allTime: 'All time',
       specificDate: 'Specific Date',
       selectDate: 'Select date',
-      totalRecords: 'total records',
       lastActivity: 'Last activity',
       insulinData: 'Insulin Data',
       records: 'records',
@@ -1308,8 +1327,6 @@ export const translations: Record<Language, Translations> = {
       insulin: 'Insulin',
       meals: 'Meals',
       exercise: 'Exercise',
-      periods: 'Periods',
-      mood: 'Mood',
       loadingData: 'Loading data...',
       connectingServer: 'Connecting to server...',
       decryptingData: 'Decrypting data...',
@@ -1393,7 +1410,6 @@ export const translations: Record<Language, Translations> = {
       errorLoadingUsers: 'ERROR LOADING USERS',
       hrvResults: 'HRV Results',
       noHrvResults: 'No HRV results available',
-      charts: 'Charts',
       showCharts: 'Show Charts',
       hideCharts: 'Hide Charts',
       // Métricas HRV
@@ -1514,7 +1530,6 @@ export const translations: Record<Language, Translations> = {
       showsMealTypes: 'Shows which meal types are registered most frequently.',
       xAxis: 'X Axis',
       yAxis: 'Y Axis',
-      mealTypes: 'Meal Types',
       numberOfRecords: 'Number of Records',
       showsAverageInsulin: 'Shows the average amount of insulin administered each day.',
       numberOfInjections: 'Number of injections',
@@ -1524,7 +1539,6 @@ export const translations: Record<Language, Translations> = {
       percentageRecords: 'Percentage of records with that level',
       showsInsulinInjections: 'Shows how many insulin injections were recorded each day.',
       showsMealRegistrations: 'Shows how many meals were recorded each day.',
-      numberOfMeals: 'Number of Meals',
       showsExerciseSessions: 'Shows how many exercise sessions were recorded each day.',
       numberOfSessions: 'Number of Sessions',
       showsMoodRecords: 'Shows how many mood records were made each day.',
@@ -1533,8 +1547,7 @@ export const translations: Record<Language, Translations> = {
       dates: 'Dates',
       quantity: 'Quantity',
       mealType: 'Meal Type',
-      exerciseType: 'Exercise Type',
-      moodLevel: 'Mood Level'
+      exerciseType: 'Exercise Type'
     },
     overview: {
       title: 'System Overview',
@@ -1712,7 +1725,6 @@ export const translations: Record<Language, Translations> = {
       yes: 'Yes',
       no: 'No',
       ok: 'OK',
-      close: 'Close',
       found: 'found',
       language: 'Language'
     },

@@ -1,14 +1,43 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://byzrronowbnffarazhps.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5enJyb25vd2JuZmZhcmF6aHBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2MzExMTMsImV4cCI6MjA2NTIwNzExM30.8Yl1kAJu6bBP1ZX0MQ7l5jVqBM6QcMjqP0ADNGnnibI'
+// Legacy browser client. Access is being migrated to same-origin API routes
+// with HttpOnly cookies; do not add fallback URLs or keys here.
+let browserClient: SupabaseClient | null = null
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+function getBrowserClient(): SupabaseClient {
+  if (browserClient !== null) {
+    return browserClient
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Supabase browser client no configurado: faltan NEXT_PUBLIC_SUPABASE_URL y/o NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+    )
+  }
+
+  browserClient = createClient(supabaseUrl, supabaseAnonKey)
+  return browserClient
+}
+
+/**
+ * Fail-closed lazy proxy so importing legacy pages during build does not require
+ * production credentials. Any actual Supabase call throws until the frontend is
+ * migrated to the cookie-based API.
+ */
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, property) {
+    const client = getBrowserClient()
+    const value = Reflect.get(client, property)
+    return typeof value === 'function' ? value.bind(client) : value
+  },
+})
 
 export interface User {
   UserID: number
   Username: string
-  PasswordHash: string
   UUID: string | null
   GDPRConsent: boolean
   GDPRConsentDate: string | null
@@ -116,4 +145,4 @@ export const ROLE_PERMISSIONS = {
     'view_own_data',
     'view_own_analytics'
   ]
-} as const 
+} as const

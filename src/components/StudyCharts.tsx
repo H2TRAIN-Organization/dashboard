@@ -108,7 +108,7 @@ export default function StudyCharts({ exerciseData, moodData, hrvData, insulinDa
     return acc
   }, {} as { [key: number]: { total: number, count: number, intensity: number } })
   
-  const barData = Object.values(intensityHrvData).map(item => ({
+  const barData = (Object.values(intensityHrvData) as Array<{ total: number; count: number; intensity: number }>).map(item => ({
     intensidad: item.intensity,
     intensidadLabel: item.intensity === 1 ? 'Bajo' : item.intensity === 2 ? 'Moderado' : 'Alto',
     hrvPromedio: Math.round((item.total / item.count) * 100) / 100,
@@ -402,7 +402,7 @@ export default function StudyCharts({ exerciseData, moodData, hrvData, insulinDa
                   hrv: 'HRV Readiness Promedio (%)',
                   mood: 'Estado de Ánimo Promedio (/10)'
                 }
-                return [`${Math.round(value * 100) / 100}`, labels[name] || name]
+                return [`${Math.round(Number(value) * 100) / 100}`, labels[name] || name]
               }}
               labelFormatter={(label) => `Semana: ${label}`}
             />

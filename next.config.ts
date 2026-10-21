@@ -1,19 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  
-  // Deshabilitar ESLint durante el build para evitar errores
-  eslint: {
-    ignoreDuringBuilds: true,
-    dirs: [], // No lintear ningún directorio
-  },
+  // TypeScript and ESLint are checked by their own commands (see package.json).
+  // Builds must not hide diagnostics from either tool.
 
-  // Deshabilitar TypeScript durante el build para evitar errores
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  
   // Configuración de seguridad
   async headers() {
     return [
@@ -40,7 +30,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  
+
   // Redirigir HTTP a HTTPS en producción
   async redirects() {
     return [
