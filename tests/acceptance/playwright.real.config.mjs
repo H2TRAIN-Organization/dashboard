@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const testDir = dirname(fileURLToPath(import.meta.url))
@@ -12,6 +12,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [['line']],
+  outputDir: resolve(testDir, '../../test-results/playwright-dashboard'),
   use: {
     baseURL: 'http://localhost:4630',
     channel: 'chrome',

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createAuthGateway } from "@/server/infrastructure/auth/auth-gateway";
 import { createSessionTokenCodec } from "@/server/infrastructure/auth/session-token";
 import { ServiceUnavailableError } from "@/server/domain/errors";
+import type { User } from "@/server/domain/user";
 import {
   FakeClock,
   FakeEmailTransport,
@@ -19,23 +20,32 @@ const NOW = new Date("2026-01-01T00:00:00.000Z");
 
 function setup(options: {
   appMetadata?: Record<string, unknown>;
+  emailAddress?: string;
   userRole?: "admin" | "doctor" | "user";
+  userUsername?: string;
+  userUuid?: string | null;
+  seedUsers?: readonly User[];
+  emailLinkIdField?: "UserID" | "UUID";
   resolveVerifiedLink?: (identity: ReturnType<typeof emailUser>) => Promise<{ userId: string } | null>;
 } = {}) {
   const clock = new FakeClock(NOW);
   const user = makeUser({
     id: "42",
-    username: "alice",
+    username: options.userUsername ?? "alice",
     email: null,
     role: options.userRole ?? "admin",
+    uuid: options.userUuid ?? null,
   });
-  const users = new FakeUserStore([user], new Map([["alice", VALID_BCRYPT_HASH]]));
+  const seedUsers = options.seedUsers ?? [user];
+  const users = new FakeUserStore(seedUsers, new Map([["alice", VALID_BCRYPT_HASH]]));
   const passwords = new FakePasswordVerifier();
   const sessions = new FakeSessionStore();
   const limiter = new FakeLimiter();
   const email = new FakeEmailTransport();
+  const emailAddress = options.emailAddress ?? "alice@example.com";
   email.signInResult = successEmail(
     emailUser({
+      email: emailAddress,
       appMetadata: options.appMetadata ?? {
         role: "admin",
         app_user_id: "42",
@@ -43,6 +53,7 @@ function setup(options: {
     }),
   );
   email.verifiedUser = emailUser({
+    email: emailAddress,
     appMetadata: options.appMetadata ?? {
       role: "admin",
       app_user_id: "42",
@@ -61,6 +72,9 @@ function setup(options: {
     clock,
     sessionTtlSeconds: 8 * 60 * 60,
     emailLink: {
+      ...(options.emailLinkIdField === undefined
+        ? {}
+        : { idField: options.emailLinkIdField }),
       ...(options.resolveVerifiedLink === undefined
         ? {}
         : { resolveVerifiedLink: options.resolveVerifiedLink }),
@@ -100,7 +114,155 @@ describe("email authentication", () => {
     );
   });
 
-  it("fails closed when app_metadata has no explicit app_user_id", async () => {
+  it("links a confirmed email to exactly one normalized Username using the users role", async () => {
+    const { gateway, sessions } = setup({
+      appMetadata: { provider: "email", role: "admin" },
+      userUsername: "Alice@Example.com",
+      userRole: "doctor",
+    });
+    const session = await gateway.authenticateByEmail(
+      "alice@example.com",
+      "correct",
+    );
+
+    expect(session?.user).toMatchObject({
+      id: "42",
+      username: "Alice@Example.com",
+      email: "alice@example.com",
+      role: "doctor",
+    });
+    expect(sessions.size()).toBe(1);
+  });
+
+  it("links the current operational email jiahao.yang@ulpgc.es to its unique user", async () => {
+    const { gateway, sessions } = setup({
+      appMetadata: { provider: "email" },
+      emailAddress: "jiahao.yang@ulpgc.es",
+      userUsername: "jiahao.yang@ulpgc.es",
+      userRole: "user",
+    });
+    const session = await gateway.authenticateByEmail(
+      "jiahao.yang@ulpgc.es",
+      "correct",
+    );
+
+    expect(session?.user).toMatchObject({
+      id: "42",
+      username: "jiahao.yang@ulpgc.es",
+      email: "jiahao.yang@ulpgc.es",
+      role: "user",
+    });
+    expect(session?.method).toBe("email");
+    expect(sessions.size()).toBe(1);
+  });
+
+  it("denies an ambiguous email/Username match instead of choosing a role", async () => {
+    const first = makeUser({
+      id: "42",
+      username: "alice@example.com",
+      role: "user",
+    });
+    const second = makeUser({
+      id: "43",
+      username: "ALICE@example.com",
+      role: "admin",
+    });
+    const { gateway, sessions } = setup({
+      appMetadata: { provider: "email" },
+      seedUsers: [first, second],
+    });
+
+    await expect(
+      gateway.authenticateByEmail("alice@example.com", "correct"),
+    ).rejects.toThrow(/ambig|vínculo/);
+    expect(sessions.size()).toBe(0);
+  });
+
+  it("denies an explicit app_user_id that conflicts with the unique Username match", async () => {
+    const linked = makeUser({ id: "42", username: "alice", role: "user" });
+    const matched = makeUser({
+      id: "43",
+      username: "alice@example.com",
+      role: "admin",
+    });
+    const { gateway, sessions } = setup({
+      appMetadata: { role: "user", app_user_id: "42" },
+      seedUsers: [linked, matched],
+    });
+
+    await expect(
+      gateway.authenticateByEmail("alice@example.com", "correct"),
+    ).rejects.toThrow(/conflicto/);
+    expect(sessions.size()).toBe(0);
+  });
+
+  it("denies a unique Username link when another user owns the Auth UUID", async () => {
+    const target = makeUser({
+      id: "42",
+      username: "alice@example.com",
+      role: "user",
+    });
+    const uuidOwner = makeUser({
+      id: "43",
+      username: "other",
+      role: "user",
+      uuid: "auth-user-1",
+    });
+    const { gateway, sessions } = setup({
+      appMetadata: { provider: "email" },
+      seedUsers: [target, uuidOwner],
+    });
+
+    await expect(
+      gateway.authenticateByEmail("alice@example.com", "correct"),
+    ).rejects.toThrow(/UUID|distintos/);
+    expect(sessions.size()).toBe(0);
+  });
+
+  it("denies an explicit app_user_id when another user owns the Auth UUID", async () => {
+    const linked = makeUser({ id: "42", username: "alice", role: "user" });
+    const uuidOwner = makeUser({
+      id: "43",
+      username: "other",
+      role: "user",
+      uuid: "auth-user-1",
+    });
+    const { gateway, sessions } = setup({
+      appMetadata: { role: "user", app_user_id: "42" },
+      seedUsers: [linked, uuidOwner],
+    });
+
+    await expect(
+      gateway.authenticateByEmail("alice@example.com", "correct"),
+    ).rejects.toThrow(/UUID|distinto/);
+    expect(sessions.size()).toBe(0);
+  });
+
+  it("denies a malformed app_user_id even when the email has a unique Username", async () => {
+    const { gateway, sessions } = setup({
+      appMetadata: { app_user_id: { nested: true } },
+      userUsername: "alice@example.com",
+    });
+
+    await expect(
+      gateway.authenticateByEmail("alice@example.com", "correct"),
+    ).rejects.toThrow(/app_user_id/);
+    expect(sessions.size()).toBe(0);
+  });
+
+  it("fails closed when a UUID-mode app_user_id does not resolve", async () => {
+    const { gateway, sessions } = setup({
+      appMetadata: { role: "user", app_user_id: "missing-auth-uuid" },
+      emailLinkIdField: "UUID",
+    });
+
+    await expect(
+      gateway.authenticateByEmail("alice@example.com", "correct"),
+    ).rejects.toThrow(/app_user_id|vínculo/);
+    expect(sessions.size()).toBe(0);
+  });
+
+  it("fails closed when app_metadata has no link and no unique Username match", async () => {
     const { gateway, sessions } = setup({ appMetadata: { role: "admin" } });
     await expect(
       gateway.authenticateByEmail("alice@example.com", "correct"),

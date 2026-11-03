@@ -88,6 +88,9 @@ export function toNextResponse(result: HttpResult): NextResponse {
   for (const [name, value] of Object.entries(result.headers ?? {})) {
     response.headers.set(name, value);
   }
+  // Every route using this adapter carries session or private application data.
+  // Apply this also to errors/logout so a shared cache never retains a session.
+  response.headers.set("Cache-Control", "private, no-store");
   applyCookies(response, result.cookies ?? []);
   return response;
 }

@@ -85,6 +85,68 @@ describe("SupabaseAuthStore", () => {
     expect(headers.get("apikey")).toBe(SERVICE_KEY);
   });
 
+  it("finds exact normalized Username matches case-insensitively without selecting hashes", async () => {
+    const requests: { url: string; init?: RequestInit }[] = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      requests.push({ url: String(input), init });
+      return jsonResponse([
+        {
+          UserID: 42,
+          Username: "Jiahao.Yang@ULPGC.es",
+          UUID: null,
+          role: "user",
+          GDPRConsent: false,
+          GDPRConsentDate: null,
+        },
+        {
+          UserID: 43,
+          Username: "other@example.com",
+          UUID: null,
+          role: "user",
+          GDPRConsent: false,
+          GDPRConsentDate: null,
+        },
+      ]);
+    };
+    const store = storeWith(fetchImpl);
+    const matches = await store.findByNormalizedUsername(
+      " jiahao.yang@ulpgc.es ",
+    );
+
+    expect(matches.map((user) => user.id)).toEqual(["42"]);
+    const request = requests[0];
+    expect(request?.url).toContain("Username=ilike.jiahao.yang%40ulpgc.es");
+    expect(request?.url).toContain("limit=3");
+    expect(request?.url).not.toContain("PasswordHash");
+  });
+
+  it("returns every normalized duplicate so the caller can deny ambiguity", async () => {
+    const fetchImpl: FetchLike = async () =>
+      jsonResponse([
+        {
+          UserID: 42,
+          Username: "Jiahao.Yang@ULPGC.es",
+          UUID: null,
+          role: "user",
+          GDPRConsent: false,
+          GDPRConsentDate: null,
+        },
+        {
+          UserID: 43,
+          Username: "jiahao.yang@ulpgc.es",
+          UUID: null,
+          role: "admin",
+          GDPRConsent: false,
+          GDPRConsentDate: null,
+        },
+      ]);
+    const store = storeWith(fetchImpl);
+    const matches = await store.findByNormalizedUsername(
+      "JIAHAO.YANG@ULPGC.ES",
+    );
+    expect(matches).toHaveLength(2);
+  });
+
   it("does not select PasswordHash when loading a session user", async () => {
     let capturedUrl = "";
     const fetchImpl: FetchLike = async (input) => {

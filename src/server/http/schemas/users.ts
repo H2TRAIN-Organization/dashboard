@@ -5,17 +5,53 @@ export const userRoleSchema = z.enum(["admin", "doctor", "user"]);
 
 export const userIdSchema = z.string().trim().min(1).max(128);
 
+const pageSchema = z.coerce.number().int().min(1).max(1_000_000);
+
+const pageSizeSchema = z.coerce
+  .number()
+  .int()
+  .refine((value) => value === 10 || value === 25 || value === 50, {
+    message: "pageSize debe ser 10, 25 o 50",
+  });
+
+/**
+ * Users Management uses 1-based `page` + `pageSize` (10/25/50, default 25).
+ * The legacy `limit`/`offset` pair stays for existing clients. Mixing both
+ * families is rejected so the effective window is never ambiguous. Filters are
+ * always forwarded to the repository; it applies them before the range and
+ * returns the filtered count.
+ */
 export const userListQuerySchema = z
   .strictObject({
     search: z.string().trim().min(1).max(128).optional(),
     role: userRoleSchema.optional(),
-    limit: z.coerce.number().int().min(1).max(100).default(50),
-    offset: z.coerce.number().int().min(0).default(0),
+    page: pageSchema.optional(),
+    pageSize: pageSizeSchema.optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
   })
-  .transform((value) => ({
-    ...value,
-    search: value.search === undefined ? undefined : value.search.trim(),
-  }));
+  .superRefine((value, context) => {
+    const usesPage = value.page !== undefined || value.pageSize !== undefined;
+    const usesLegacy = value.limit !== undefined || value.offset !== undefined;
+    if (usesPage && usesLegacy) {
+      context.addIssue({
+        code: "custom",
+        path: ["page"],
+        message: "Usa page/pageSize o limit/offset, no ambos",
+      });
+    }
+  })
+  .transform((value) => {
+    const limit = value.pageSize ?? value.limit ?? 25;
+    const offset =
+      value.page === undefined ? (value.offset ?? 0) : (value.page - 1) * limit;
+    return {
+      ...(value.search === undefined ? {} : { search: value.search }),
+      ...(value.role === undefined ? {} : { role: value.role }),
+      limit,
+      offset,
+    };
+  });
 
 export const createUserBodySchema = z.strictObject({
   username: z.string().trim().min(1).max(USERNAME_MAX_LENGTH),

@@ -1,10 +1,20 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { User, UserRole } from '@/lib/api-types'
 import { errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Edit, Trash2, Search, Save, X, RefreshCw, User as UserIcon, Key, Shield, CheckCircle, AlertCircle, Users, Plus, Lock } from 'lucide-react'
+import {
+  DEFAULT_USERS_PAGE_SIZE,
+  USERS_PAGE_SIZES,
+  clampUsersPage,
+  pageAfterDeletion,
+  usersRange,
+  usersTotalPages,
+  isUsersPageSize,
+  type UsersPageSize,
+} from '@/lib/dashboard-data'
+import { Edit, Trash2, Search, Save, X, RefreshCw, User as UserIcon, Key, Shield, CheckCircle, AlertCircle, Users, Plus, Lock, ChevronLeft, ChevronRight } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { useSession } from '@/contexts/SessionContext'
@@ -16,7 +26,12 @@ export default function UsersPage() {
   const canWrite = session?.user.role === 'admin'
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<UsersPageSize>(DEFAULT_USERS_PAGE_SIZE)
+  const [total, setTotal] = useState(0)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [editForm, setEditForm] = useState({
     Username: '',
@@ -34,57 +49,117 @@ export default function UsersPage() {
   const [createLoading, setCreateLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  const fetchUsers = useCallback(async () => {
-    await Promise.resolve()
+  const requestRef = useRef(0)
+  const hasLoadedRef = useRef(false)
+  const tableScrollRef = useRef<HTMLDivElement | null>(null)
+  const topScrollRef = useRef<HTMLDivElement | null>(null)
+  const topSpacerRef = useRef<HTMLDivElement | null>(null)
+  const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false)
+
+  const totalPageCount = usersTotalPages(total, pageSize)
+  const currentPage = clampUsersPage(page, total, pageSize)
+  const range = usersRange(total, currentPage, pageSize)
+
+  const loadUsers = useCallback(async () => {
+    const requestId = requestRef.current + 1
+    requestRef.current = requestId
+    if (hasLoadedRef.current) setRefreshing(true)
+    else setLoading(true)
     try {
-      setLoading(true)
-      const result = await usersApi.listAll()
+      const result = await usersApi.list({
+        search: debouncedSearch.length > 0 ? debouncedSearch : undefined,
+        page,
+        pageSize,
+      })
+      if (requestId !== requestRef.current) return
       setUsers(result.users)
+      setTotal(result.total)
+      hasLoadedRef.current = true
+      // A filter or a deletion can leave the requested page out of range.
+      const nextPage = clampUsersPage(page, result.total, pageSize)
+      if (nextPage !== page) setPage(nextPage)
     } catch (error) {
+      if (requestId !== requestRef.current) return
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Error fetching users:', error)
       setMessage({ type: 'error', text: errorMessage(error) })
     } finally {
-      setLoading(false)
+      if (requestId === requestRef.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    }
+  }, [debouncedSearch, page, pageSize])
+
+  // Filters reset pagination after a short debounce (DR18).
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim())
+      setPage(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchTerm])
+
+  useEffect(() => {
+    if (!session) return
+    let active = true
+    const load = async () => {
+      // Yield once so the effect body does not synchronously set state.
+      await Promise.resolve()
+      if (!active) return
+      await loadUsers()
+    }
+    void load()
+    return () => {
+      active = false
+    }
+  }, [session, loadUsers])
+
+  const syncHorizontalScrollbar = useCallback(() => {
+    const container = tableScrollRef.current
+    if (!container) return
+    const overflow = container.scrollWidth > container.clientWidth + 1
+    setHasHorizontalOverflow(overflow)
+    if (topSpacerRef.current) {
+      topSpacerRef.current.style.width = `${container.scrollWidth}px`
     }
   }, [])
 
   useEffect(() => {
-    if (!session) return
-    let cancelled = false
-
-    const loadUsers = async () => {
-      await Promise.resolve()
-      if (cancelled) return
-      try {
-        setLoading(true)
-        const result = await usersApi.listAll()
-        if (cancelled) return
-        setUsers(result.users)
-      } catch (error) {
-        if (cancelled) return
-        console.error('Error fetching users:', error)
-        setMessage({ type: 'error', text: errorMessage(error) })
-      } finally {
-        if (!cancelled) setLoading(false)
+    if (loading) return
+    syncHorizontalScrollbar()
+    const handleResize = () => syncHorizontalScrollbar()
+    window.addEventListener('resize', handleResize)
+    let observer: ResizeObserver | null = null
+    const container = tableScrollRef.current
+    if (typeof ResizeObserver !== 'undefined' && container) {
+      observer = new ResizeObserver(handleResize)
+      observer.observe(container)
+      if (container.firstElementChild instanceof HTMLElement) {
+        observer.observe(container.firstElementChild)
       }
     }
-
-    void loadUsers()
     return () => {
-      cancelled = true
+      window.removeEventListener('resize', handleResize)
+      observer?.disconnect()
     }
-  }, [session])
+  }, [loading, syncHorizontalScrollbar])
 
-  const deleteUser = async (userId: string) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este usuario? Esta acción no se puede deshacer.')) {
-      try {
-        await usersApi.remove(userId)
-        setMessage({ type: 'success', text: 'Usuario eliminado exitosamente' })
-        fetchUsers()
-      } catch (error) {
-        console.error('Error deleting user:', error)
-        setMessage({ type: 'error', text: errorMessage(error) })
-      }
+  const deleteUser = async (user: User) => {
+    if (!confirm(t.users.confirmDelete)) {
+      return
+    }
+    try {
+      await usersApi.remove(user.UserID)
+      setMessage({ type: 'success', text: t.dashboard.userDeleted })
+      setUsers((current) => current.filter((entry) => entry.UserID !== user.UserID))
+      setTotal((current) => Math.max(0, current - 1))
+      const nextPage = pageAfterDeletion(page, total, pageSize)
+      if (nextPage !== page) setPage(nextPage)
+      else await loadUsers()
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      setMessage({ type: 'error', text: errorMessage(error) })
     }
   }
 
@@ -127,7 +202,7 @@ export default function UsersPage() {
         GDPRConsent: false,
         role: 'user'
       })
-      setMessage({ type: 'success', text: 'Usuario actualizado exitosamente' })
+      setMessage({ type: 'success', text: t.dashboard.userUpdated })
     } catch (error) {
       console.error('Error updating user:', error)
       setMessage({ type: 'error', text: errorMessage(error) })
@@ -137,7 +212,7 @@ export default function UsersPage() {
   }
 
   const clearUUID = async (userId: string) => {
-    if (!confirm('¿Estás seguro de que quieres limpiar el UUID de este usuario? Esto invalidará el UUID actual.')) {
+    if (!confirm(t.dashboard.confirmClearUUID)) {
       return
     }
 
@@ -145,7 +220,7 @@ export default function UsersPage() {
       setClearingUUID(true)
       const updated = await usersApi.clearUuid(userId)
       replaceUser(updated)
-      setMessage({ type: 'success', text: 'UUID limpiado exitosamente' })
+      setMessage({ type: 'success', text: t.dashboard.uuidCleared })
     } catch (error) {
       console.error('Error clearing UUID:', error)
       setMessage({ type: 'error', text: errorMessage(error) })
@@ -172,15 +247,11 @@ export default function UsersPage() {
     }
   }
 
-  const filteredUsers = users.filter(user =>
-    getDisplayUsername(user).toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      setMessage({ type: 'success', text: 'UUID copiado al portapapeles' })
+      setMessage({ type: 'success', text: t.users.uuidCopied })
     }).catch(() => {
-      setMessage({ type: 'error', text: 'Error al copiar al portapapeles' })
+      setMessage({ type: 'error', text: t.users.uuidCopyError })
     })
   }
 
@@ -188,7 +259,7 @@ export default function UsersPage() {
     e.preventDefault()
     
     if (!createForm.username || !createForm.password) {
-      setMessage({ type: 'error', text: 'Nombre de usuario y contraseña son requeridos' })
+      setMessage({ type: 'error', text: t.auth.invalidCredentials })
       return
     }
 
@@ -202,13 +273,16 @@ export default function UsersPage() {
         role: createForm.role,
       })
 
-      setMessage({ type: 'success', text: 'Usuario creado exitosamente' })
+      setMessage({ type: 'success', text: t.dashboard.userCreated })
       setCreateForm({ password: '', username: '', role: 'user' })
       setShowCreateForm(false)
-      fetchUsers()
+      await loadUsers()
     } catch (error) {
       console.error('Error:', error)
-      setMessage({ type: 'error', text: `Error creando usuario: ${errorMessage(error)}` })
+      setMessage({
+        type: 'error',
+        text: t.users.createError.replace('{error}', () => errorMessage(error)),
+      })
     } finally {
       setCreateLoading(false)
     }
@@ -241,7 +315,7 @@ export default function UsersPage() {
                     <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900">
                       {t.dashboard.userManagement}
                     </h2>
-                    <p className="text-gray-600 text-sm sm:text-base lg:text-xl font-light">Administra usuarios, edita información y regenera UUIDs</p>
+                    <p className="text-gray-600 text-sm sm:text-base lg:text-xl font-light">{t.dashboard.userManagementDescription}</p>
                   </div>
                 </div>
               </div>
@@ -249,7 +323,7 @@ export default function UsersPage() {
                 <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-sm border border-gray-200/50 px-4 sm:px-6 py-2 sm:py-3 rounded-xl shadow-lg">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="text-sm sm:text-base text-gray-800 font-semibold">
-                    {users.length} usuarios registrados
+                    {t.users.total}: {total}
                   </span>
                 </div>
                 {canWrite && (
@@ -273,8 +347,20 @@ export default function UsersPage() {
                   placeholder={t.dashboard.searchUsers}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 sm:pl-14 pr-4 py-3 sm:py-4 bg-white/50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-white/70 text-sm sm:text-base"
+                  aria-label={t.dashboard.searchUsers}
+                  className="w-full pl-12 sm:pl-14 pr-12 sm:pr-14 py-3 sm:py-4 bg-white/50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-white/70 text-sm sm:text-base"
                 />
+                {searchTerm.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    aria-label={t.common.clear}
+                    title={t.common.clear}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-500 hover:bg-white hover:text-gray-800"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -306,14 +392,14 @@ export default function UsersPage() {
                 <div className="flex items-center justify-center py-12 sm:py-20">
                   <div className="flex items-center space-x-4 bg-white/80 backdrop-blur-sm border border-gray-200/50 px-6 sm:px-10 py-4 sm:py-6 rounded-2xl shadow-lg">
                     <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-blue-600"></div>
-                    <span className="text-gray-800 font-semibold text-base sm:text-lg">Cargando usuarios...</span>
+                    <span className="text-gray-800 font-semibold text-base sm:text-lg">{t.dashboard.loadingUsers}</span>
                   </div>
                 </div>
               ) : (
                 <>
                   {/* Vista de tarjetas para móvil */}
                   <div className="block lg:hidden space-y-4">
-                    {filteredUsers.map((user) => (
+                    {users.map((user) => (
                       <div key={user.UserID} className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-5 shadow-lg hover:shadow-xl transition-all duration-300">
                         {/* Header de la tarjeta */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 space-y-3 sm:space-y-0">
@@ -324,7 +410,7 @@ export default function UsersPage() {
                               </span>
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="text-lg font-bold text-gray-900 truncate">{getDisplayUsername(user)}</h3>
+                              <h3 className="text-lg font-bold text-gray-900 break-words leading-snug">{getDisplayUsername(user)}</h3>
                               <p className="text-sm text-gray-600">ID: {user.UserID}</p>
                             </div>
                           </div>
@@ -340,7 +426,7 @@ export default function UsersPage() {
                           <div className="flex items-start space-x-3">
                             <div className="flex-1 min-w-0">
                               <div className="text-xs text-gray-800 font-mono bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 break-all leading-relaxed">
-                                {user.UUID ?? 'Sin UUID'}
+                                {user.UUID ?? t.users.noUUIDAssigned}
                               </div>
                             </div>
                             {user.UUID && (
@@ -371,7 +457,7 @@ export default function UsersPage() {
                             )}
                           </div>
                           <div className="flex items-center space-x-2">
-                            <label className="text-sm font-semibold text-gray-700">Rol:</label>
+                            <label className="text-sm font-semibold text-gray-700">{t.users.role}:</label>
                             {canWrite ? (
                               <select
                                 value={user.role || 'user'}
@@ -392,14 +478,14 @@ export default function UsersPage() {
 
                         {/* Botones de acción */}
                         {canWrite && (
-                          <div className="flex items-center justify-center sm:justify-end space-x-3 pt-2 border-t border-gray-200">
+                          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 sm:gap-3 pt-2 border-t border-gray-200">
                             <button
                               onClick={() => startEditing(user)}
                               className="flex items-center justify-center px-4 py-2 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
                               title={t.dashboard.edit}
                             >
                               <Edit className="h-4 w-4 text-white" />
-                              <span className="text-sm font-medium text-white hidden sm:block ml-2">Editar</span>
+                              <span className="text-sm font-medium text-white hidden sm:block ml-2">{t.dashboard.edit}</span>
                             </button>
                             <button
                               onClick={() => clearUUID(user.UserID)}
@@ -408,15 +494,15 @@ export default function UsersPage() {
                               title={t.users.clearUUID}
                             >
                               <RefreshCw className={`h-4 w-4 text-white ${clearingUUID ? 'animate-spin' : ''}`} />
-                              <span className="text-sm font-medium text-white hidden sm:block ml-2">Limpiar</span>
+                              <span className="text-sm font-medium text-white hidden sm:block ml-2">{t.common.clear}</span>
                             </button>
                             <button
-                              onClick={() => deleteUser(user.UserID)}
+                              onClick={() => deleteUser(user)}
                               className="flex items-center justify-center px-4 py-2 bg-gradient-to-br from-red-600 to-rose-600 rounded-lg hover:from-red-500 hover:to-rose-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
                               title={t.dashboard.delete}
                             >
                               <Trash2 className="h-4 w-4 text-white" />
-                              <span className="text-sm font-medium text-white hidden sm:block ml-2">Eliminar</span>
+                              <span className="text-sm font-medium text-white hidden sm:block ml-2">{t.dashboard.delete}</span>
                             </button>
                           </div>
                         )}
@@ -425,8 +511,38 @@ export default function UsersPage() {
                   </div>
 
                   {/* Vista de tabla para desktop */}
-                  <div className="hidden lg:block overflow-x-auto">
-                    <table className="w-full min-w-[900px]">
+                  <div className="hidden lg:block">
+                    {/* Barra horizontal superior sincronizada con la tabla.
+                        Solo se muestra cuando la tabla desborda (DR19). */}
+                    <div
+                      ref={topScrollRef}
+                      aria-hidden="true"
+                      className={`mb-2 overflow-x-auto ${hasHorizontalOverflow ? 'block' : 'hidden'}`}
+                      onScroll={(event) => {
+                        if (tableScrollRef.current) {
+                          tableScrollRef.current.scrollLeft = event.currentTarget.scrollLeft
+                        }
+                      }}
+                    >
+                      <div ref={topSpacerRef} className="h-1" />
+                    </div>
+                    <div
+                      ref={tableScrollRef}
+                      className="overflow-x-auto"
+                      onScroll={(event) => {
+                        if (topScrollRef.current) {
+                          topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft
+                        }
+                      }}
+                    >
+                      <table className="w-full min-w-[1040px] table-fixed">
+                        <colgroup>
+                          <col className="w-[26%]" />
+                          <col className="w-[38%]" />
+                          <col className="w-[12%]" />
+                          <col className="w-[10%]" />
+                          <col className="w-[14%]" />
+                        </colgroup>
                       <thead>
                         <tr className="border-b border-gray-200">
                           <th className="px-3 sm:px-4 lg:px-6 xl:px-8 py-3 sm:py-4 lg:py-6 text-left text-xs sm:text-sm font-bold text-gray-800 uppercase tracking-wider">
@@ -447,7 +563,7 @@ export default function UsersPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredUsers.map((user) => (
+                        {users.map((user) => (
                           <tr key={user.UserID} className="border-b border-gray-100 hover:bg-gray-50/50 transition-all duration-300">
                             <td className="px-3 sm:px-4 lg:px-6 xl:px-8 py-3 sm:py-4 lg:py-6 xl:py-8">
                               <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
@@ -459,7 +575,7 @@ export default function UsersPage() {
                                   </div>
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-xs sm:text-sm lg:text-base xl:text-xl font-bold text-gray-900 truncate">
+                                  <div className="text-xs sm:text-sm lg:text-base xl:text-xl font-bold text-gray-900 break-words leading-snug">
                                     {getDisplayUsername(user)}
                                   </div>
                                   <div className="text-xs sm:text-sm text-gray-600">
@@ -468,11 +584,11 @@ export default function UsersPage() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-3 sm:px-4 lg:px-6 xl:px-8 py-3 sm:py-4 lg:py-6 xl:py-8">
-                              <div className="flex items-center space-x-2 sm:space-x-3">
+                            <td className="px-3 sm:px-4 lg:px-6 xl:px-8 py-3 sm:py-4 lg:py-6 xl:py-8 align-top">
+                              <div className="flex items-start space-x-2 sm:space-x-3">
                                 <div className="flex-1 min-w-0">
                                   <div className="text-xs sm:text-sm text-gray-800 font-mono bg-gray-50 border border-gray-200 rounded-lg px-2 sm:px-3 lg:px-4 py-2 sm:py-3 break-all">
-                                    {user.UUID ?? 'Sin UUID'}
+                                    {user.UUID ?? t.users.noUUIDAssigned}
                                   </div>
                                 </div>
                                 {user.UUID && (
@@ -508,13 +624,14 @@ export default function UsersPage() {
                               </div>
                             </td>
                             <td className="px-3 sm:px-4 lg:px-6 xl:px-8 py-3 sm:py-4 lg:py-6 xl:py-8 text-right">
-                              <div className="flex flex-col items-end space-y-2 sm:space-y-3">
+                              <div className="flex flex-col items-end gap-2">
                                 {/* Selector de rol */}
                                 {canWrite ? (
                                   <select
                                     value={user.role || 'user'}
                                     onChange={(e) => updateUserRole(user.UserID, e.target.value)}
-                                    className="px-2 sm:px-3 py-1 sm:py-2 bg-white border border-gray-300 rounded-lg text-xs sm:text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 w-full sm:w-auto"
+                                    aria-label={t.users.roleLabel}
+                                    className="px-2 sm:px-3 py-1 sm:py-2 bg-white border border-gray-300 rounded-lg text-xs sm:text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 w-full max-w-[9rem]"
                                   >
                                     <option value="admin">{t.dashboard.admin}</option>
                                     <option value="doctor">{t.dashboard.doctor}</option>
@@ -528,7 +645,7 @@ export default function UsersPage() {
                                 
                                 {/* Botones de acción */}
                                 {canWrite && (
-                                  <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 lg:space-x-3">
+                                  <div className="flex flex-wrap items-center justify-end gap-2">
                                     <button
                                       onClick={() => startEditing(user)}
                                       className="p-2 sm:p-3 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-lg hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
@@ -545,7 +662,7 @@ export default function UsersPage() {
                                       <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-white ${clearingUUID ? 'animate-spin' : ''}`} />
                                     </button>
                                     <button
-                                      onClick={() => deleteUser(user.UserID)}
+                                      onClick={() => deleteUser(user)}
                                       className="p-2 sm:p-3 bg-gradient-to-br from-red-600 to-rose-600 rounded-lg hover:from-red-500 hover:to-rose-500 transition-all duration-300 transform hover:scale-105 shadow-lg"
                                       title={t.dashboard.delete}
                                     >
@@ -559,16 +676,73 @@ export default function UsersPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
+
+                  {/* Paginación compartida por la tabla y las tarjetas móviles
+                      (DR18): misma página, mismo total filtrado. */}
+                  {total > 0 && (
+                    <div className="mt-6 flex flex-col gap-4 border-t border-gray-200 pt-4 lg:flex-row lg:items-center lg:justify-between">
+                      <p className="text-sm text-gray-700" aria-live="polite">
+                        {range.from}-{range.to} / {total}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label htmlFor="users-page-size" className="text-sm text-gray-700">
+                          {t.dashboard.rowsPerPage}
+                        </label>
+                        <select
+                          id="users-page-size"
+                          value={pageSize}
+                          onChange={(event) => {
+                            const next = Number(event.target.value)
+                            if (isUsersPageSize(next)) {
+                              setPageSize(next)
+                              setPage(1)
+                            }
+                          }}
+                          className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+                        >
+                          {USERS_PAGE_SIZES.map((size) => (
+                            <option key={size} value={size}>
+                              {size}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage <= 1 || refreshing}
+                          aria-label={t.common.previous}
+                          title={t.common.previous}
+                          className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <span className="min-w-[64px] text-center text-sm font-semibold text-gray-800">
+                          {currentPage} / {totalPageCount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPage(Math.min(totalPageCount, currentPage + 1))}
+                          disabled={currentPage >= totalPageCount || refreshing}
+                          aria-label={t.common.next}
+                          title={t.common.next}
+                          className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
 
-            {filteredUsers.length === 0 && !loading && (
+            {!loading && users.length === 0 && total === 0 && (message === null || message.type === 'success') && (
               <div className="relative z-10 text-center py-20">
                 <div className="p-8 bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl inline-block shadow-lg">
                   <UserIcon className="h-20 w-20 text-gray-400 mx-auto mb-6" />
-                  <p className="text-gray-600 text-xl font-semibold">No se encontraron usuarios</p>
+                  <p className="text-gray-600 text-xl font-semibold">{t.users.noResults}</p>
                 </div>
               </div>
             )}
@@ -679,7 +853,7 @@ export default function UsersPage() {
                       value={createForm.username}
                       onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
                       className="w-full bg-white/50 border border-gray-200 rounded-xl px-3 sm:px-4 py-3 sm:py-4 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-white/70 text-sm sm:text-base"
-                      placeholder="Nombre de usuario único"
+                      placeholder={t.users.usernameLabel}
                       required
                     />
                   </div>
@@ -694,7 +868,7 @@ export default function UsersPage() {
                       value={createForm.password}
                       onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                       className="w-full bg-white/50 border border-gray-200 rounded-xl px-3 sm:px-4 py-3 sm:py-4 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-white/70 text-sm sm:text-base"
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder={t.users.passwordLabel}
                       minLength={6}
                       required
                     />

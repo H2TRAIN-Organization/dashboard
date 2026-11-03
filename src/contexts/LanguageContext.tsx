@@ -85,3 +85,18 @@ export function useLanguage() {
   }
   return context
 }
+
+/**
+ * Variante tolerante para componentes que también se renderizan aislados en
+ * pruebas o fuera del proveedor. Mantiene el español como respaldo explícito.
+ */
+export function useOptionalLanguage(): LanguageContextType {
+  const context = useContext(LanguageContext)
+  return (
+    context ?? {
+      language: DEFAULT_LANGUAGE,
+      setLanguage: updateLanguage,
+      t: translations[DEFAULT_LANGUAGE],
+    }
+  )
+}

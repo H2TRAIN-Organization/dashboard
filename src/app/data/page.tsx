@@ -5,12 +5,19 @@ import { createPortal } from 'react-dom'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Download, Activity, Calendar, User as UserIcon, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
-import LanguageSelector from '@/components/LanguageSelector'
+import UserAutocomplete from './user-autocomplete'
+import {
+  HEALTH_DATA_CATEGORIES,
+  buildHealthCsvDocument,
+  healthCsvFilename,
+  type HealthDataCategory,
+} from '@/lib/health-csv'
+import { isUserGroupExpanded, usersForRecordGroups, visibleMetricCards } from '@/lib/dashboard-data'
 
 function formatDateForInput(date: Date) {
   const year = date.getFullYear()
@@ -80,15 +87,22 @@ function CustomCalendar({
   popupRef,
   position,
 }: CustomCalendarProps) {
+  const { language, t } = useLanguage()
   if (!isOpen) return null
 
   const daysInMonth = getDaysInMonth(selectedDate)
   const firstDay = getFirstDayOfMonth(selectedDate)
-  const monthNames = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-  ]
-  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  const locale = language === 'en' ? 'en-US' : 'es-ES'
+  const monthFormatter = new Intl.DateTimeFormat(locale, { month: 'long' })
+  const weekdayFormatter = new Intl.DateTimeFormat(locale, { weekday: 'short' })
+  const capitalize = (value: string) =>
+    value.charAt(0).toLocaleUpperCase(locale) + value.slice(1)
+  // 7 January 2024 is a Sunday, so the array starts on the same weekday as
+  // the calendar grid.
+  const dayNames = Array.from({ length: 7 }, (_, index) =>
+    capitalize(weekdayFormatter.format(new Date(2024, 0, 7 + index))),
+  )
+  const monthLabel = capitalize(monthFormatter.format(selectedDate))
 
   const renderCalendarDays = () => {
     const days = []
@@ -185,18 +199,24 @@ function CustomCalendar({
         {/* Header del calendario */}
         <div className="flex items-center justify-between mb-6">
           <button
+            type="button"
             onClick={() => onDateChange(navigateMonth(selectedDate, 'prev'))}
+            aria-label={t.common.previous}
+            title={t.common.previous}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
           >
             <ChevronLeft className="h-5 w-5 text-slate-600" />
           </button>
 
           <h3 className="text-lg font-bold text-slate-800">
-            {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+            {monthLabel} {selectedDate.getFullYear()}
           </h3>
 
           <button
+            type="button"
             onClick={() => onDateChange(navigateMonth(selectedDate, 'next'))}
+            aria-label={t.common.next}
+            title={t.common.next}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
           >
             <ChevronRight className="h-5 w-5 text-slate-600" />
@@ -220,16 +240,18 @@ function CustomCalendar({
         {/* Footer */}
         <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
           <button
+            type="button"
             onClick={() => onSelectDate(new Date())}
             className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
           >
-            Hoy
+            {t.datepicker.today}
           </button>
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200"
           >
-            Cerrar
+            {t.datepicker.close}
           </button>
         </div>
       </div>
@@ -238,9 +260,16 @@ function CustomCalendar({
   )
 }
 
+// Errors raised locally use a translation key so the visible text follows the
+// language selector; backend errors are shown unchanged.
+type DataLoadError =
+  | { kind: 'translated'; key: 'missingUsername' | 'queryTimeout' }
+  | { kind: 'message'; message: string }
+
 export default function DataPage() {
   const { session } = useSession()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
+  const locale = language === 'en' ? 'en-US' : 'es-ES'
   
   const [insulinData, setInsulinData] = useState<InsulinData[]>([])
   const [foodData, setFoodData] = useState<FoodData[]>([])
@@ -250,19 +279,32 @@ export default function DataPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingProgress, setLoadingProgress] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<DataLoadError | null>(null)
   const [selectedUser, setSelectedUser] = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('')
   const [timeRange, setTimeRange] = useState<string>('all')
   const [selectedDataType, setSelectedDataType] = useState<string>('all')
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())
   const [showAllRecords, setShowAllRecords] = useState<Set<string>>(new Set())
-  const [searchTerm, setSearchTerm] = useState<string>('')
+  const [usersError, setUsersError] = useState<string | null>(null)
+  const [usersLoading, setUsersLoading] = useState(true)
   
   // Regular users only ever receive their own data; admins and doctors may read all.
   const currentRole = session?.user.role ?? null
   const currentUsername = session?.user.username ?? null
   const isIndividualUser = currentRole === 'user'
+
+  // Sequence guards and cancellation keep late responses from a previous
+  // filter or account from overwriting the current view.
+  const dataRequestRef = useRef(0)
+  const dataAbortRef = useRef<AbortController | null>(null)
+  const usersRequestRef = useRef(0)
+
+  const errorText = error
+    ? error.kind === 'translated'
+      ? t.data[error.key]
+      : error.message
+    : null
   
   // Estados para el timepicker personalizado
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
@@ -273,19 +315,46 @@ export default function DataPage() {
   const datePickerPopupRef = useRef<HTMLDivElement | null>(null)
   const [datePickerPosition, setDatePickerPosition] = useState<CalendarPosition | null>(null)
 
+  const cancelDataRequest = useCallback(() => {
+    dataRequestRef.current += 1
+    dataAbortRef.current?.abort()
+    dataAbortRef.current = null
+  }, [])
+
   const fetchData = useCallback(async () => {
+    const requestId = dataRequestRef.current + 1
+    dataRequestRef.current = requestId
+    // Abort the previous request before starting a new one. Its catch/finally
+    // sees a stale requestId and cannot overwrite state.
+    dataAbortRef.current?.abort()
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000)
+    dataAbortRef.current = controller
+    let timedOut = false
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, 30000)
+
     try {
       setLoading(true)
       setLoadingProgress(0)
       setError(null)
+      // A new filter/account must not retain the previous owner's records if
+      // its request later fails or times out.
+      setInsulinData([])
+      setFoodData([])
+      setExerciseData([])
+      setPeriodData([])
+      setMoodData([])
 
       setLoadingProgress(20)
 
       const selected = isIndividualUser ? (currentUsername ?? '') : selectedUser
       if (isIndividualUser && selected.length === 0) {
-        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
+        if (requestId === dataRequestRef.current) {
+          setError({ kind: 'translated', key: 'missingUsername' })
+        }
+        return
       }
 
       setLoadingProgress(40)
@@ -299,6 +368,14 @@ export default function DataPage() {
         { signal: controller.signal },
       )
 
+      if (requestId !== dataRequestRef.current) return
+      if (controller.signal.aborted) {
+        // A timeout can settle after the response arrives; an abort caused by
+        // a newer filter or by unmount has already failed the guard above.
+        if (timedOut) setError({ kind: 'translated', key: 'queryTimeout' })
+        return
+      }
+
       setLoadingProgress(80)
       setInsulinData(data.insulinData)
       setFoodData(data.foodData)
@@ -307,42 +384,80 @@ export default function DataPage() {
       setMoodData(data.moodData)
       setLoadingProgress(100)
     } catch (caught) {
-      if (caught instanceof Error && caught.name === 'AbortError') {
-        setError('La consulta de datos tardó demasiado. Inténtalo de nuevo.')
-      } else {
-        console.error('Error fetching data:', caught)
-        setError(errorMessage(caught))
+      if (requestId !== dataRequestRef.current) return
+      if (timedOut) {
+        setError({ kind: 'translated', key: 'queryTimeout' })
+        return
       }
+      // A filter/account change aborts the request on purpose; showing an
+      // error for the superseded request would be a false failure.
+      if (caught instanceof Error && caught.name === 'AbortError') return
+      console.error('Error fetching data:', caught)
+      setError({ kind: 'message', message: errorMessage(caught) })
     } finally {
-      clearTimeout(timeoutId)
-      setLoading(false)
+      window.clearTimeout(timeoutId)
+      if (requestId === dataRequestRef.current) {
+        dataAbortRef.current = null
+        setLoading(false)
+      }
     }
   }, [selectedUser, dateFilter, timeRange, selectedDataType, isIndividualUser, currentUsername])
 
   const fetchUsers = useCallback(async () => {
+    const requestId = usersRequestRef.current + 1
+    usersRequestRef.current = requestId
     try {
+      setUsersLoading(true)
+      setUsersError(null)
       const result = await usersApi.listAll()
+      if (requestId !== usersRequestRef.current) return
       setUsers(result.users)
     } catch (caught) {
+      if (requestId !== usersRequestRef.current) return
       console.error('Error fetching users:', caught)
-      setError(errorMessage(caught))
+      // The data itself can still be shown; only the administrative user
+      // picker reports this failure.
+      setUsersError(errorMessage(caught))
+    } finally {
+      if (requestId === usersRequestRef.current) {
+        setUsersLoading(false)
+      }
     }
   }, [])
 
+  // The user catalogue is only reloaded with the session, never on a filter
+  // change (DR07/DR11).
   useEffect(() => {
     if (!session) return
-    let cancelled = false
+    let active = true
     const load = async () => {
       // Yield once so the effect body does not synchronously set state.
       await Promise.resolve()
-      if (cancelled) return
-      await Promise.all([fetchData(), fetchUsers()])
+      if (!active) return
+      await fetchUsers()
     }
     void load()
     return () => {
-      cancelled = true
+      active = false
+      usersRequestRef.current += 1
     }
-  }, [session, fetchData, fetchUsers])
+  }, [session, fetchUsers])
+
+  useEffect(() => {
+    if (!session) return
+    let active = true
+    const load = async () => {
+      // Yield once so the effect body does not synchronously set state.
+      await Promise.resolve()
+      if (!active) return
+      await fetchData()
+    }
+    void load()
+    return () => {
+      active = false
+      cancelDataRequest()
+    }
+  }, [session, fetchData, cancelDataRequest])
 
   // Cerrar calendario al hacer click fuera y recalcular posición al hacer scroll/resize
   useEffect(() => {
@@ -419,10 +534,6 @@ export default function DataPage() {
     }
   }, [isDatePickerOpen])
 
-  const getUserEmail = (username: string) => {
-    return username || 'Usuario desconocido'
-  }
-
   const toggleUserExpansion = (userId: string) => {
     const newExpanded = new Set(expandedUsers)
     if (newExpanded.has(userId)) {
@@ -451,7 +562,7 @@ export default function DataPage() {
   }
 
   const formatDisplayDate = (date: Date) => {
-    return date.toLocaleDateString('es-ES', {
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -473,187 +584,26 @@ export default function DataPage() {
   }
 
   const exportData = () => {
-    let csvContent = ''
-    let filename = 'datos_usuarios.csv'
+    const categories: readonly HealthDataCategory[] =
+      selectedDataType === 'all'
+        ? HEALTH_DATA_CATEGORIES
+        : HEALTH_DATA_CATEGORIES.filter(
+            (category) => category === selectedDataType,
+          )
 
-    // Función para escapar valores CSV
-    const escapeCsvValue = (value: unknown) => {
-      if (value === null || value === undefined) return ''
-      const stringValue = String(value).trim()
-      // Solo escapar si contiene punto y coma, comillas o saltos de línea
-      if (stringValue.includes(';') || stringValue.includes('"') || stringValue.includes('\n')) {
-        return `"${stringValue.replace(/"/g, '""')}"`
-      }
-      return stringValue
-    }
+    // The API already applied the user, range and date filters. Every
+    // authorized record is exported, including records hidden behind
+    // "show less" in the cards (DR15).
+    const csvContent = buildHealthCsvDocument(
+      { insulinData, foodData, exerciseData, periodData, moodData },
+      { categories },
+    )
 
-    // Función para formatear fecha
-    const formatDate = (dateString: string) => {
-      try {
-        return new Date(dateString).toLocaleDateString('es-ES')
-      } catch {
-        return dateString
-      }
-    }
-
-    switch (selectedDataType) {
-      case 'insulin':
-        csvContent = [
-          ['Usuario', 'Tipo de Dato', 'Tipo de Insulina', 'Dosis', 'Fecha y Hora'],
-          ...insulinData.map(item => [
-            escapeCsvValue(getUserEmail(item.username)),
-            escapeCsvValue('Insulina'),
-            escapeCsvValue(item.insulinType),
-            escapeCsvValue(item.dose),
-            escapeCsvValue(formatDate(item.date_time))
-          ])
-        ].map(row => row.join(';')).join('\n')
-        filename = 'datos_insulina.csv'
-        break
-      case 'food':
-        csvContent = [
-          ['Usuario', 'Tipo de Dato', 'Tipo de Comida', 'Cantidad', 'Carbohidratos', 'Fecha y Hora'],
-          ...foodData.map(item => [
-            escapeCsvValue(getUserEmail(item.username)),
-            escapeCsvValue('Comida'),
-            escapeCsvValue(item.food_type),
-            escapeCsvValue(item.quantity),
-            escapeCsvValue(item.carbs),
-            escapeCsvValue(formatDate(item.date_time))
-          ])
-        ].map(row => row.join(';')).join('\n')
-        filename = 'datos_comidas.csv'
-        break
-      case 'exercise':
-        csvContent = [
-          ['Usuario', 'Tipo de Dato', 'Tipo de Ejercicio', 'Intensidad', 'Descripción', 'Fecha y Hora'],
-          ...exerciseData.map(item => [
-            escapeCsvValue(getUserEmail(item.username)),
-            escapeCsvValue('Ejercicio'),
-            escapeCsvValue(item.exercise_type),
-            escapeCsvValue(item.intensity),
-            escapeCsvValue(item.exercise_description),
-            escapeCsvValue(formatDate(item.date_time))
-          ])
-        ].map(row => row.join(';')).join('\n')
-        filename = 'datos_ejercicio.csv'
-        break
-      case 'period':
-        csvContent = [
-          ['Usuario', 'Tipo de Dato', 'Fecha de Inicio', 'Fecha de Fin', 'Intensidad', 'Síntomas', 'Notas'],
-          ...periodData.map(item => [
-            escapeCsvValue(getUserEmail(item.username)),
-            escapeCsvValue('Período'),
-            escapeCsvValue(formatDate(item.startDate)),
-            escapeCsvValue(formatDate(item.endDate)),
-            escapeCsvValue(item.intensity),
-            escapeCsvValue(Array.isArray(item.symptoms) ? item.symptoms.join('; ') : item.symptoms),
-            escapeCsvValue(item.notes)
-          ])
-        ].map(row => row.join(';')).join('\n')
-        filename = 'datos_periodo.csv'
-        break
-      case 'mood':
-        csvContent = [
-          ['Usuario', 'Tipo de Dato', 'Valor de Estado de Ánimo', 'Fuera de Rutina', 'Descripción de Rutina', 'Emociones', 'Otra Emoción', 'Fecha y Hora'],
-          ...moodData.map(item => [
-            escapeCsvValue(getUserEmail(item.username)),
-            escapeCsvValue('Estado de Ánimo'),
-            escapeCsvValue(item.mood_value),
-            escapeCsvValue(item.out_of_routine ? 'Sí' : 'No'),
-            escapeCsvValue(item.routine_description),
-            escapeCsvValue(Array.isArray(item.emotions) ? item.emotions.join('; ') : item.emotions),
-            escapeCsvValue(item.other_emotion),
-            escapeCsvValue(formatDate(item.date_time))
-          ])
-        ].map(row => row.join(';')).join('\n')
-        filename = 'datos_estado_animo.csv'
-        break
-      default:
-        // Exportar todos los datos en un formato unificado
-        const allData = [
-          // Insulina
-          ...insulinData.map(item => ({
-            usuario: getUserEmail(item.username),
-            tipoDato: 'Insulina',
-            valor1: item.insulinType,
-            valor2: item.dose,
-            valor3: '',
-            valor4: '',
-            valor5: '',
-            fecha: formatDate(item.date_time)
-          })),
-          // Comidas
-          ...foodData.map(item => ({
-            usuario: getUserEmail(item.username),
-            tipoDato: 'Comida',
-            valor1: item.food_type,
-            valor2: item.quantity,
-            valor3: item.carbs,
-            valor4: '',
-            valor5: '',
-            fecha: formatDate(item.date_time)
-          })),
-          // Ejercicio
-          ...exerciseData.map(item => ({
-            usuario: getUserEmail(item.username),
-            tipoDato: 'Ejercicio',
-            valor1: item.exercise_type,
-            valor2: item.intensity,
-            valor3: item.exercise_description,
-            valor4: '',
-            valor5: '',
-            fecha: formatDate(item.date_time)
-          })),
-          // Períodos
-          ...periodData.map(item => ({
-            usuario: getUserEmail(item.username),
-            tipoDato: 'Período',
-            valor1: formatDate(item.startDate),
-            valor2: formatDate(item.endDate),
-            valor3: item.intensity,
-            valor4: Array.isArray(item.symptoms) ? item.symptoms.join('; ') : item.symptoms,
-            valor5: item.notes,
-            fecha: formatDate(item.startDate)
-          })),
-          // Estado de ánimo
-          ...moodData.map(item => ({
-            usuario: getUserEmail(item.username),
-            tipoDato: 'Estado de Ánimo',
-            valor1: item.mood_value,
-            valor2: item.out_of_routine ? 'Sí' : 'No',
-            valor3: item.routine_description,
-            valor4: Array.isArray(item.emotions) ? item.emotions.join('; ') : item.emotions,
-            valor5: item.other_emotion,
-            fecha: formatDate(item.date_time)
-          }))
-        ]
-
-        csvContent = [
-          ['Usuario', 'Tipo de Dato', 'Valor 1', 'Valor 2', 'Valor 3', 'Valor 4', 'Valor 5', 'Fecha'],
-          ...allData.map(item => [
-            escapeCsvValue(item.usuario),
-            escapeCsvValue(item.tipoDato),
-            escapeCsvValue(item.valor1),
-            escapeCsvValue(item.valor2),
-            escapeCsvValue(item.valor3),
-            escapeCsvValue(item.valor4),
-            escapeCsvValue(item.valor5),
-            escapeCsvValue(item.fecha)
-          ])
-        ].map(row => row.join(';')).join('\n')
-        filename = 'todos_los_datos.csv'
-    }
-
-    // Agregar BOM para que Excel reconozca UTF-8 y las columnas correctamente
-    const BOM = '\uFEFF'
-    const csvWithBOM = BOM + csvContent
-    
-    const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = filename
+    a.download = healthCsvFilename(categories)
     a.click()
     window.URL.revokeObjectURL(url)
   }
@@ -668,8 +618,86 @@ export default function DataPage() {
     totalRecords: insulinData.length + foodData.length + exerciseData.length + periodData.length + moodData.length
   }
 
-  // Agrupar datos por usuario para las tarjetas
-  const userDataGroups = users.map(user => {
+  // DR12: once loading finished, a category without records is not rendered as
+  // an empty metric card. This is a record count, so the values shown are real
+  // positives; record-level values such as mood 0 or `out_of_routine: false`
+  // are preserved in the cards and CSV below.
+  const metricCards: Array<{
+    key: string
+    count: number
+    label: string
+    Icon: LucideIcon
+    iconClass: string
+    valueClass: string
+    hoverClass: string
+  }> = visibleMetricCards([
+    {
+      key: 'insulin',
+      count: stats.totalInsulin,
+      label: t.dashboard.insulin,
+      Icon: Pill,
+      iconClass: 'from-blue-600 to-blue-700',
+      valueClass: 'text-blue-600',
+      hoverClass: 'hover:shadow-blue-500/10',
+    },
+    {
+      key: 'food',
+      count: stats.totalFood,
+      label: t.dashboard.food,
+      Icon: Utensils,
+      iconClass: 'from-green-600 to-green-700',
+      valueClass: 'text-green-600',
+      hoverClass: 'hover:shadow-green-500/10',
+    },
+    {
+      key: 'exercise',
+      count: stats.totalExercise,
+      label: t.dashboard.exercise,
+      Icon: Dumbbell,
+      iconClass: 'from-orange-600 to-orange-700',
+      valueClass: 'text-orange-600',
+      hoverClass: 'hover:shadow-orange-500/10',
+    },
+    {
+      key: 'period',
+      count: stats.totalPeriods,
+      label: t.dashboard.periods,
+      Icon: CalendarDays,
+      iconClass: 'from-purple-600 to-purple-700',
+      valueClass: 'text-purple-600',
+      hoverClass: 'hover:shadow-purple-500/10',
+    },
+    {
+      key: 'mood',
+      count: stats.totalMood,
+      label: t.dashboard.mood,
+      Icon: Smile,
+      iconClass: 'from-pink-600 to-pink-700',
+      valueClass: 'text-pink-600',
+      hoverClass: 'hover:shadow-pink-500/10',
+    },
+    {
+      key: 'total',
+      count: stats.totalRecords,
+      label: t.dashboard.total,
+      Icon: Activity,
+      iconClass: 'from-indigo-600 to-indigo-700',
+      valueClass: 'text-indigo-600',
+      hoverClass: 'hover:shadow-indigo-500/10',
+    },
+  ])
+
+  // Group data by user. Usernames found only in the records are still grouped
+  // so an incomplete user listing cannot hide authorized records (DR07/DR08).
+  const groupableUsers = usersForRecordGroups(users, [
+    ...insulinData.map(item => item.username),
+    ...foodData.map(item => item.username),
+    ...exerciseData.map(item => item.username),
+    ...periodData.map(item => item.username),
+    ...moodData.map(item => item.username),
+  ])
+
+  const userDataGroups = groupableUsers.map(user => {
     const userInsulin = insulinData.filter(item => item.username === user.Username)
     const userFood = foodData.filter(item => item.username === user.Username)
     const userExercise = exerciseData.filter(item => item.username === user.Username)
@@ -749,14 +777,14 @@ export default function DataPage() {
               <span className={`inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full ${colors.text} bg-gradient-to-r ${colors.icon} text-white`}>
                 {getDataTypeIcon(type)}
                 <span className="ml-2">
-                  {type === 'insulin' ? 'Insulina' : 
-                   type === 'food' ? 'Comida' : 
-                   type === 'exercise' ? 'Ejercicio' : 
-                   type === 'period' ? 'Período' : 'Estado de Ánimo'}
+                  {type === 'insulin' ? t.dashboard.insulin :
+                   type === 'food' ? t.dashboard.meals :
+                   type === 'exercise' ? t.dashboard.exercise :
+                   type === 'period' ? t.dashboard.periods : t.dashboard.mood}
                 </span>
               </span>
               <span className="text-sm text-gray-600">
-                {new Date(item.date_time || ('startDate' in item ? item.startDate : '')).toLocaleDateString('es-ES')}
+                {new Date(item.date_time || ('startDate' in item ? item.startDate : '')).toLocaleDateString(locale)}
               </span>
             </div>
             <div className="text-sm text-gray-800">
@@ -832,11 +860,6 @@ export default function DataPage() {
         
         <Navigation title={isIndividualUser ? t.dashboard.healthData : t.dashboard.healthData} showBackButton={true} />
         
-        {/* Selector de idioma */}
-        <div className="absolute top-6 right-6 z-20 hidden xl:block">
-          <LanguageSelector />
-        </div>
-        
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8 xl:py-12 relative z-10">
           {/* Header con estadísticas */}
           <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-10 mb-6 sm:mb-12 overflow-hidden shadow-2xl">
@@ -849,7 +872,7 @@ export default function DataPage() {
                   </div>
                   <div>
                     <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900">
-                      {isIndividualUser ? t.dashboard.healthData : t.dashboard.healthData}
+                      {t.dashboard.healthData}
                     </h2>
                     <p className="text-gray-600 text-sm sm:text-base lg:text-xl font-light">{t.dashboard.healthDataDescription}</p>
                   </div>
@@ -859,7 +882,7 @@ export default function DataPage() {
                 <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-sm border border-gray-200/50 px-4 sm:px-6 py-2 sm:py-3 rounded-xl shadow-lg">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="text-sm sm:text-base text-gray-800 font-semibold">
-                    {stats.totalRecords} registros totales
+                    {stats.totalRecords} {t.dashboard.totalRecords}
                   </span>
                 </div>
                 <button
@@ -871,116 +894,44 @@ export default function DataPage() {
                 </button>
               </div>
             </div>
-
-            {/* Barra de búsqueda */}
-            <div className="relative z-10">
-              <div className="relative max-w-md">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar en datos..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 sm:pl-14 pr-4 py-3 sm:py-4 bg-white/50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-white/70 text-sm sm:text-base"
-                />
-              </div>
-            </div>
           </div>
 
-          {error && (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {error}
+          {errorText && (
+            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 sm:flex-row sm:items-center sm:justify-between">
+              <span role="alert">{errorText}</span>
+              <button
+                type="button"
+                onClick={() => void fetchData()}
+                className="self-start rounded-lg bg-red-600 px-3 py-1.5 text-white hover:bg-red-700"
+              >
+                {t.common.retry}
+              </button>
             </div>
           )}
 
-          {/* Estadísticas generales */}
-          <div className="mb-8 sm:mb-12">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-              <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 sm:p-3 lg:p-4 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl sm:rounded-2xl shadow-lg">
-                      <Pill className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white" />
+          {/* Estadísticas generales: solo roles privilegiados y solo categorías
+              con datos tras terminar la carga (DR09/DR12). */}
+          {!isIndividualUser && !loading && !error && metricCards.length > 0 && (
+            <div className="mb-8 sm:mb-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+                {metricCards.map(({ key, count, label, Icon, iconClass, valueClass, hoverClass }) => (
+                  <div key={key} className={`relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl ${hoverClass} transition-all duration-300 transform hover:-translate-y-1`}>
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className={`p-2 sm:p-3 lg:p-4 bg-gradient-to-br ${iconClass} rounded-xl sm:rounded-2xl shadow-lg`}>
+                          <Icon className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white" />
+                        </div>
+                      </div>
+                      <div className="ml-3 sm:ml-4 lg:ml-6">
+                        <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{label}</h3>
+                        <p className={`text-2xl sm:text-3xl lg:text-4xl font-bold ${valueClass}`}>{count}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="ml-3 sm:ml-4 lg:ml-6">
-                    <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{t.dashboard.insulin}</h3>
-                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-blue-600">{stats.totalInsulin}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-green-500/10 transition-all duration-300 transform hover:-translate-y-1">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 sm:p-3 lg:p-4 bg-gradient-to-br from-green-600 to-green-700 rounded-xl sm:rounded-2xl shadow-lg">
-                      <Utensils className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-3 sm:ml-4 lg:ml-6">
-                    <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{t.dashboard.food}</h3>
-                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-green-600">{stats.totalFood}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-orange-500/10 transition-all duration-300 transform hover:-translate-y-1">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 sm:p-3 lg:p-4 bg-gradient-to-br from-orange-600 to-orange-700 rounded-xl sm:rounded-2xl shadow-lg">
-                      <Dumbbell className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-3 sm:ml-4 lg:ml-6">
-                    <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{t.dashboard.exercise}</h3>
-                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-orange-600">{stats.totalExercise}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-300 transform hover:-translate-y-1">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 sm:p-3 lg:p-4 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl sm:rounded-2xl shadow-lg">
-                      <CalendarDays className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-3 sm:ml-4 lg:ml-6">
-                    <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{t.dashboard.periods}</h3>
-                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-purple-600">{stats.totalPeriods}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-pink-500/10 transition-all duration-300 transform hover:-translate-y-1">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 sm:p-3 lg:p-4 bg-gradient-to-br from-pink-600 to-pink-700 rounded-xl sm:rounded-2xl shadow-lg">
-                      <Smile className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-3 sm:ml-4 lg:ml-6">
-                    <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{t.dashboard.mood}</h3>
-                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-pink-600">{stats.totalMood}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 transform hover:-translate-y-1">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 sm:p-3 lg:p-4 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl sm:rounded-2xl shadow-lg">
-                      <Activity className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-3 sm:ml-4 lg:ml-6">
-                    <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{t.dashboard.total}</h3>
-                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-indigo-600">{stats.totalRecords}</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Filtros mejorados */}
           <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-10 mb-8 sm:mb-12 overflow-hidden shadow-2xl">
@@ -1005,30 +956,15 @@ export default function DataPage() {
               
               <div className={`grid grid-cols-1 gap-4 sm:gap-6 ${isIndividualUser ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4'}`}>
                 {!isIndividualUser && (
-                  <div>
-                    <label className="block text-xs sm:text-sm font-bold text-blue-900 mb-2 sm:mb-3 flex items-center">
-                      <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      {t.dashboard.user}
-                    </label>
-                    <select
-                      value={selectedUser}
-                      onChange={(e) => setSelectedUser(e.target.value)}
-                      className="w-full bg-white border-2 border-blue-200 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-blue-900 shadow-lg hover:border-blue-300 transition-all duration-300 cursor-pointer appearance-none bg-gradient-to-r from-blue-50 to-indigo-50 text-sm sm:text-base"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                        backgroundPosition: 'right 8px center',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '12px'
-                      }}
-                    >
-                      <option value="all" className="bg-white text-blue-900 py-2">{t.dashboard.allUsers}</option>
-                      {users.filter(user => user.Username.length > 0).map(user => (
-                        <option key={user.UserID} value={user.Username} className="bg-white text-blue-900">
-                          {getDisplayUsername(user)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <UserAutocomplete
+                    users={users}
+                    value={selectedUser}
+                    onChange={setSelectedUser}
+                    label={t.dashboard.user}
+                    allUsersLabel={t.dashboard.allUsers}
+                    loading={usersLoading}
+                    error={usersError}
+                  />
                 )}
                 
                 <div>
@@ -1048,11 +984,11 @@ export default function DataPage() {
                     }}
                   >
                     <option value="all" className="bg-white text-blue-900 py-2">{t.dashboard.allTypes}</option>
-                    <option value="insulin" className="bg-white text-blue-900">Insulina</option>
-                    <option value="food" className="bg-white text-blue-900">Comidas</option>
-                    <option value="exercise" className="bg-white text-blue-900">Ejercicio</option>
-                    <option value="period" className="bg-white text-blue-900">Períodos</option>
-                    <option value="mood" className="bg-white text-blue-900">Estado de Ánimo</option>
+                    <option value="insulin" className="bg-white text-blue-900">{t.dashboard.insulin}</option>
+                    <option value="food" className="bg-white text-blue-900">{t.dashboard.meals}</option>
+                    <option value="exercise" className="bg-white text-blue-900">{t.dashboard.exercise}</option>
+                    <option value="period" className="bg-white text-blue-900">{t.dashboard.periods}</option>
+                    <option value="mood" className="bg-white text-blue-900">{t.dashboard.mood}</option>
                   </select>
                 </div>
                 
@@ -1073,10 +1009,9 @@ export default function DataPage() {
                     }}
                   >
                     <option value="all" className="bg-white text-blue-900 py-2">{t.dashboard.allTime}</option>
-                    <option value="1d" className="bg-white text-blue-900">Último día</option>
-                    <option value="7d" className="bg-white text-blue-900">Últimos 7 días</option>
-                    <option value="30d" className="bg-white text-blue-900">Últimos 30 días</option>
-                    <option value="90d" className="bg-white text-blue-900">Últimos 90 días</option>
+                    <option value="7d" className="bg-white text-blue-900">{t.data.last7Days}</option>
+                    <option value="30d" className="bg-white text-blue-900">{t.data.last30Days}</option>
+                    <option value="90d" className="bg-white text-blue-900">{t.data.last90Days}</option>
                   </select>
                 </div>
                 
@@ -1150,14 +1085,20 @@ export default function DataPage() {
             /* Vista de tarjetas por usuario */
             <div className="space-y-4 sm:space-y-6 lg:space-y-8">
               {userDataGroups.length > 0 ? (
-                userDataGroups.map((group) => (
+                userDataGroups.map((group) => {
+                  const isExpanded = isUserGroupExpanded(
+                    isIndividualUser,
+                    group.user.UserID,
+                    expandedUsers,
+                  )
+                  return (
                   <div key={group.user.UserID} className="relative bg-white backdrop-blur-xl border border-blue-200/50 rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg">
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-blue-100/50"></div>
                     
                     <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-blue-200">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-lg sm:text-xl font-bold text-blue-900 mb-1 truncate">
+                          <h3 className="text-lg sm:text-xl font-bold text-blue-900 mb-1 break-words" title={getDisplayUsername(group.user)}>
                             {getDisplayUsername(group.user)}
                           </h3>
                           <p className="text-sm sm:text-base text-blue-700">
@@ -1169,65 +1110,84 @@ export default function DataPage() {
                             <p className="text-xs sm:text-sm text-blue-600">{t.dashboard.lastActivity}</p>
                             <p className="text-xs sm:text-sm font-medium text-blue-900">
                               {group.stats.lastActivity ? 
-                                new Date(group.stats.lastActivity).toLocaleDateString('es-ES') : 
-                                'N/A'
+                                new Date(group.stats.lastActivity).toLocaleDateString(locale) :
+                                t.common.notAvailable
                               }
                             </p>
                           </div>
-                          <button
-                            onClick={() => toggleUserExpansion(group.user.UserID)}
-                            className="p-2 sm:p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl hover:from-blue-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105 flex-shrink-0"
-                          >
-                            {expandedUsers.has(group.user.UserID) ? (
-                              <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                            )}
-                          </button>
+                          {!isIndividualUser && (
+                            <button
+                              type="button"
+                              onClick={() => toggleUserExpansion(group.user.UserID)}
+                              aria-expanded={isExpanded}
+                              title={isExpanded ? t.dashboard.showLess : t.dashboard.viewAll}
+                              className="p-2 sm:p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl hover:from-blue-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105 flex-shrink-0"
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
                     
-                    {expandedUsers.has(group.user.UserID) && (
+                    {isExpanded && (
                       <div className="relative z-10 p-4 sm:p-6 lg:p-8">
-                        {/* Resumen por tipo de dato */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
-                          <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-blue-50 to-blue-100 backdrop-blur-sm border border-blue-200 rounded-lg sm:rounded-xl">
-                            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
-                              <Pill className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
-                            </div>
-                            <p className="text-sm sm:text-base lg:text-lg font-bold text-blue-600">{group.stats.insulinCount}</p>
-                            <p className="text-xs sm:text-sm text-blue-700">{t.dashboard.insulin}</p>
+                        {/* Resumen por tipo de dato: el usuario normal ve sus
+                            categorías directamente y sin resumen redundante
+                            (DR09); las tarjetas vacías no se muestran (DR12). */}
+                        {!isIndividualUser && group.stats.totalRecords > 0 && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+                            {group.stats.insulinCount > 0 && (
+                              <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-blue-50 to-blue-100 backdrop-blur-sm border border-blue-200 rounded-lg sm:rounded-xl">
+                                <div className="p-1.5 sm:p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
+                                  <Pill className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
+                                </div>
+                                <p className="text-sm sm:text-base lg:text-lg font-bold text-blue-600">{group.stats.insulinCount}</p>
+                                <p className="text-xs sm:text-sm text-blue-700">{t.dashboard.insulin}</p>
+                              </div>
+                            )}
+                            {group.stats.foodCount > 0 && (
+                              <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-green-50 to-green-100 backdrop-blur-sm border border-green-200 rounded-lg sm:rounded-xl">
+                                <div className="p-1.5 sm:p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
+                                  <Utensils className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
+                                </div>
+                                <p className="text-sm sm:text-base lg:text-lg font-bold text-green-600">{group.stats.foodCount}</p>
+                                <p className="text-xs sm:text-sm text-green-700">{t.dashboard.meals}</p>
+                              </div>
+                            )}
+                            {group.stats.exerciseCount > 0 && (
+                              <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-orange-50 to-orange-100 backdrop-blur-sm border border-orange-200 rounded-lg sm:rounded-xl">
+                                <div className="p-1.5 sm:p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
+                                  <Dumbbell className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
+                                </div>
+                                <p className="text-sm sm:text-base lg:text-lg font-bold text-orange-600">{group.stats.exerciseCount}</p>
+                                <p className="text-xs sm:text-sm text-orange-700">{t.dashboard.exercise}</p>
+                              </div>
+                            )}
+                            {group.stats.periodCount > 0 && (
+                              <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-purple-50 to-purple-100 backdrop-blur-sm border border-purple-200 rounded-lg sm:rounded-xl">
+                                <div className="p-1.5 sm:p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
+                                  <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
+                                </div>
+                                <p className="text-sm sm:text-base lg:text-lg font-bold text-purple-600">{group.stats.periodCount}</p>
+                                <p className="text-xs sm:text-sm text-purple-700">{t.dashboard.periods}</p>
+                              </div>
+                            )}
+                            {group.stats.moodCount > 0 && (
+                              <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-pink-50 to-pink-100 backdrop-blur-sm border border-pink-200 rounded-lg sm:rounded-xl">
+                                <div className="p-1.5 sm:p-2 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
+                                  <Smile className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
+                                </div>
+                                <p className="text-sm sm:text-base lg:text-lg font-bold text-pink-600">{group.stats.moodCount}</p>
+                                <p className="text-xs sm:text-sm text-pink-700">{t.dashboard.mood}</p>
+                              </div>
+                            )}
                           </div>
-                          <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-green-50 to-green-100 backdrop-blur-sm border border-green-200 rounded-lg sm:rounded-xl">
-                            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
-                              <Utensils className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
-                            </div>
-                            <p className="text-sm sm:text-base lg:text-lg font-bold text-green-600">{group.stats.foodCount}</p>
-                            <p className="text-xs sm:text-sm text-green-700">{t.dashboard.meals}</p>
-                          </div>
-                          <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-orange-50 to-orange-100 backdrop-blur-sm border border-orange-200 rounded-lg sm:rounded-xl">
-                            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
-                              <Dumbbell className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
-                            </div>
-                            <p className="text-sm sm:text-base lg:text-lg font-bold text-orange-600">{group.stats.exerciseCount}</p>
-                            <p className="text-xs sm:text-sm text-orange-700">{t.dashboard.exercise}</p>
-                          </div>
-                          <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-purple-50 to-purple-100 backdrop-blur-sm border border-purple-200 rounded-lg sm:rounded-xl">
-                            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
-                              <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
-                            </div>
-                            <p className="text-sm sm:text-base lg:text-lg font-bold text-purple-600">{group.stats.periodCount}</p>
-                            <p className="text-xs sm:text-sm text-purple-700">{t.dashboard.periods}</p>
-                          </div>
-                          <div className="text-center p-3 sm:p-4 bg-gradient-to-br from-pink-50 to-pink-100 backdrop-blur-sm border border-pink-200 rounded-lg sm:rounded-xl">
-                            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg w-fit mx-auto mb-2 sm:mb-3">
-                              <Smile className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-white" />
-                            </div>
-                            <p className="text-sm sm:text-base lg:text-lg font-bold text-pink-600">{group.stats.moodCount}</p>
-                            <p className="text-xs sm:text-sm text-pink-700">{t.dashboard.mood}</p>
-                          </div>
-                        </div>
+                        )}
 
                         {/* Datos detallados por tipo */}
                         <div className="space-y-6 sm:space-y-8">
@@ -1299,8 +1259,9 @@ export default function DataPage() {
                       </div>
                     )}
                   </div>
-                ))
-              ) : (
+                  )
+                })
+              ) : !error ? (
                 <div className="relative bg-gradient-to-r from-slate-800/50 to-slate-900/50 backdrop-blur-xl border border-white/20 rounded-2xl sm:rounded-3xl p-6 sm:p-8 lg:p-12 text-center">
                   <div className="absolute inset-0 bg-gradient-to-r from-slate-800/20 to-slate-900/20"></div>
                   <div className="relative z-10">
@@ -1311,7 +1272,7 @@ export default function DataPage() {
                     <p className="text-white/70 text-sm sm:text-base lg:text-lg">{t.dashboard.noRecordsForFilters}</p>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
         </div>

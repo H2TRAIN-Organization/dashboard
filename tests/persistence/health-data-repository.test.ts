@@ -226,6 +226,67 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
     ).toBe(false);
   });
 
+  it("returns every authorized user across more than three users and multiple pages", async () => {
+    const usernames = ["alice", "bob", "carol", "dave", "erin"];
+    const gateway = new FakePersistenceGateway({
+      insulindata: usernames.map((username, index) =>
+        insulinRow(index + 1, username, `2026-01-0${index + 1}T10:00:00`),
+      ),
+    });
+    const repo = new SupabaseHealthDataRepository(gateway, decryptor(), {
+      pageSize: 2,
+    });
+    const query = {
+      timeRange: "all",
+      selectedDataType: "insulin",
+      dateFilter: null,
+      from: null,
+      to: "2026-12-31T23:59:59.999Z",
+    } as const;
+
+    const all = await repo.getDecryptedData({
+      ...query,
+      selectedUser: null,
+    });
+    expect(all.insulinData.map((record) => record.username)).toEqual(usernames);
+    expect(new Set(all.insulinData.map((record) => record.username)).size).toBe(5);
+
+    const pages = gateway.selectCalls.filter(
+      (call) => call.table === "insulindata",
+    );
+    expect(pages).toHaveLength(3);
+    expect(pages.map((call) => call.request.range)).toEqual([
+      { from: 0, to: 1 },
+      { from: 2, to: 3 },
+      { from: 4, to: 5 },
+    ]);
+    for (const call of pages) {
+      expect(call.request.order).toEqual({ column: "id", ascending: true });
+      expect(
+        call.request.filters?.some((filter) => filter.column === "username"),
+      ).toBe(false);
+    }
+
+    const selected = await repo.getDecryptedData({
+      ...query,
+      selectedUser: "carol",
+    });
+    expect(selected.insulinData.map((record) => record.username)).toEqual([
+      "carol",
+    ]);
+    expect(selected.insulinData).toHaveLength(1);
+
+    const lastCall = gateway.selectCalls.at(-1);
+    expect(
+      lastCall?.request.filters?.some(
+        (filter) =>
+          filter.kind === "eq" &&
+          filter.column === "username" &&
+          filter.value === "carol",
+      ),
+    ).toBe(true);
+  });
+
   it("filters the literal username all in decrypted and legacy reads", async () => {
     const gateway = new FakePersistenceGateway({
       insulindata: [

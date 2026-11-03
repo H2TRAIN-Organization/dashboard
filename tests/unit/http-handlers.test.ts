@@ -34,6 +34,11 @@ const allUser = makeUser({
   username: "all",
   role: "user",
 });
+const legacyEmailUser = makeUser({
+  id: "legacy-email-1",
+  username: "javier.alayón@ulpgc.es",
+  role: "user",
+});
 
 function setup() {
   const accounts: TestAccount[] = [
@@ -65,10 +70,17 @@ function setup() {
       method: "username",
       expiresAt: "2026-12-31T23:59:59.000Z",
     },
+    {
+      user: legacyEmailUser,
+      password: "legacy-secret",
+      token: "legacy-token",
+      method: "username",
+      expiresAt: "2026-12-31T23:59:59.000Z",
+    },
   ];
   const auth = createAuthUseCases(new TestAuthGateway(accounts));
   const users = createUserUseCases(
-    new InMemoryUserRepository([admin, doctor, user, allUser]),
+    new InMemoryUserRepository([admin, doctor, user, allUser, legacyEmailUser]),
     new InMemoryUserDataPresence(),
   );
   const dataRepository = new InMemoryHealthDataRepository();
@@ -119,6 +131,37 @@ describe("HTTP auth handlers", () => {
     expect(byUsername.status).toBe(200);
     expect(bodyOf(byUsername).method).toBe("username");
     expect(byUsername.body).not.toHaveProperty("token");
+  });
+
+  it("lets an email-shaped legacy Username authenticate without mislabeling the method", async () => {
+    const { api } = setup();
+    const result = await api.auth.login({
+      body: {
+        email: "javier.alayón@ulpgc.es",
+        password: "legacy-secret",
+      },
+    });
+
+    expect(result.status).toBe(200);
+    expect(bodyOf(result)).toMatchObject({
+      method: "username",
+      user: { username: "javier.alayón@ulpgc.es", role: "user" },
+    });
+    expect(result.cookies?.[0]).toMatchObject({
+      name: "dashboard_session",
+      value: "legacy-token",
+      httpOnly: true,
+    });
+  });
+
+  it("keeps a 400 for an email field without @", async () => {
+    const { api } = setup();
+    const result = await api.auth.login({
+      body: { email: "not-an-email", password: "whatever" },
+    });
+
+    expect(result.status).toBe(400);
+    expect(JSON.stringify(result.body)).not.toContain("whatever");
   });
 
   it("returns 401 for bad credentials and 400 without echoing request secrets", async () => {

@@ -85,6 +85,14 @@ export interface UserUpdateInput {
 export interface UserListQuery {
   search?: string
   role?: UserRole
+  /**
+   * Preferred pagination (DR17): 1-based page and one of 10/25/50. Never send
+   * `page`/`pageSize` together with `limit`/`offset`; the backend rejects the
+   * mixture with 400.
+   */
+  page?: number
+  pageSize?: 10 | 25 | 50
+  /** Legacy pagination kept for `listAll()` and older deployments. */
   limit?: number
   offset?: number
 }

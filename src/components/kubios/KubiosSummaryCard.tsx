@@ -4,45 +4,38 @@ import Link from 'next/link'
 import { AlertTriangle, ArrowUpRight, Clock, Heart, TrendingUp } from 'lucide-react'
 import { usePermissions } from '@/components/RoleGuard'
 import { useLanguage } from '@/contexts/LanguageContext'
-import { useKubiosMe } from '@/hooks/useKubiosPersonal'
+import {
+  kubiosErrorTranslationKey,
+  useKubiosPersonal,
+} from '@/hooks/useKubiosPersonal'
 import {
   formatKubiosDate,
   formatKubiosMetric,
-  isKubiosPersonalVisible,
 } from '@/lib/kubios-personal'
 
 /**
- * Resumen compacto de las mediciones Kubios propias. Se oculta mientras carga,
- * ante cualquier error y cuando el estado no es `ready`/`stale` con mediciones:
- * el dashboard nunca anuncia datos que el usuario no tiene.
+ * Resumen compacto de las mediciones Kubios propias. La tarjeta y la vista
+ * /kubios consumen la misma vista derivada: solo se anuncia contenido cuando
+ * hay un estado ready/stale con mediciones. Si falla la serie de resultados
+ * pero /me conserva el resumen, la tarjeta mantiene ese resumen y muestra el
+ * error, igual que la página; nunca inventa una lista ni oculta el fallo.
  */
 export default function KubiosSummaryCard() {
   const { t, language } = useLanguage()
   const { hasPermission } = usePermissions()
-  const { view } = useKubiosMe()
+  const { view } = useKubiosPersonal({ from: '', to: '' })
 
   if (!hasPermission('view_own_kubios')) return null
-  if (view.phase !== 'data' || view.data === null) return null
-  if (!isKubiosPersonalVisible(view.data.status, view.data.measurement_count)) {
-    return null
-  }
+  if (!view.available) return null
 
-  const summary = view.data
-  const latest = summary.latest_result
+  const { latest, measurementCount, syncedAt } = view
   const readiness = latest?.result.readiness
   const notAvailable = t.kubios.personal.notAvailable
-  const latestDate = formatKubiosDate(
-    latest?.measured_timestamp,
-    language,
-    notAvailable,
-  )
-  const syncedDate = formatKubiosDate(
-    summary.synced_at,
-    language,
-    notAvailable,
-  )
+  const latestDate = formatKubiosDate(latest?.measured_timestamp, language, notAvailable)
+  const syncedDate = formatKubiosDate(syncedAt, language, notAvailable)
   const readinessText = formatKubiosMetric(readiness, 1, notAvailable)
-  const isStale = summary.status === 'stale'
+  const isStale = view.stale
+  const hasError = view.error !== null
 
   return (
     <Link href="/kubios" className="group block" aria-label={t.kubios.personal.viewDetails}>
@@ -55,7 +48,7 @@ export default function KubiosSummaryCard() {
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-indigo-800 group-hover:text-indigo-600 transition-colors">
-                {summary.measurement_count.toLocaleString()}
+                {measurementCount.toLocaleString(language === 'en' ? 'en-US' : 'es-ES')}
               </div>
               <div className="text-xs text-indigo-600/70">{t.kubios.measurements}</div>
             </div>
@@ -95,10 +88,22 @@ export default function KubiosSummaryCard() {
             </span>
           </div>
 
-          {isStale && (
+          {(isStale || hasError) && (
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-              <span>{t.kubios.personal.staleWarning}</span>
+              <span>
+                {isStale
+                  ? t.kubios.personal.staleWarning
+                  : t.kubios.personal[kubiosErrorTranslationKey(view.error)]}
+              </span>
+            </div>
+          )}
+          {isStale && hasError && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>
+                {t.kubios.personal[kubiosErrorTranslationKey(view.error)]}
+              </span>
             </div>
           )}
 

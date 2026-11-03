@@ -21,3 +21,13 @@ export function normalizeEmail(email: string): string {
 export function normalizeUsername(username: string): string {
   return username.trim();
 }
+
+/**
+ * Conservatively normalizes an identity for an exact comparison: trim,
+ * Unicode NFC and lower case. It is used only to decide whether a confirmed
+ * Supabase email matches exactly one legacy Username; the persisted Username
+ * and the role always come from public.users.
+ */
+export function normalizeIdentity(value: string): string {
+  return value.trim().normalize("NFC").toLowerCase();
+}

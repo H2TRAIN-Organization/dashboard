@@ -14,6 +14,12 @@ export interface LoginCredentials {
 export interface AuthGateway {
   authenticateByEmail(email: string, password: string): Promise<Session | null>;
   authenticateByUsername(username: string, password: string): Promise<Session | null>;
+  /**
+   * True when a legacy `public.users.Username` exists for this exact value.
+   * Used to let an email-shaped legacy account log in without probing the
+   * legacy verifier on every ordinary email login.
+   */
+  hasLegacyUsername(username: string): Promise<boolean>;
   getSession(token: string): Promise<Session | null>;
   revokeSession(token: string): Promise<void>;
 }

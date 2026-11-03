@@ -4,6 +4,11 @@ Guía de prerrequisitos y pendientes para preparar Supabase. **No implica que mi
 
 ## Estado de integración
 
+La lista siguiente conserva la evidencia histórica de la release anterior.
+La implementación local de Dashboard Remaking y sus comprobaciones actuales
+se documentan en `docs/dashboard-remaking.md`; requiere revisión humana y no
+constituye una publicación ni un despliegue nuevo.
+
 - Estado actual: `dev` `fcb2bda`; **código local validado / Supabase remoto pendiente**.
 - Checks del root: `npm run check` 177 tests/27 archivos, lint de `src`+tests 0 errores/0 warnings, TypeScript server+app 0, build PASS, audit producción 0. Build final `ktSETdnx6ZkFPtJqM5Gf9`.
 - Launcher portable desde el root real: calendario 1/1 PASS + 12 browser PASS (2 backend real + 10 frontend mock), 0 fallos/skips; incluye resize 667x375→667x667, filtros clear, idioma/persistencia/storage bloqueado. T-066 cerrado.
@@ -19,7 +24,7 @@ Guía de prerrequisitos y pendientes para preparar Supabase. **No implica que mi
 - PostgREST debe consultarse con `Accept-Profile: public` explícito. El perfil por defecto `api` puede devolver 404.
 - Tablas físicas observadas: `users`, `insulindata`, `fooddata`, `exercisedata`, `periodrecords`, `mooddata` y `polar_data`. No usar alias con guion bajo sin verificarlos.
 - `users.PasswordHash` se observó con prefijo bcrypt y longitud 60. De 21 usuarios, 17 usan bcrypt con coste 10 y 4 tienen un formato desconocido; esos 4 deben fallar cerrado. No se copiaron hashes ni credenciales.
-- Cinco identidades de Supabase Auth no tienen `app_metadata.role` ni `app_user_id`. El acceso por email requiere una vinculación administrada explícita entre Auth y el usuario de aplicación; no se inventan identidades ni se infiere el vínculo.
+- En la inspección histórica, cinco identidades de Supabase Auth no tenían `app_metadata.role` ni `app_user_id`. Dashboard Remaking admite además correo Auth confirmado con coincidencia única y normalizada en `users.Username`, tomando el rol de esa fila. Los vínculos administrados contradictorios y las coincidencias ambiguas se deniegan; no se inventan usuarios ni roles.
 - El username literal `all` sigue siendo un usuario normal. Solo el `null` interno de rol privilegiado representa alcance global; ningún string, incluido `all`, debe omitir el filtro. El IDOR se cerró en `3b2a675` y el helper se alineó en `1f8bf95`.
 - La clave publishable permitió leer `PasswordHash` vía REST. Es un riesgo que deben bloquear RLS y grants; no se debe exponer el hash.
 - Tipos, nulabilidad, defaults, PK/FK, unique, índices y RLS remotos no están verificados. Los fixtures SQL locales sí prueban RLS y roles reales en PostgreSQL local; eso no demuestra el estado remoto.
@@ -27,7 +32,7 @@ Guía de prerrequisitos y pendientes para preparar Supabase. **No implica que mi
 ## Pendientes
 
 1. **Migraciones remotas:** aplicar auth SQL + M1-M5 en staging con backup previo, archivo por archivo. No aplicadas en remoto.
-2. **Vinculación Auth:** asignar `app_metadata.role` y `app_user_id` a las 5 identidades sin metadatos, con vínculo administrado explícito.
+2. **Vinculación Auth:** comprobar cada identidad mediante vínculo administrado válido o correo confirmado que coincida inequívocamente con `users.Username`; no modificar metadatos remotos de forma automática.
 3. **RLS y grants remotos:** impedir lectura de `PasswordHash` y datos de salud con la publishable; verificar políticas por rol/tabla.
 4. **Service role remota:** validar una clave privada `service_role` o `sb_secret_`; el runtime debe preferirla y no caer en `anon`.
 5. **M4/M5 e ingestores:** las 6 tablas de salud y `users` quedan privadas para anon/authenticated/PUBLIC; los clientes legacy necesitan identidad/política dedicada, nunca service key en cliente.
@@ -40,7 +45,7 @@ Guía de prerrequisitos y pendientes para preparar Supabase. **No implica que mi
 No hay aplicación automática. Este checklist describe el orden operativo; no autoriza por sí mismo cambios remotos.
 
 - [ ] **SQL remoto:** aplicar auth SQL + M1-M5 en staging, con backup y preflight abortivo. No aplicado.
-- [ ] **Auth remoto:** vincular explícitamente las 5 identidades con `app_metadata.role`/`app_user_id`; no inferir nombres.
+- [ ] **Auth remoto:** comprobar vínculos administrados o coincidencias únicas de correo confirmado; rechazar ambigüedades y obtener siempre el rol de `users`.
 - [ ] **Hashes:** los 4 no-bcrypt fallan cerrado; reset manual autorizado, sin adivinar algoritmo.
 - [ ] **RLS/grants:** verificar en remoto que publishable no lee `PasswordHash` ni datos de salud.
 - [ ] **M4/M5:** confirmar privatización de 6 tablas de salud y `users`; ingestores legacy con identidad/política dedicada, nunca service key en cliente.

@@ -1,0 +1,30 @@
+purpose:
+  stands_in_for: Supabase Auth and public PostgREST HTTP endpoints, using synthetic data only.
+  unblocks: Local Dashboard Remaking authentication, authorization, pagination and health-data regression checks.
+assumptions:
+  - id: postgrest-range-pagination
+    status: supported
+    claim: In the simulated environment, the real dashboard retrieves all 1011 matching health records across the repository's 1000-row page boundary.
+    reason: The test seeds the dependency over HTTP and reads through the mounted Next API and production persistence adapter; it does not replace the dashboard API with a mock.
+    verification: On 2026-11-03 the three Dashboard Remaking API acceptance tests passed, including global reads, a selected user and owner isolation. The simulation recorded multiple PostgREST requests with ranges. This establishes caller pagination against the stand-in, not every constraint or policy in real Supabase.
+    source: tests/acceptance/dashboard-remaking.test.mjs; src/server/infrastructure/persistence/health/health-data-repository.ts; local run t037-20261103182634
+    updated_at: '2026-11-03'
+  - id: filtered-users-total
+    status: supported
+    claim: In the simulated environment, the dashboard filters users before paging, reports the filtered total and preserves unique IDs across pages.
+    reason: HTTP acceptance exercises the mounted API with 32 matching users and sizes 10 and 25; repository tests also verify ordering and exact count requests.
+    verification: On 2026-11-03 page 1 returned 25 users, page 2 returned seven and both reported total 32; all 32 IDs were distinct. Mixing page/pageSize with limit returned 400. The real provider's complete schema and concurrent-write behavior remain outside this check.
+    source: tests/acceptance/dashboard-remaking.test.mjs; tests/persistence/user-repository.test.ts; contracts/openapi.yaml; local run t037-20261103182634
+    updated_at: '2026-11-03'
+  - id: live-seed-compatibility
+    status: supported
+    claim: The explicitly authorized DR-20261103-v1 batch contains eight encrypted exercises, eight meals and eight insulin records for the confirmed account, and the current production reader decrypts and exports those 24 rows.
+    reason: This claim is backed by a separate real read/write operation and an opted-in read-only integration test, rather than the simulation.
+    verification: On 2026-11-03 the first apply added eight rows per category, a repeated apply added zero, and DR_VERIFY_LIVE_SEED=1 passed through the production repository and common CSV exporter. This does not establish real browser login or authorization as that person.
+    source: scripts/seed-dashboard-dr.mjs; tests/unit/dashboard-seed-live.test.ts; test-results/dashboard-remaking/seed-health.csv
+    updated_at: '2026-11-03'
+fingerprints:
+  - id: dashboard-remaking-working-tree
+    date: '2026-11-03'
+    commit: '3575aac4884f541c4e081e916325c85e6e91efb4'
+    cli: 'Postman CLI 1.74.0; Node 24.16.0'

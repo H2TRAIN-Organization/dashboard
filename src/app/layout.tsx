@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { AppAuthProvider } from "@/contexts/AppAuthContext";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import GlobalLanguageSelector from "@/components/GlobalLanguageSelector";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -33,6 +34,7 @@ export default function RootLayout({
             <AuthProvider>
               <AppAuthProvider>
                 {children}
+                <GlobalLanguageSelector />
               </AppAuthProvider>
             </AuthProvider>
           </SessionProvider>

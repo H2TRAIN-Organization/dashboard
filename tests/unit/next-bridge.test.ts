@@ -24,6 +24,7 @@ describe("Next.js response bridge", () => {
     expect(setCookie).toContain("Secure");
     expect(setCookie).toContain("SameSite=lax");
     expect(setCookie).toContain("Path=/");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 
   it("clears the cookie with Max-Age=0", () => {
@@ -45,6 +46,7 @@ describe("Next.js response bridge", () => {
       status: 204,
     }));
     expect(response.status).toBe(403);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 
   it("allows same-origin mutations through the CSRF gate", async () => {

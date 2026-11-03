@@ -279,6 +279,9 @@ export function createAuthRuntime(options: AuthRuntimeOptions): AuthRuntime {
   });
   const passwords = createBcryptPasswordVerifier(options.bcrypt);
   const tokens = createSessionTokenCodec(config.sessionSecret, { now });
+  // Without an injected resolver, createAuthGateway applies the conservative
+  // confirmed-email + unique normalized public.users.Username link and rejects
+  // ambiguous/conflicting app_user_id or UUID links.
   const emailLink: EmailLinkOptions = {
     ...(options.emailLinkIdField === undefined
       ? {}

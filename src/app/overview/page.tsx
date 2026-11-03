@@ -10,7 +10,7 @@ import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridNavigation from '@/components/HybridNavigation'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
-import LanguageSelector from '@/components/LanguageSelector'
+import { hasAnyRecords } from '@/components/dashboard-shell/metrics'
 
 interface ActivityRecord {
   date_time?: string
@@ -30,7 +30,7 @@ function isRecentlyActive(userData: readonly ActivityRecord[], now: number) {
 }
 
 export default function OverviewPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { session } = useSession()
   const [insulinData, setInsulinData] = useState<InsulinData[]>([])
   const [foodData, setFoodData] = useState<FoodData[]>([])
@@ -41,6 +41,7 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now] = useState(() => Date.now())
+  const locale = language === 'en' ? 'en-US' : 'es-ES'
 
   const currentRole = session?.user.role ?? null
   const currentUsername = session?.user.username ?? null
@@ -53,7 +54,7 @@ export default function OverviewPage() {
 
       const selected = isIndividualUser ? (currentUsername ?? '') : 'all'
       if (isIndividualUser && selected.length === 0) {
-        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
+        throw new Error(t.overview.missingUsername)
       }
 
       const data = await dataApi.getDecrypted({
@@ -72,7 +73,7 @@ export default function OverviewPage() {
     } finally {
       setLoading(false)
     }
-  }, [isIndividualUser, currentUsername])
+  }, [isIndividualUser, currentUsername, t.overview.missingUsername])
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -217,20 +218,13 @@ export default function OverviewPage() {
   if (systemStats.avgMood < 5 && systemStats.totalMood > 0) {
     systemAlerts.push({
       type: 'info',
-      message: `Promedio de estado de ánimo bajo: ${systemStats.avgMood}/10`,
+      message: t.overview.lowMoodAlert.replace(
+        '{value}',
+        systemStats.avgMood.toString(),
+      ),
       icon: AlertTriangle
     })
   }
-
-  // Debug: Log de datos para verificar
-  console.log('Debug Overview Data:', {
-    insulinData: insulinData.length,
-    foodData: foodData.length,
-    exerciseData: exerciseData.length,
-    periodData: periodData.length,
-    moodData: moodData.length,
-    totalRecords: systemStats.totalRecords
-  })
 
   // Datos para gráficos
   const dataByType = [
@@ -239,13 +233,13 @@ export default function OverviewPage() {
     { name: t.overview.exercise, value: systemStats.totalExercise, color: '#F59E0B' },
     { name: t.overview.periods, value: systemStats.totalPeriods, color: '#8B5CF6' },
     { name: t.overview.mood, value: systemStats.totalMood, color: '#EC4899' }
-  ]
+  ].filter((entry) => entry.value > 0)
 
   // Actividad por día (últimos 7 días)
   const activityByDay = Array.from({ length: 7 }, (_, i) => {
     const date = new Date()
     date.setDate(date.getDate() - i)
-    const dateStr = date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
+    const dateStr = date.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', { month: 'short', day: 'numeric' })
     
     const dayInsulin = insulinData.filter(d => 
       new Date(d.date_time).toDateString() === date.toDateString()
@@ -292,6 +286,16 @@ export default function OverviewPage() {
     }
   }
 
+  const hasData = hasAnyRecords(
+    insulinData,
+    foodData,
+    exerciseData,
+    periodData,
+    moodData,
+  )
+  const showData = !loading && error === null && hasData
+  const showEmpty = !loading && error === null && !hasData
+
   return (
     <HybridProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden" style={{ colorScheme: 'light' }}>
@@ -302,11 +306,6 @@ export default function OverviewPage() {
           <div className="absolute bottom-20 left-1/4 w-80 h-80 bg-purple-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
         </div>
 
-        {/* Language Selector */}
-        <div className="absolute top-6 right-6 z-20">
-          <LanguageSelector />
-        </div>
-        
         <HybridNavigation title={t.dashboard.generalSummary} showBackButton={true} />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
@@ -339,6 +338,23 @@ export default function OverviewPage() {
             </div>
           </div>
 
+          {loading && (
+            <div className="mb-8 flex items-center justify-center rounded-2xl border border-blue-200 bg-white px-6 py-12 shadow-sm">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-sm font-medium text-gray-700">{t.common.loading}</span>
+            </div>
+          )}
+
+          {showEmpty && (
+            <div className="mb-8 rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm">
+              <Database className="mx-auto mb-4 h-10 w-10 text-slate-400" />
+              <h2 className="text-lg font-bold text-gray-900">{t.overview.noDataTitle}</h2>
+              <p className="mt-2 text-sm text-gray-600">{t.overview.noDataDescription}</p>
+            </div>
+          )}
+
+          {showData && (
+            <>
           {/* Estadísticas principales */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="relative bg-white border border-gray-200 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -375,6 +391,7 @@ export default function OverviewPage() {
               </div>
             </div>
 
+            {insulinData.length > 0 && (
             <div className="relative bg-white border border-gray-200 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -389,7 +406,9 @@ export default function OverviewPage() {
                 </div>
               </div>
             </div>
+            )}
 
+            {moodData.length > 0 && (
             <div className="relative bg-white border border-gray-200 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -404,10 +423,12 @@ export default function OverviewPage() {
                 </div>
               </div>
             </div>
+            )}
           </div>
 
           {/* Estadísticas por tipo de dato */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            {systemStats.totalInsulin > 0 && (
             <div className="text-center p-6 bg-white border border-gray-200 rounded-xl shadow-lg">
               <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg w-fit mx-auto mb-4">
                 <Pill className="h-8 w-8 text-white" />
@@ -415,6 +436,8 @@ export default function OverviewPage() {
               <p className="text-2xl font-bold text-blue-600">{systemStats.totalInsulin}</p>
               <p className="text-sm text-gray-600">{t.overview.insulin}</p>
             </div>
+            )}
+            {systemStats.totalFood > 0 && (
             <div className="text-center p-6 bg-white border border-gray-200 rounded-xl shadow-lg">
               <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-lg w-fit mx-auto mb-4">
                 <Utensils className="h-8 w-8 text-white" />
@@ -422,6 +445,8 @@ export default function OverviewPage() {
               <p className="text-2xl font-bold text-green-600">{systemStats.totalFood}</p>
               <p className="text-sm text-gray-600">{t.overview.meals}</p>
             </div>
+            )}
+            {systemStats.totalExercise > 0 && (
             <div className="text-center p-6 bg-white border border-gray-200 rounded-xl shadow-lg">
               <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg w-fit mx-auto mb-4">
                 <Dumbbell className="h-8 w-8 text-white" />
@@ -429,6 +454,8 @@ export default function OverviewPage() {
               <p className="text-2xl font-bold text-orange-600">{systemStats.totalExercise}</p>
               <p className="text-sm text-gray-600">{t.overview.exercise}</p>
             </div>
+            )}
+            {systemStats.totalPeriods > 0 && (
             <div className="text-center p-6 bg-white border border-gray-200 rounded-xl shadow-lg">
               <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg w-fit mx-auto mb-4">
                 <CalendarDays className="h-8 w-8 text-white" />
@@ -436,6 +463,8 @@ export default function OverviewPage() {
               <p className="text-2xl font-bold text-purple-600">{systemStats.totalPeriods}</p>
               <p className="text-sm text-gray-600">{t.overview.periods}</p>
             </div>
+            )}
+            {systemStats.totalMood > 0 && (
             <div className="text-center p-6 bg-white border border-gray-200 rounded-xl shadow-lg">
               <div className="p-3 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg w-fit mx-auto mb-4">
                 <Smile className="h-8 w-8 text-white" />
@@ -443,6 +472,7 @@ export default function OverviewPage() {
               <p className="text-2xl font-bold text-pink-600">{systemStats.totalMood}</p>
               <p className="text-sm text-gray-600">{t.overview.mood}</p>
             </div>
+            )}
           </div>
 
           {/* Alertas del sistema */}
@@ -557,7 +587,7 @@ export default function OverviewPage() {
                       itemStyle={{ color: 'white' }}
                       labelStyle={{ color: 'white' }}
                     />
-                    <Area type="monotone" dataKey="total" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} />
+                    <Area type="monotone" dataKey="total" name={t.overview.totalRecordsOverview} stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -566,6 +596,7 @@ export default function OverviewPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Usuarios más activos */}
+            {mostActiveUsers.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-medium text-black mb-4 flex items-center">
                 <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
@@ -586,7 +617,7 @@ export default function OverviewPage() {
                         <div>
                           <p className="text-sm font-medium text-black">{getDisplayUsername(user)}</p>
                           <p className="text-xs text-gray-600">
-                            {user.recordCount} registros totales
+                            {user.recordCount} {t.dashboard.records}
                           </p>
                         </div>
                       </div>
@@ -599,7 +630,7 @@ export default function OverviewPage() {
                         </div>
                         {user.lastActivity && (
                           <p className="text-xs text-gray-600">
-                            {new Date(user.lastActivity).toLocaleDateString('es-ES')}
+                            {new Date(user.lastActivity).toLocaleDateString(locale)}
                           </p>
                         )}
                       </div>
@@ -608,6 +639,7 @@ export default function OverviewPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Datos recientes */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -630,7 +662,7 @@ export default function OverviewPage() {
                             {getTypeLabel(item.type)} - {item.username}
                           </p>
                           <p className="text-xs text-gray-600">
-                            {new Date(item.displayDate).toLocaleDateString('es-ES')}
+                            {new Date(item.displayDate).toLocaleDateString(locale)}
                           </p>
                         </div>
                       </div>
@@ -659,31 +691,38 @@ export default function OverviewPage() {
               {t.overview.additionalSystemMetrics}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {foodData.length > 0 && (
               <div className="text-center">
                 <p className="text-2xl font-bold text-green-600">{systemStats.avgCarbs}</p>
                 <p className="text-sm text-gray-600">{t.overview.averageCarbs}</p>
               </div>
+              )}
+              {systemStats.totalUsers > 0 && (
               <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600">{systemStats.totalUsers > 0 ? Math.round(systemStats.totalRecords / systemStats.totalUsers) : 0}</p>
+                <p className="text-2xl font-bold text-blue-600">{Math.round(systemStats.totalRecords / systemStats.totalUsers)}</p>
                 <p className="text-sm text-gray-600">{t.overview.recordsPerUser}</p>
               </div>
+              )}
+              {systemStats.lastActivity && (
               <div className="text-center">
                 <p className="text-2xl font-bold text-purple-600">
-                  {systemStats.lastActivity ?
-                    Math.ceil((now - systemStats.lastActivity.getTime()) / (1000 * 60 * 60 * 24)) :
-                    0
-                  }
+                  {Math.ceil((now - systemStats.lastActivity.getTime()) / (1000 * 60 * 60 * 24))}
                 </p>
                 <p className="text-sm text-gray-600">{t.overview.daysSinceLastActivity}</p>
               </div>
+              )}
+              {systemStats.totalUsers > 0 && (
               <div className="text-center">
                 <p className="text-2xl font-bold text-orange-600">
-                  {systemStats.totalUsers > 0 ? Math.round((systemStats.activeUsers / systemStats.totalUsers) * 100) : 0}%
+                  {Math.round((systemStats.activeUsers / systemStats.totalUsers) * 100)}%
                 </p>
                 <p className="text-sm text-gray-600">{t.overview.activeUsersRate}</p>
               </div>
+              )}
             </div>
           </div>
+            </>
+          )}
         </div>
       </div>
     </HybridProtectedRoute>

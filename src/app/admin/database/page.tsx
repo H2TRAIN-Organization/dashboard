@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Database, Table, Download, Upload, RefreshCw, FileText, HardDrive, Activity, TrendingUp, CheckCircle, Clock, Database as DatabaseIcon } from 'lucide-react'
+import { Database, Table, Download, Upload, RefreshCw, FileText, TrendingUp, CheckCircle, Database as DatabaseIcon } from 'lucide-react'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
 import HybridNavigation from '@/components/HybridNavigation'
@@ -9,11 +9,12 @@ import type { AdminTableInfo } from '@/lib/api-types'
 import { adminApi, errorMessage } from '@/lib/api-client'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
-import LanguageSelector from '@/components/LanguageSelector'
 
 export default function AdminDatabasePage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { session } = useSession()
+  const notAvailable = t.common.notAvailable
+  const locale = language === 'en' ? 'en-US' : 'es-ES'
   
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -62,36 +63,36 @@ export default function AdminDatabasePage() {
   }, [session])
 
   const formatCount = (value: number | null) =>
-    value === null ? 'No disponible' : value.toLocaleString()
+    value === null ? null : value.toLocaleString(locale)
 
   const databaseFeatures = [
     {
       title: t.admin.tableExplorer,
-      description: 'Explorar y visualizar todas las tablas de la base de datos',
+      description: t.admin.tableExplorerDescription,
       icon: Table,
       color: 'from-blue-500 to-cyan-500',
-      stats: dbStats.totalTables === null ? 'No disponible' : `${dbStats.totalTables} tablas`
+      stats: dbStats.totalTables === null ? null : `${dbStats.totalTables.toLocaleString(locale)} ${t.admin.tables}`
     },
     {
       title: t.admin.exportData,
-      description: 'Exportar datos en formato JSON o CSV',
+      description: t.admin.exportDataDescription,
       icon: Download,
       color: 'from-green-500 to-emerald-500',
-      stats: dbStats.totalRecords === null ? 'No disponible' : `${dbStats.totalRecords.toLocaleString()} registros`
+      stats: dbStats.totalRecords === null ? null : `${dbStats.totalRecords.toLocaleString(locale)} ${t.admin.records}`
     },
     {
       title: t.admin.createBackup,
-      description: 'Crear respaldo completo de la base de datos',
+      description: t.admin.createBackupDescription,
       icon: Upload,
       color: 'from-purple-500 to-pink-500',
-      stats: 'No disponible'
+      stats: null
     },
     {
       title: t.admin.refreshStats,
-      description: 'Actualizar estadísticas y métricas del sistema',
+      description: t.admin.refreshStatsDescription,
       icon: RefreshCw,
       color: 'from-orange-500 to-red-500',
-      stats: 'No disponible'
+      stats: null
     }
   ]
 
@@ -107,12 +108,7 @@ export default function AdminDatabasePage() {
         </div>
         
         <HybridNavigation title={t.admin.databaseManagement} showBackButton={true} />
-        
-        {/* Selector de idioma */}
-        <div className="absolute top-6 right-6 z-20">
-          <LanguageSelector />
-        </div>
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
           {error && (
             <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -135,6 +131,7 @@ export default function AdminDatabasePage() {
               </div>
               
               <div className="flex flex-wrap gap-4 mt-6 sm:mt-0">
+                {dbStats.totalTables !== null && (
                 <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl px-6 py-4 shadow-lg">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-blue-100 rounded-lg">
@@ -146,7 +143,9 @@ export default function AdminDatabasePage() {
                     </div>
                   </div>
                 </div>
+                )}
                 
+                {dbStats.totalRecords !== null && (
                 <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl px-6 py-4 shadow-lg">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-green-100 rounded-lg">
@@ -158,18 +157,7 @@ export default function AdminDatabasePage() {
                     </div>
                   </div>
                 </div>
-                
-                <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl px-6 py-4 shadow-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <HardDrive className="h-5 w-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">{t.admin.databaseSize}</p>
-                      <p className="text-2xl font-bold text-gray-900">No disponible</p>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -189,9 +177,11 @@ export default function AdminDatabasePage() {
                     <div className={`p-4 bg-gradient-to-br ${feature.color} rounded-2xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110`}>
                       <feature.icon className="h-8 w-8 text-white" />
                     </div>
+                    {feature.stats && (
                     <div className="text-right">
                       <p className="text-sm text-gray-500 font-medium">{feature.stats}</p>
                     </div>
+                    )}
                   </div>
                   
                   <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-green-600 transition-colors duration-300">
@@ -226,7 +216,7 @@ export default function AdminDatabasePage() {
               <div className="flex items-center space-x-2">
                 <div className={`w-3 h-3 rounded-full animate-pulse ${error ? 'bg-gray-400' : 'bg-green-500'}`}></div>
                 <span className={`font-semibold ${error ? 'text-gray-500' : 'text-green-600'}`}>
-                  {error ? 'No disponible' : t.admin.operational}
+                  {error ? notAvailable : t.admin.operational}
                 </span>
               </div>
             </div>
@@ -235,12 +225,12 @@ export default function AdminDatabasePage() {
               <div className="flex items-center justify-center py-16">
                 <div className="flex items-center space-x-3">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <span className="text-gray-600 font-medium">Cargando tablas...</span>
+                  <span className="text-gray-600 font-medium">{t.admin.loadingTables}</span>
                 </div>
               </div>
             ) : tables.length === 0 ? (
               <div className="py-16 text-center text-gray-600 font-medium">
-                No disponible
+                {t.common.noData}
               </div>
             ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -251,14 +241,14 @@ export default function AdminDatabasePage() {
                       <Database className="h-5 w-5 text-white" />
                     </div>
                     <span className={`text-sm font-medium ${table.accessible ? 'text-green-600' : 'text-gray-500'}`}>
-                      {table.accessible ? t.admin.operational : 'No disponible'}
+                      {table.accessible ? t.admin.operational : notAvailable}
                     </span>
                   </div>
                   <h4 className="text-lg font-bold text-gray-900 mb-2">{table.name}</h4>
                   <p className="text-gray-600 text-sm">
                     {table.accessible
-                      ? `${table.recordCount.toLocaleString()} ${t.admin.records}`
-                      : 'No disponible'}
+                      ? `${table.recordCount.toLocaleString(locale)} ${t.admin.records}`
+                      : notAvailable}
                   </p>
                 </div>
               ))}
@@ -281,40 +271,8 @@ export default function AdminDatabasePage() {
               <div className="flex items-center space-x-2">
                 <div className={`w-3 h-3 rounded-full animate-pulse ${error ? 'bg-gray-400' : 'bg-green-500'}`}></div>
                 <span className={`font-semibold ${error ? 'text-gray-500' : 'text-green-600'}`}>
-                  {error ? 'No disponible' : t.admin.operational}
+                  {error ? notAvailable : t.admin.operational}
                 </span>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-blue-500 rounded-lg">
-                    <HardDrive className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-2xl font-bold text-blue-600">No disponible</span>
-                </div>
-                <p className="text-blue-700 font-medium">{t.admin.databaseSize}</p>
-              </div>
-              
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-green-500 rounded-lg">
-                    <Activity className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-2xl font-bold text-green-600">No disponible</span>
-                </div>
-                <p className="text-green-700 font-medium">{t.admin.uptime}</p>
-              </div>
-              
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-purple-500 rounded-lg">
-                    <Clock className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-2xl font-bold text-purple-600">No disponible</span>
-                </div>
-                <p className="text-purple-700 font-medium">{t.admin.lastBackup}</p>
               </div>
             </div>
           </div>

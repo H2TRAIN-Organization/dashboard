@@ -20,12 +20,11 @@ export default function SimpleNavigation({ title, showBackButton = true }: Simpl
   const router = useRouter()
 
   const handleSignOut = async () => {
-    const destination = session?.method === 'username' ? '/app-login' : '/login'
     await logout()
-    router.push(destination)
+    router.push('/login')
   }
 
-  const backHref = session?.method === 'username' ? '/app-dashboard' : '/'
+  const backHref = '/'
 
   return (
     <div className="relative bg-gradient-to-r from-blue-600/95 via-blue-700/95 to-blue-800/95 backdrop-blur-xl border-b border-blue-200/30">
@@ -83,9 +82,9 @@ export default function SimpleNavigation({ title, showBackButton = true }: Simpl
                   {userRole === 'doctor' && <Stethoscope className="h-3 w-3 text-green-300" />}
                   {userRole === 'user' && <UserIcon className="h-3 w-3 text-blue-200" />}
                   <p className="text-blue-100/80 text-xs capitalize">
-                    {userRole === 'admin' && 'Administrador'}
-                    {userRole === 'doctor' && 'Médico'}
-                    {userRole === 'user' && 'Usuario'}
+                    {userRole === 'admin' && t.roles.administrator}
+                    {userRole === 'doctor' && t.roles.physician}
+                    {userRole === 'user' && t.roles.patient}
                   </p>
                 </div>
               </div>

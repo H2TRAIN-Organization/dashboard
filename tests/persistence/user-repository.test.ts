@@ -72,6 +72,51 @@ describe("SupabaseUserRepository", () => {
     }
   });
 
+  it("filters before paginating and walks every user exactly once in stable order", async () => {
+    const rows = Array.from({ length: 12 }, (_, index) => {
+      const number = index + 1;
+      return {
+        UserID: 100 + number,
+        Username: `member-${String(number).padStart(2, "0")}`,
+        UUID: null,
+        GDPRConsent: false,
+        GDPRConsentDate: null,
+        role: index % 3 === 0 ? "user" : index % 3 === 1 ? "doctor" : "admin",
+        PasswordHash: validBcryptHash("x"),
+      };
+    });
+    const gateway = new FakePersistenceGateway({ users: rows });
+    const repository = new SupabaseUserRepository(gateway, fakePasswordHasher());
+
+    const seen: string[] = [];
+    for (let page = 0; page < 6; page += 1) {
+      const result = await repository.list({ limit: 2, offset: page * 2 });
+      expect(result.total).toBe(12);
+      seen.push(...result.users.map((user) => user.username));
+    }
+    expect(seen).toEqual(rows.map((row) => row.Username));
+
+    const filtered = await repository.list({
+      search: "member-1",
+      role: "user",
+      limit: 1,
+      offset: 0,
+    });
+    expect(filtered.total).toBe(1);
+    expect(filtered.users.map((user) => user.username)).toEqual(["member-10"]);
+
+    const call = gateway.selectCalls.at(-1);
+    expect(call?.request).toMatchObject({
+      count: "exact",
+      order: { column: "UserID", ascending: true },
+      range: { from: 0, to: 0 },
+    });
+    expect(call?.request.filters).toEqual([
+      { kind: "ilike", column: "Username", value: "%member-1%" },
+      { kind: "eq", column: "role", value: "user" },
+    ]);
+  });
+
   it("finds by canonical id and username, and fails closed for email", async () => {
     const { repository } = setup();
     await expect(repository.findById("1")).resolves.toMatchObject({

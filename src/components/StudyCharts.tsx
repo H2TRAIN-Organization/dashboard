@@ -1,150 +1,229 @@
 'use client'
 
 import {
-  LineChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
   Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell
 } from 'recharts'
+import { useOptionalLanguage } from '@/contexts/LanguageContext'
 
 interface StudyChartsProps {
   exerciseData: any[]
   moodData: any[]
 }
 
-export default function StudyCharts({ exerciseData, moodData }: StudyChartsProps) {
+interface CorrelationRow {
+  date: string
+  fullDate: string
+  exerciseDuration: number
+  moodValue: number
+}
 
-  // Validar que tenemos datos para mostrar
+interface WeeklyRow {
+  week: string
+  exercise: number
+  mood: number
+  count: number
+}
+
+interface IntensityRow {
+  name: string
+  value: number
+  color: string
+}
+
+const tooltipStyle = {
+  backgroundColor: '#1f2937',
+  border: '1px solid #374151',
+  borderRadius: '8px',
+  color: 'white',
+}
+
+function readDate(record: any): Date | null {
+  const value = record?.date || record?.date_time || record?.measured_timestamp
+  if (typeof value !== 'string' || value.length === 0) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function readNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function weekNumber(date: Date): number {
+  const start = new Date(date.getFullYear(), 0, 1)
+  return Math.ceil(
+    ((date.getTime() - start.getTime()) / (24 * 60 * 60 * 1000) +
+      start.getDay() +
+      1) /
+      7,
+  )
+}
+
+export default function StudyCharts({ exerciseData, moodData }: StudyChartsProps) {
+  const { t, language } = useOptionalLanguage()
+  const locale = language === 'en' ? 'en-US' : 'es-ES'
+  const notAvailable = t.common.notAvailable
+
   if (!exerciseData || exerciseData.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-white/70 text-lg">No hay datos de ejercicio disponibles para mostrar en los gráficos</p>
+      <div className="py-12 text-center">
+        <p className="text-lg text-slate-600">{t.study.noDataValue}</p>
       </div>
     )
   }
 
-  // Preparar datos para los gráficos de actividad y bienestar
-  const correlationData = exerciseData.map((exercise, index) => {
-    // Formatear fecha para mostrar
-    const exerciseDate = exercise.date || exercise.date_time || new Date().toISOString()
-    const formattedDate = new Date(exerciseDate).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
-
+  const correlationData: CorrelationRow[] = exerciseData.map((exercise, index) => {
+    const date = readDate(exercise)
     return {
-      date: formattedDate,
-      fullDate: exerciseDate,
-      exerciseType: exercise.exercise_type || 'Ejercicio',
-      exerciseDuration: exercise.duration || 30, // Duración en minutos
-      moodValue: moodData[index]?.mood_value || 0
+      date: date
+        ? date.toLocaleDateString(locale, {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          })
+        : notAvailable,
+      fullDate: date ? date.toISOString() : '',
+      exerciseDuration: readNumber(exercise.duration),
+      moodValue: readNumber(moodData[index]?.mood_value),
     }
   })
 
-  // Datos para gráfico de barras de tendencias semanales
-  const weeklyTrends = exerciseData.reduce((acc, exercise) => {
-    // Usar date_time si date no existe
-    const exerciseDate = exercise.date || exercise.date_time || new Date().toISOString()
-    const week = Math.floor((new Date(exerciseDate).getTime() - new Date().getTime()) / (7 * 24 * 60 * 60 * 1000))
-    if (!acc[week]) {
-      acc[week] = { week: `Semana ${Math.abs(week)}`, exercise: 0, mood: 0, count: 0 }
-    }
-    acc[week].exercise += exercise.duration || 0
-    acc[week].mood += moodData[exerciseData.indexOf(exercise)]?.mood_value || 0
-    acc[week].count += 1
-    return acc
-  }, {} as any)
+  const weeklyTrends = exerciseData.reduce<Record<string, WeeklyRow>>(
+    (accumulator, exercise, index) => {
+      const date = readDate(exercise)
+      const weekKey = date
+        ? `${date.getFullYear()}-${Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000))}`
+        : 'unknown'
+      if (accumulator[weekKey] === undefined) {
+        accumulator[weekKey] = {
+          week:
+            weekKey === 'unknown' || date === null
+              ? notAvailable
+              : `${t.study.charts.week} ${weekNumber(date)}`,
+          exercise: 0,
+          mood: 0,
+          count: 0,
+        }
+      }
+      accumulator[weekKey].exercise += readNumber(exercise.duration)
+      accumulator[weekKey].mood += readNumber(moodData[index]?.mood_value)
+      accumulator[weekKey].count += 1
+      return accumulator
+    },
+    {},
+  )
 
-  const weeklyData = Object.values(weeklyTrends).map((week: any) => ({
+  const weeklyData = Object.values(weeklyTrends).map((week) => ({
     ...week,
-    exercise: week.exercise / week.count,
-    mood: week.mood / week.count
+    exercise: week.count > 0 ? week.exercise / week.count : 0,
+    mood: week.count > 0 ? week.mood / week.count : 0,
   }))
 
-  // Datos para gráfico de distribución de intensidad de ejercicio
-  const exerciseIntensity = exerciseData.reduce((acc, exercise) => {
-    const intensity = exercise.intensity || 'Moderado'
-    acc[intensity] = (acc[intensity] || 0) + 1
-    return acc
-  }, {} as any)
+  const exerciseIntensity = exerciseData.reduce<Record<string, number>>(
+    (accumulator, exercise) => {
+      const intensity =
+        typeof exercise.intensity === 'string' && exercise.intensity.trim().length > 0
+          ? exercise.intensity
+          : notAvailable
+      accumulator[intensity] = (accumulator[intensity] || 0) + 1
+      return accumulator
+    },
+    {},
+  )
 
-  const intensityData = Object.entries(exerciseIntensity).map(([intensity, count]) => ({
-    name: intensity,
-    value: count,
-    color: intensity === 'Bajo' ? '#10b981' : intensity === 'Moderado' ? '#f59e0b' : '#ef4444'
-  }))
+  const intensityData: IntensityRow[] = Object.entries(exerciseIntensity).map(
+    ([intensity, count]) => ({
+      name: intensity,
+      value: count,
+      color:
+        intensity.toLowerCase() === 'bajo'
+          ? '#10b981'
+          : intensity.toLowerCase() === 'moderado'
+            ? '#f59e0b'
+            : '#ef4444',
+    }),
+  )
+
+  const evolutionTitle =
+    t.study.charts.evolutionTitle ||
+    'Evolución Temporal: Ejercicio y Estado de Ánimo'
+  const intensityTitle =
+    t.study.charts.intensityTitle ||
+    'Distribución de Intensidades de Ejercicio'
+  const moodLabel = t.study.charts.mood || 'Estado de Ánimo'
 
   return (
     <div className="space-y-8">
-      {/* Gráfico de Evolución Temporal: Ejercicio y Estado de Ánimo */}
-      <div className="relative bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold text-blue-600 mb-6 flex items-center">
-          <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg mr-3">
+      <div className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
+        <h3 className="mb-6 flex items-center text-xl font-bold text-blue-600">
+          <span className="mr-3 rounded-lg bg-gradient-to-br from-green-500 to-green-600 p-2">
             <LineChart className="h-5 w-5 text-white" />
-          </div>
-          Evolución Temporal: Ejercicio y Estado de Ánimo
+          </span>
+          {evolutionTitle}
         </h3>
-        <p className="text-sm text-gray-600 mb-6">
-          Análisis temporal de la actividad física y el bienestar emocional.
-          <strong className="text-green-400"> Eje X:</strong> Fechas |
-          <strong className="text-green-400"> Eje Y:</strong> Duración de ejercicio y estado de ánimo
+        <p className="mb-6 text-sm text-gray-600">
+          {t.study.charts.evolutionDescription}
+          <strong className="text-green-700"> {t.study.charts.date}:</strong>{' '}
+          {t.study.charts.date} |<strong className="text-green-700"> {t.study.charts.values}:</strong>{' '}
+          {t.study.charts.duration} + {moodLabel}
         </p>
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={correlationData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
             <XAxis
               dataKey="date"
-              stroke="#9ca3af"
+              stroke="#6b7280"
               fontSize={12}
-              label={{ value: 'Fecha', position: 'insideBottom', offset: -10, style: { textAnchor: 'middle', fill: '#9ca3af' } }}
+              label={{
+                value: t.study.charts.date,
+                position: 'insideBottom',
+                offset: -10,
+                style: { textAnchor: 'middle', fill: '#6b7280' },
+              }}
             />
             <YAxis
-              stroke="#9ca3af"
+              stroke="#6b7280"
               fontSize={12}
-              label={{ value: 'Valores', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9ca3af' } }}
+              label={{
+                value: t.study.charts.values,
+                angle: -90,
+                position: 'insideLeft',
+                style: { textAnchor: 'middle', fill: '#6b7280' },
+              }}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
-                borderRadius: '8px',
-                color: 'white'
-              }}
+              contentStyle={tooltipStyle}
               itemStyle={{ color: 'white' }}
               labelStyle={{ color: 'white' }}
-              formatter={(value, name) => {
-                const labels: any = {
-                  exerciseDuration: 'Duración Ejercicio (min)',
-                  moodValue: 'Estado de Ánimo (/10)'
-                }
-                return [`${value}`, labels[name] || name]
-              }}
-              labelFormatter={(label) => `Fecha: ${label}`}
+              formatter={(value, name) => [
+                `${value}`,
+                name === 'exerciseDuration'
+                  ? t.study.charts.duration
+                  : name === 'moodValue'
+                    ? moodLabel
+                    : name,
+              ]}
+              labelFormatter={(label) => `${t.study.charts.date}: ${label}`}
             />
-            <Legend
-              wrapperStyle={{
-                paddingTop: '20px',
-                fontSize: '14px',
-                color: '#374151'
-              }}
-            />
+            <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '14px', color: '#374151' }} />
             <Line
               type="monotone"
               dataKey="exerciseDuration"
               stroke="#10b981"
               strokeWidth={3}
               dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-              name="Duración Ejercicio"
+              name={t.study.charts.duration}
             />
             <Line
               type="monotone"
@@ -152,85 +231,68 @@ export default function StudyCharts({ exerciseData, moodData }: StudyChartsProps
               stroke="#f59e0b"
               strokeWidth={3}
               dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
-              name="Estado de Ánimo"
+              name={moodLabel}
             />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Gráfico de Tendencias Semanales */}
-      <div className="relative bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold text-blue-600 mb-6 flex items-center">
-          <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg mr-3">
+      <div className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
+        <h3 className="mb-6 flex items-center text-xl font-bold text-blue-600">
+          <span className="mr-3 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 p-2">
             <BarChart className="h-5 w-5 text-white" />
-          </div>
-          Análisis Semanal: Actividad y Estado de Ánimo
+          </span>
+          {t.study.charts.weeklyTitle}
         </h3>
-        <p className="text-sm text-gray-600 mb-6">
-          Análisis semanal que muestra las tendencias promedio de actividad física y estado de ánimo.
-          <strong className="text-purple-400"> Eje X:</strong> Semanas |
-          <strong className="text-purple-400"> Eje Y:</strong> Valores promedio de ejercicio y estado de ánimo
-        </p>
+        <p className="mb-6 text-sm text-gray-600">{t.study.charts.weeklyDescription}</p>
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={weeklyData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" />
             <XAxis
               dataKey="week"
-              stroke="#9ca3af"
+              stroke="#6b7280"
               fontSize={12}
-              label={{ value: 'Semana', position: 'insideBottom', offset: -10, style: { textAnchor: 'middle', fill: '#9ca3af' } }}
+              label={{
+                value: t.study.charts.week,
+                position: 'insideBottom',
+                offset: -10,
+                style: { textAnchor: 'middle', fill: '#6b7280' },
+              }}
             />
             <YAxis
-              stroke="#9ca3af"
+              stroke="#6b7280"
               fontSize={12}
-              label={{ value: 'Valores Promedio', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9ca3af' } }}
+              label={{
+                value: t.study.charts.averageValues,
+                angle: -90,
+                position: 'insideLeft',
+                style: { textAnchor: 'middle', fill: '#6b7280' },
+              }}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
-                borderRadius: '8px',
-                color: 'white'
-              }}
+              contentStyle={tooltipStyle}
               itemStyle={{ color: 'white' }}
               labelStyle={{ color: 'white' }}
-              formatter={(value, name) => {
-                const labels: any = {
-                  exercise: 'Ejercicio Promedio (min)',
-                  mood: 'Estado de Ánimo Promedio (/10)'
-                }
-                return [`${Math.round(Number(value) * 100) / 100}`, labels[name] || name]
-              }}
-              labelFormatter={(label) => `Semana: ${label}`}
+              formatter={(value, name) => [
+                `${Math.round(Number(value) * 100) / 100}`,
+                name === 'exercise' ? t.study.charts.duration : moodLabel,
+              ]}
+              labelFormatter={(label) => `${t.study.charts.week}: ${label}`}
             />
-            <Bar
-              dataKey="exercise"
-              fill="#10b981"
-              name="exercise"
-              radius={[4, 4, 0, 0]}
-            />
-            <Bar
-              dataKey="mood"
-              fill="#f59e0b"
-              name="mood"
-              radius={[4, 4, 0, 0]}
-            />
+            <Bar dataKey="exercise" fill="#10b981" name={t.study.charts.duration} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="mood" fill="#f59e0b" name={moodLabel} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Gráfico de Distribución de Intensidad de Ejercicio */}
-      <div className="relative bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold text-blue-600 mb-6 flex items-center">
-          <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg mr-3">
+      <div className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
+        <h3 className="mb-6 flex items-center text-xl font-bold text-blue-600">
+          <span className="mr-3 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 p-2">
             <PieChart className="h-5 w-5 text-white" />
-          </div>
-          Distribución de Intensidades de Ejercicio
+          </span>
+          {intensityTitle}
         </h3>
-        <p className="text-sm text-gray-600 mb-6">
-          Análisis de la distribución de intensidades de ejercicio realizadas durante el período de estudio.
-          <strong className="text-orange-400"> Cada sector:</strong> Porcentaje de sesiones con esa intensidad
-        </p>
+        <p className="mb-6 text-sm text-gray-600">{t.study.charts.intensityDescription}</p>
         <div className="flex items-center justify-center">
           <ResponsiveContainer width="100%" height={400}>
             <PieChart>
@@ -249,16 +311,11 @@ export default function StudyCharts({ exerciseData, moodData }: StudyChartsProps
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid #374151',
-                  borderRadius: '8px',
-                  color: 'white'
-                }}
+                contentStyle={tooltipStyle}
                 itemStyle={{ color: 'white' }}
                 labelStyle={{ color: 'white' }}
-                formatter={(value, name) => [`${value} sesiones`, 'Cantidad']}
-                labelFormatter={(label) => `Intensidad: ${label}`}
+                formatter={(value) => [`${value} ${t.study.charts.sessions}`, t.study.charts.sessions]}
+                labelFormatter={(label) => `${t.study.charts.intensity}: ${label}`}
               />
             </PieChart>
           </ResponsiveContainer>

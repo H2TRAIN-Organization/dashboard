@@ -13,6 +13,7 @@ import type {
   VerifiedEmailUser,
 } from "@/server/infrastructure/auth/contracts";
 import type { BcryptLibrary } from "@/server/infrastructure/auth/bcrypt-password-verifier";
+import { normalizeIdentity } from "@/server/infrastructure/auth/rate-limit";
 import type { User } from "@/server/domain/user";
 
 export const VALID_BCRYPT_HASH =
@@ -95,6 +96,13 @@ export class FakeUserStore implements AuthUserStore {
       return null;
     }
     return { user: { ...user }, passwordHash: this.hashes.get(id) ?? "" };
+  }
+
+  async findByNormalizedUsername(username: string): Promise<readonly User[]> {
+    const normalized = normalizeIdentity(username);
+    return [...this.users.values()]
+      .filter((user) => normalizeIdentity(user.username) === normalized)
+      .map((user) => ({ ...user }));
   }
 
   async findByUserId(id: string): Promise<User | null> {

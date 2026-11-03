@@ -5,6 +5,7 @@ import { useSession } from '@/contexts/SessionContext'
 import type { UserRole } from '@/lib/api-types'
 import { ROLE_PERMISSIONS, hasPermission, hasRoleAtLeast } from '@/lib/permissions'
 import { Shield, AlertCircle } from 'lucide-react'
+import { useLanguage } from '@/contexts/LanguageContext'
 
 interface RoleGuardProps {
   children: ReactNode
@@ -23,19 +24,29 @@ export function RoleDenied({
   requiredPermission?: string
   currentRole: UserRole
 }) {
+  const { t } = useLanguage()
+  const roleLabel = t.roles[requiredRole === 'admin' ? 'administrator' : requiredRole === 'doctor' ? 'physician' : 'patient']
+
   return (
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="text-center">
         <Shield className="h-16 w-16 text-orange-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Permisos Insuficientes</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t.auth.insufficientPermissions}</h2>
         <p className="text-gray-600 mb-4">
           {requiredRole
-            ? `Necesitas el rol ${requiredRole} para acceder a esta sección.`
-            : 'No tienes permisos para acceder a esta sección.'}
+            ? t.auth.needRole.replace('{role}', roleLabel)
+            : t.auth.noPermission}
         </p>
         <p className="text-sm text-gray-500">
-          Tu rol actual: <span className="font-semibold">{currentRole}</span>
-          {requiredPermission ? ` · Permiso requerido: ${requiredPermission}` : ''}
+          {t.auth.currentRole}:{' '}
+          <span className="font-semibold">
+            {currentRole === 'admin'
+              ? t.roles.administrator
+              : currentRole === 'doctor'
+                ? t.roles.physician
+                : t.roles.patient}
+          </span>
+          {requiredPermission ? ` · ${t.auth.requiredPermission}: ${requiredPermission}` : ''}
         </p>
       </div>
     </div>
@@ -50,6 +61,7 @@ export default function RoleGuard({
   showError = true,
 }: RoleGuardProps) {
   const { session, loading } = useSession()
+  const { t } = useLanguage()
 
   if (loading) {
     return (
@@ -64,8 +76,8 @@ export default function RoleGuard({
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Acceso Denegado</h2>
-          <p className="text-gray-600">Debes iniciar sesión para acceder a esta sección.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t.auth.accessDenied}</h2>
+          <p className="text-gray-600">{t.auth.loginRequired}</p>
         </div>
       </div>
     ) : fallback ?? null

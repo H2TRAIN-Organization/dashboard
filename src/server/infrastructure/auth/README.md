@@ -67,18 +67,26 @@ DTO de sesión: `{ user, method: "email"|"username", expiresAt }`. Nunca incluye
 1. `signInWithPassword` con clave pública.
 2. `getUser(accessToken)` con la misma clave para re-verificar.
 3. Email confirmado, mismo `authUserId` y mismo email normalizado.
-4. Vínculo explícito:
-   - `app_metadata.role` (`admin|doctor|user`) **y**
-     `app_metadata.app_user_id` (por defecto `public.users.UserID`; configurable
-     a `UUID` con `emailLinkIdField`), o
+4. Vínculo, por orden:
+   - `app_metadata.app_user_id` explícito (por defecto `public.users.UserID`;
+     configurable a `UUID` con `emailLinkIdField`). Exige un
+     `app_metadata.role` válido y que coincida con el rol persistido.
    - `options.resolveVerifiedEmailLink` inyectado por el integrador.
-5. El rol real se lee de `public.users` y debe coincidir con `app_metadata.role`.
-6. Sin vínculo explícito: falla cerrado con error de configuración. No se infiere
-   el UUID de Auth por email, nombre ni por la columna `UUID`.
+   - Coincidencia **única** entre el email confirmado normalizado (trim, NFC,
+     minúsculas) y `public.users.Username` normalizado con el mismo criterio.
+5. El rol real se lee siempre de `public.users`. En el vínculo por email único
+   no se usa `app_metadata.role`. `user_metadata` nunca participa.
+6. Cero coincidencias, más de una, un `app_user_id` presente que no resuelva o
+   que contradiga la coincidencia única, un `app_user_id` malformado, o una fila
+   `public.users.UUID = auth.users.id` que apunte a otro `UserID`: falla cerrado
+   con error de configuración (503) y sin sesión. No se infiere el UUID de Auth
+   por email, nombre ni por la columna heredada `UUID`; esta solo se usa para
+   detectar ese conflicto y, si se configura, como `emailLinkIdField=UUID`.
 
-La inspección readonly actual muestra 5 identidades Auth y **cero** con
-`app_metadata.role`/`app_user_id`; por tanto el login email queda cerrado hasta
-que se administren esos metadatos.
+La cuenta operativa actual (`jiahao.yang@ulpgc.es`) puede no tener
+`app_metadata.app_user_id`; el vínculo por coincidencia única de `Username`
+cubre ese caso sin crear metadatos ni inventar un rol. La unicidad real de
+`public.users.Username` debe verificarse antes de sembrar la cuenta.
 
 ## Username / bcrypt
 
