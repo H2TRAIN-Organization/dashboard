@@ -8,6 +8,8 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, LogOut, User, Sparkles, Shield, Stethoscope, Menu, X } from 'lucide-react'
 import { usePermissions } from '@/components/RoleGuard'
 import { useLanguage } from '@/contexts/LanguageContext'
+import { useKubiosMe } from '@/hooks/useKubiosPersonal'
+import { isKubiosPersonalVisible } from '@/lib/kubios-personal'
 import LanguageSelector from './LanguageSelector'
 
 interface NavigationProps {
@@ -20,6 +22,7 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
   const { session, logout } = useSession()
   const user = session?.user ?? null
   const { userRole, hasPermission } = usePermissions()
+  const { view: kubiosView } = useKubiosMe()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -29,12 +32,36 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
     router.push(destination)
   }
 
+  // Kubios solo aparece cuando la respuesta propia confirma mediciones
+  // disponibles; un estado vacío, pendiente o de error no anuncia la sección.
+  const showPersonalKubios =
+    kubiosView.phase === 'data' &&
+    kubiosView.data !== null &&
+    isKubiosPersonalVisible(
+      kubiosView.data.status,
+      kubiosView.data.measurement_count,
+    )
+
   // Rutas de navegación
-  const navigationRoutes = [
+  const navigationRoutes: Array<{
+    path: string
+    label: string
+    icon: string
+    requiresPermission?: string
+  }> = [
     { path: '/', label: t.navigation.dashboard, icon: '🏠' },
     { path: '/users', label: t.navigation.users, icon: '👥', requiresPermission: 'view_users' },
     { path: '/data', label: t.navigation.data, icon: '📊' },
-    { path: '/kubios', label: t.navigation.kubios, icon: '❤️' },
+    ...(showPersonalKubios
+      ? [
+          {
+            path: '/kubios',
+            label: t.navigation.kubios,
+            icon: '❤️',
+            requiresPermission: 'view_own_kubios',
+          },
+        ]
+      : []),
     { path: '/analytics', label: t.navigation.analytics, icon: '📈' },
     { path: '/admin', label: t.navigation.admin, icon: '⚙️', requiresPermission: 'view_admin' },
   ].filter(route => !route.requiresPermission || hasPermission(route.requiresPermission))

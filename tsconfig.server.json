@@ -14,6 +14,8 @@
     "src/app/api/data/route.ts",
     "src/app/api/decrypted-data/route.ts",
     "src/app/api/admin/database/**/*.ts",
+    "src/app/api/kubios/**/*.ts",
+    "src/app/api/cron/kubios-sync/route.ts",
     "tests/**/*.ts",
     "vitest.config.mts",
     "playwright.config.ts"

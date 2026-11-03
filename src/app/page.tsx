@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Users, Activity, BarChart3, Home, Heart, Sparkles, Zap, Shield, TrendingUp, Settings } from 'lucide-react'
+import { Users, Activity, BarChart3, Home, Sparkles, Zap, Shield, TrendingUp, Settings } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleGuard from '@/components/RoleGuard'
 import Navigation from '@/components/Navigation'
+import KubiosSummaryCard from '@/components/kubios/KubiosSummaryCard'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
@@ -35,7 +36,6 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     users: null as number | null,
     records: null as number | null,
-    hrvUsers: null as number | null,
     accuracy: null as number | null,
     systemStatus: null as number | null
   })
@@ -63,14 +63,9 @@ export default function DashboardPage() {
           throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
         }
 
-        const [usersResult, dataResult, hrvResult] = await Promise.allSettled([
+        const [usersResult, dataResult] = await Promise.allSettled([
           usersApi.count(),
           dataApi.getDecrypted({ selectedUser, timeRange: 'all' }),
-          fetch('/api/kubios/team-users').then(async (response) => {
-            if (!response.ok) return 0
-            const payload = (await response.json()) as { users?: unknown[] }
-            return Array.isArray(payload.users) ? payload.users.length : 0
-          }),
         ])
 
         if (cancelled) return
@@ -88,7 +83,6 @@ export default function DashboardPage() {
         setStats({
           users: userCount,
           records: totalRecords,
-          hrvUsers: hrvResult.status === 'fulfilled' ? hrvResult.value : 0,
           accuracy: null,
           systemStatus: null
         })
@@ -104,7 +98,6 @@ export default function DashboardPage() {
         setStats({
           users: null,
           records: null,
-          hrvUsers: null,
           accuracy: null,
           systemStatus: null
         })
@@ -254,34 +247,7 @@ export default function DashboardPage() {
             </Link>
             </RoleGuard>
 
-            <Link href="/kubios" className="group">
-              <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 hover:border-blue-300/70 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/10">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="p-4 bg-gradient-to-br from-blue-400 to-blue-500 rounded-2xl shadow-lg group-hover:shadow-blue-400/50 transition-all duration-300">
-                      <Heart className="h-8 w-8 text-white" />
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-blue-800 group-hover:text-blue-600 transition-colors">
-                        {loading ? <LoadingDots /> : formatCount(stats.hrvUsers)}
-                      </div>
-                      <div className="text-xs text-blue-600/70">Usuarios</div>
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-700 transition-colors">
-                    {t.dashboard.hrvAnalysis}
-                  </h3>
-                  <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                    {t.dashboard.hrvAnalysisDescription}
-                  </p>
-                  <div className="flex items-center text-blue-600 text-sm font-medium">
-                    <span>{t.dashboard.access}</span>
-                    <Heart className="h-4 w-4 ml-2 group-hover:scale-110 transition-transform" />
-                  </div>
-                </div>
-              </div>
-            </Link>
+            <KubiosSummaryCard />
 
             {/* <Link href="/study" className="group">
               <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 hover:border-blue-300/70 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/10">

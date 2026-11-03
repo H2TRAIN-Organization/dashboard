@@ -256,6 +256,33 @@ export interface Translations {
     noHrvResults: string
     showCharts: string
     hideCharts: string
+    // Resumen y estados del Kubios personal
+    personal: {
+      summaryTitle: string
+      summaryDescription: string
+      onlyOwnData: string
+      latestMeasurement: string
+      latestReadiness: string
+      syncedAt: string
+      staleWarning: string
+      viewDetails: string
+      statusUnlinked: string
+      statusPending: string
+      statusEmpty: string
+      emptyRange: string
+      loadError: string
+      invalidResponse: string
+      sessionExpired: string
+      serviceUnavailable: string
+      invalidDateRange: string
+      clearFilters: string
+      notAvailable: string
+      dailyResult: string
+      artefactLevel: string
+      retry: string
+      resultsInRange: string
+      filterHint: string
+    }
     // Métricas HRV
     metrics: {
       meanHr: string
@@ -843,6 +870,32 @@ export const translations: Record<Language, Translations> = {
       noHrvResults: 'No hay resultados HRV disponibles',
       showCharts: 'Mostrar Gráficos',
       hideCharts: 'Ocultar Gráficos',
+      personal: {
+        summaryTitle: 'Mi HRV (Kubios)',
+        summaryDescription: 'Tus mediciones HRV sincronizadas. Solo tú puedes verlas.',
+        onlyOwnData: 'Solo se muestran tus propios datos de Kubios.',
+        latestMeasurement: 'Última medición',
+        latestReadiness: 'Readiness reciente',
+        syncedAt: 'Última sincronización',
+        staleWarning: 'Los datos mostrados son la última copia sincronizada y podrían no estar actualizados.',
+        viewDetails: 'Ver mi Kubios',
+        statusUnlinked: 'Tu cuenta todavía no está vinculada a Kubios. Cuando se complete la vinculación, tus mediciones aparecerán aquí.',
+        statusPending: 'La vinculación con Kubios está pendiente. Vuelve a intentarlo cuando se haya completado.',
+        statusEmpty: 'Todavía no hay mediciones HRV sincronizadas en tu cuenta.',
+        emptyRange: 'No hay mediciones HRV en el rango de fechas seleccionado.',
+        loadError: 'No se pudieron cargar tus resultados HRV. Inténtalo de nuevo.',
+        invalidResponse: 'El servicio devolvió una respuesta no válida.',
+        sessionExpired: 'Tu sesión ha caducado. Inicia sesión de nuevo para consultar tus resultados HRV.',
+        serviceUnavailable: 'El servicio de Kubios no está disponible en este momento. Inténtalo de nuevo más tarde.',
+        invalidDateRange: 'El rango de fechas no es válido. Revisa las fechas.',
+        clearFilters: 'Limpiar filtros',
+        notAvailable: 'N/D',
+        dailyResult: 'Resultado diario',
+        artefactLevel: 'Nivel de artefactos',
+        retry: 'Reintentar',
+        resultsInRange: 'Resultados en el rango seleccionado',
+        filterHint: 'Filtra por fechas. Solo se consultan tus datos.'
+      },
       // Métricas HRV
       metrics: {
         meanHr: 'FC Reposo',
@@ -1412,6 +1465,32 @@ export const translations: Record<Language, Translations> = {
       noHrvResults: 'No HRV results available',
       showCharts: 'Show Charts',
       hideCharts: 'Hide Charts',
+      personal: {
+        summaryTitle: 'My HRV (Kubios)',
+        summaryDescription: 'Your synchronized HRV measurements. Only you can see them.',
+        onlyOwnData: 'Only your own Kubios data is shown.',
+        latestMeasurement: 'Latest measurement',
+        latestReadiness: 'Recent readiness',
+        syncedAt: 'Last sync',
+        staleWarning: 'The data shown is the last synchronized copy and may be out of date.',
+        viewDetails: 'View my Kubios',
+        statusUnlinked: 'Your account is not linked to Kubios yet. Your measurements will appear here once linking is complete.',
+        statusPending: 'Kubios linking is pending. Try again once it has completed.',
+        statusEmpty: 'There are no synchronized HRV measurements in your account yet.',
+        emptyRange: 'There are no HRV measurements in the selected date range.',
+        loadError: 'Your HRV results could not be loaded. Please try again.',
+        invalidResponse: 'The service returned an invalid response.',
+        sessionExpired: 'Your session has expired. Sign in again to view your HRV results.',
+        serviceUnavailable: 'The Kubios service is unavailable right now. Please try again later.',
+        invalidDateRange: 'The date range is invalid. Check the dates.',
+        clearFilters: 'Clear filters',
+        notAvailable: 'N/A',
+        dailyResult: 'Daily result',
+        artefactLevel: 'Artefact level',
+        retry: 'Retry',
+        resultsInRange: 'Results in the selected range',
+        filterHint: 'Filter by date. Only your own data is queried.'
+      },
       // Métricas HRV
       metrics: {
         meanHr: 'Resting HR',

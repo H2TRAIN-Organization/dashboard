@@ -39,7 +39,104 @@ tags:
     description: Acceso a datos de salud descifrados y compatibilidad legada.
   - name: admin
     description: Exploración de base de datos, solo administradores.
+  - name: kubios
+    description: Caché HRV personal; todos los roles consultan únicamente su propio vínculo.
 paths:
+  /api/kubios/me:
+    get:
+      tags: [kubios]
+      summary: Resumen del snapshot Kubios del usuario conectado
+      operationId: kubiosMe
+      description: Solo lee Supabase. La identidad procede de la cookie verificada; ningún rol permite seleccionar otro usuario.
+      responses:
+        "200":
+          description: Estado de vinculación y caché propia; nunca incluye material cifrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KubiosSummary"
+        "401":
+          $ref: "#/components/responses/KubiosFailure"
+        "503":
+          $ref: "#/components/responses/KubiosFailure"
+  /api/kubios/hrv-results:
+    get:
+      tags: [kubios]
+      summary: Mediciones HRV propias desde la caché cifrada
+      operationId: kubiosResults
+      description: Descifrado exclusivo en servidor. No consulta Kubios ni acepta selectores de usuario, equipo o miembro.
+      parameters:
+        - $ref: "#/components/parameters/KubiosFrom"
+        - $ref: "#/components/parameters/KubiosTo"
+      responses:
+        "200":
+          description: Resultados propios filtrados y fecha de sincronización real.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KubiosResults"
+        "400":
+          $ref: "#/components/responses/KubiosFailure"
+        "401":
+          $ref: "#/components/responses/KubiosFailure"
+        "503":
+          $ref: "#/components/responses/KubiosFailure"
+  /api/kubios/export:
+    get:
+      tags: [kubios]
+      summary: Exportar las mediciones propias a CSV
+      operationId: kubiosExport
+      parameters:
+        - $ref: "#/components/parameters/KubiosFrom"
+        - $ref: "#/components/parameters/KubiosTo"
+      responses:
+        "200":
+          description: CSV propio, sin identificadores de terceros y con protección de fórmulas.
+          content:
+            text/csv:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/KubiosFailure"
+        "401":
+          $ref: "#/components/responses/KubiosFailure"
+        "503":
+          $ref: "#/components/responses/KubiosFailure"
+  /api/kubios/team-users:
+    get:
+      tags: [kubios]
+      summary: Endpoint colectivo retirado
+      security: []
+      responses:
+        "410":
+          description: Retirado; no consulta el proveedor ni devuelve miembros del equipo.
+  /api/kubios/hrv-results-fallback:
+    get:
+      tags: [kubios]
+      summary: Endpoint de datos de ejemplo retirado
+      security: []
+      responses:
+        "410":
+          description: Retirado; no ofrece mediciones de ejemplo ni datos de otros usuarios.
+  /api/cron/kubios-sync:
+    post:
+      tags: [kubios]
+      summary: Sincronizar Kubios desde Supabase Cron cada cinco minutos
+      operationId: kubiosSync
+      security:
+        - kubiosCron: []
+      description: Protegido por KUBIOS_CRON_SECRET; lease, presupuesto, cursor y Retry-After evitan ejecuciones solapadas y reintentos indiscriminados.
+      responses:
+        "200":
+          description: Sincronización completa.
+        "202":
+          description: Otro trabajador tiene el lease.
+        "401":
+          description: Secreto de invocación ausente o incorrecto.
+        "429":
+          description: Pausa por cuota; Retry-After solo se incluye para una pausa finita.
+        "503":
+          description: Configuración ausente o sincronización parcial; se conserva el snapshot anterior de los miembros fallidos.
   /api/auth/login:
     post:
       tags: [auth]
@@ -451,12 +548,30 @@ paths:
           $ref: "#/components/responses/NotFound"
 components:
   securitySchemes:
+    kubiosCron:
+      type: http
+      scheme: bearer
+      description: Secreto de servidor independiente; no se utiliza la cookie de usuario.
     cookieAuth:
       type: apiKey
       in: cookie
       name: dashboard_session
       description: Cookie de sesión HttpOnly; el token nunca aparece en JSON.
   parameters:
+    KubiosFrom:
+      name: from
+      in: query
+      description: Fecha inicial inclusiva; no se admiten parámetros de identidad.
+      schema:
+        type: string
+        format: date
+    KubiosTo:
+      name: to
+      in: query
+      description: Fecha final inclusiva.
+      schema:
+        type: string
+        format: date
     UserId:
       name: id
       in: path
@@ -467,6 +582,18 @@ components:
         minLength: 1
         maxLength: 128
   responses:
+    KubiosFailure:
+      description: Error genérico sin datos personales, tokens ni detalles del proveedor.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [error]
+            properties:
+              error:
+                type: string
+                enum: [unauthorized, unavailable, invalid_query]
     BadRequest:
       description: Petición inválida o fuera de contrato.
       content:
@@ -516,6 +643,40 @@ components:
               code: USER_HAS_DATA
               message: No se puede eliminar un usuario que todavía tiene datos asociados
   schemas:
+    KubiosStatus:
+      type: string
+      enum: [unlinked, pending, empty, ready, stale]
+    KubiosSummary:
+      type: object
+      additionalProperties: false
+      required: [status, measurement_count, synced_at, latest_result]
+      properties:
+        status:
+          $ref: "#/components/schemas/KubiosStatus"
+        measurement_count:
+          type: integer
+          minimum: 0
+        synced_at:
+          type: [string, "null"]
+          format: date-time
+        latest_result:
+          type: [object, "null"]
+          additionalProperties: true
+    KubiosResults:
+      type: object
+      additionalProperties: false
+      required: [status, results, synced_at]
+      properties:
+        status:
+          $ref: "#/components/schemas/KubiosStatus"
+        results:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        synced_at:
+          type: [string, "null"]
+          format: date-time
     UserRole:
       type: string
       enum: [admin, doctor, user]

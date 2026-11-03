@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useAppAuth } from '@/contexts/AppAuthContext'
 import AppProtectedRoute from '@/components/AppProtectedRoute'
 import AppRoleGuard from '@/components/AppRoleGuard'
+import KubiosSummaryCard from '@/components/kubios/KubiosSummaryCard'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
 import {
@@ -50,7 +51,6 @@ export default function AppDashboardPage() {
   const [stats, setStats] = useState({
     users: null as number | null,
     totalRecords: null as number | null,
-    hrvUsers: null as number | null,
     systemAccuracy: null as number | null
   })
   const [loading, setLoading] = useState(true)
@@ -96,7 +96,6 @@ export default function AppDashboardPage() {
         setStats({
           users: userCount,
           totalRecords,
-          hrvUsers: null,
           systemAccuracy: null
         })
 
@@ -111,7 +110,6 @@ export default function AppDashboardPage() {
         setStats({
           users: null,
           totalRecords: null,
-          hrvUsers: null,
           systemAccuracy: null
         })
         setStatsError(errorMessage(caught))
@@ -330,20 +328,6 @@ export default function AppDashboardPage() {
                 <div className="bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-6 shadow-lg">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">{t.dashboard.hrvUsers}</p>
-                      <p className="text-3xl font-bold text-purple-600">
-                        {loading ? <LoadingDots /> : formatCount(stats.hrvUsers)}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-purple-100 rounded-2xl">
-                      <Activity className="h-6 w-6 text-purple-600" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-6 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
                       <p className="text-sm font-medium text-gray-600">{t.dashboard.systemAccuracy}</p>
                       <p className="text-3xl font-bold text-orange-600">
                         {loading ? <LoadingDots /> : formatPercent(stats.systemAccuracy)}
@@ -391,6 +375,8 @@ export default function AppDashboardPage() {
                     </div>
                   </div>
                 </Link>
+
+                <KubiosSummaryCard />
 
                 {/* Tarjeta de HRV comentada - se muestra solo para administradores */}
                 {/* <Link href="/kubios" className="group">
@@ -547,36 +533,7 @@ export default function AppDashboardPage() {
                   </Link>
                 </AppRoleGuard>
 
-                <AppRoleGuard requiredPermission="view_kubios">
-                  <Link href="/kubios" className="group">
-                    <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 hover:border-indigo-300/70 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/10">
-                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-indigo-600/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-6">
-                          <div className="p-4 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl shadow-lg group-hover:shadow-indigo-600/50 transition-all duration-300">
-                            <Activity className="h-8 w-8 text-white" />
-                          </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-indigo-800 group-hover:text-indigo-600 transition-colors">
-                              {loading ? <LoadingDots /> : formatCount(stats.hrvUsers)}
-                            </div>
-                            <div className="text-xs text-indigo-600/70">{t.dashboard.appDashboard.users}</div>
-                          </div>
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-indigo-700 transition-colors">
-                          {t.dashboard.appDashboard.hrvAnalysis}
-                        </h3>
-                        <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                          Monitoreo de variabilidad del ritmo cardíaco con Kubios
-                        </p>
-                        <div className="flex items-center text-indigo-600 text-sm font-medium">
-                          <span>{t.dashboard.appDashboard.access}</span>
-                          <Zap className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </AppRoleGuard>
+                <KubiosSummaryCard />
 
                 {/* Tarjeta de Estudio comentada - funcionalidad deshabilitada temporalmente */}
                 {/* <AppRoleGuard requiredPermission="view_study">

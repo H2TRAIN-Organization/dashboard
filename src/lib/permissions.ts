@@ -13,6 +13,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
     'export_data',
     'view_analytics',
     'view_kubios',
+    'view_own_kubios',
     'view_study',
     'view_admin',
     'manage_database',
@@ -26,6 +27,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
     'export_data',
     'view_analytics',
     'view_kubios',
+    'view_own_kubios',
     'view_study',
     'view_patient_data',
   ],
@@ -35,6 +37,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
     'view_own_data',
     'view_analytics',
     'view_own_analytics',
+    'view_own_kubios',
   ],
 }
 

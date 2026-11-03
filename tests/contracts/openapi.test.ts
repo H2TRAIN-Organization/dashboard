@@ -48,11 +48,29 @@ describe("authoritative OpenAPI contract", () => {
       "/api/data",
       "/api/admin/database/tables",
       "/api/admin/database/table-data",
+      "/api/kubios/me",
+      "/api/kubios/hrv-results",
+      "/api/kubios/export",
+      "/api/cron/kubios-sync",
     ];
     expect(spec.openapi).toBe("3.1.0");
     for (const route of requiredPaths) {
       expect(paths[route], route).toBeDefined();
     }
+  });
+
+  it("keeps personal Kubios on cookie auth and cron on a separate secret", async () => {
+    const spec = await loadSpec();
+    expect(spec.security).toEqual([{ cookieAuth: [] }]);
+    for (const endpoint of ["/api/kubios/me", "/api/kubios/hrv-results", "/api/kubios/export"]) {
+      const operation = recordAt(spec, "paths", endpoint, "get");
+      expect(operation.security).toBeUndefined();
+      const parameters = JSON.stringify(operation.parameters ?? []);
+      expect(parameters).not.toMatch(/userId|teamId|memberId/);
+    }
+    expect(recordAt(spec, "paths", "/api/cron/kubios-sync", "post").security).toEqual([
+      { kubiosCron: [] },
+    ]);
   });
 
   it("keeps public schemas free of credential material", async () => {
@@ -105,7 +123,9 @@ describe("authoritative OpenAPI contract", () => {
 
   it("uses an HttpOnly cookie session and never a bearer token in JSON", async () => {
     const spec = await loadSpec();
-    const serialized = JSON.stringify(spec);
+    // The cron has an independent server credential; public JSON must never
+    // serialize bearer/session tokens.
+    const serialized = JSON.stringify(recordAt(spec, "components", "schemas"));
     expect(serialized.toLocaleLowerCase()).not.toContain("bearer");
     expect(recordAt(spec, "components", "securitySchemes", "cookieAuth")).toMatchObject({
       type: "apiKey",
@@ -115,7 +135,8 @@ describe("authoritative OpenAPI contract", () => {
 
     const session = recordAt(spec, "components", "schemas", "SessionResponse");
     expect(session.required).toEqual(["user", "method", "expiresAt"]);
-    expect(session).not.toHaveProperty("token");
+    expect(recordAt(session, "properties")).not.toHaveProperty("token");
+    expect(recordAt(session, "properties")).not.toHaveProperty("access_token");
     const method = recordAt(session, "properties", "method");
     expect(method.enum).toEqual(["email", "username"]);
   });
