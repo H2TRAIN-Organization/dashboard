@@ -158,11 +158,10 @@ export class Aes256CbcDecryptor implements TextDecryptor {
       if (looksLikeCiphertext(first)) {
         const second = tryDecrypt(key, first.toLowerCase(), normalizedIv);
         if (second === null) {
-          throw new CryptoError(
-            "AMBIGUOUS_DOUBLE_ENCRYPTION",
-            `El campo "${field}" parece doblemente cifrado y no se pudo completar el segundo descifrado.`,
-            field,
-          );
+          // The first layer decrypted successfully. A legitimate description
+          // can itself be hexadecimal; that shape alone is not corruption.
+          // Preserve its plaintext instead of failing an entire global read.
+          return first;
         }
         return second;
       }

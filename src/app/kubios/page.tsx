@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -18,7 +18,10 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleGuard from '@/components/RoleGuard'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useSession } from '@/contexts/SessionContext'
-import { useKubiosHrvResults, useKubiosMe } from '@/hooks/useKubiosPersonal'
+import {
+  kubiosErrorTranslationKey,
+  useKubiosPersonal,
+} from '@/hooks/useKubiosPersonal'
 import { buildKubiosCsv, buildKubiosCsvFilename } from '@/lib/kubios-csv'
 import {
   formatKubiosDate,
@@ -26,26 +29,9 @@ import {
   formatKubiosText,
   getKubiosFreqDomain,
   isKubiosDataStatus,
-  sortKubiosResults,
-  type KubiosErrorKind,
 } from '@/lib/kubios-personal'
 
 type KubiosTranslations = ReturnType<typeof useLanguage>['t']
-
-function errorMessage(error: KubiosErrorKind | null, t: KubiosTranslations): string {
-  switch (error) {
-    case 'unauthorized':
-      return t.kubios.personal.sessionExpired
-    case 'unavailable':
-      return t.kubios.personal.serviceUnavailable
-    case 'invalid-query':
-      return t.kubios.personal.invalidDateRange
-    case 'contract':
-      return t.kubios.personal.invalidResponse
-    default:
-      return t.kubios.personal.loadError
-  }
-}
 
 function readinessClasses(value: unknown): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -85,8 +71,8 @@ function KubiosPersonalContent() {
   const [filter, setFilter] = useState({ from: '', to: '' })
   const [charts, setCharts] = useState({ open: false, key: '' })
 
-  const me = useKubiosMe()
-  const hrv = useKubiosHrvResults(filter)
+  const personal = useKubiosPersonal(filter)
+  const { view } = personal
 
   const filterKey = `${filter.from}|${filter.to}`
   const chartsKey = `${sessionUserId ?? ''}|${filterKey}`
@@ -100,40 +86,26 @@ function KubiosPersonalContent() {
     )
   }
 
-  const data = hrv.view.phase === 'data' ? hrv.view.data : null
-  const status = data?.status ?? null
+  // La cabecera y la lista usan la misma vista que la tarjeta del inicio. Si
+  // la serie falla pero /me conserva el resumen, se muestran las cifras
+  // cacheadas y el error de la serie por separado; los resultados nunca se
+  // completan con filas inventadas.
+  const status = view.status
   const hasDataStatus = isKubiosDataStatus(status)
-  const meData = me.view.phase === 'data' ? me.view.data : null
-  const meHasData =
-    meData !== null && isKubiosDataStatus(meData.status)
-  const results = useMemo(
-    () => (data === null ? [] : sortKubiosResults(data.results)),
-    [data],
-  )
-
-  // Con un rango activo, cabecera y lista deben describir el mismo conjunto:
-  // los resultados filtrados vigentes. El resumen global de /me solo se usa
-  // sin filtro; `synced_at` sigue siendo la fecha del snapshot global.
-  const filterActive = filter.from.length > 0 || filter.to.length > 0
+  const results = view.results
   const resultCount = results.length
-  const filteredLatest = results[0] ?? null
-  const totalMeasurements = filterActive
-    ? resultCount
-    : meHasData
-      ? meData.measurement_count
-      : resultCount
-  const latest = filterActive
-    ? filteredLatest
-    : (meHasData ? meData.latest_result : null) ?? filteredLatest
-  const syncedAt =
-    data?.synced_at ?? (meHasData ? meData.synced_at : null)
-  const stale = status === 'stale'
+  const totalMeasurements = view.measurementCount
+  const latest = view.latest
+  const syncedAt = view.syncedAt
+  const stale = view.stale
+  const resultsError = view.error
   const canExport = sessionUserId !== null && hasDataStatus && resultCount > 0
+  const showHeaderStats = hasDataStatus && totalMeasurements > 0
   const showFilters =
     status === 'empty' ||
     hasDataStatus ||
-    hrv.view.phase === 'error' ||
-    hrv.view.phase === 'loading'
+    view.phase === 'error' ||
+    view.phase === 'loading'
 
   const notAvailable = t.kubios.personal.notAvailable
   const latestDate = formatKubiosDate(
@@ -156,8 +128,7 @@ function KubiosPersonalContent() {
       : null
 
   const handleRefresh = () => {
-    me.reload()
-    hrv.reload()
+    personal.reload()
   }
 
   // Descarga local: solo se serializan los resultados propios ya cargados para
@@ -185,7 +156,7 @@ function KubiosPersonalContent() {
     }
   }
 
-  const loading = hrv.view.phase === 'loading' || hrv.view.phase === 'idle'
+  const loading = view.phase === 'loading' || view.phase === 'idle'
 
   return (
     <>
@@ -209,7 +180,7 @@ function KubiosPersonalContent() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
-            {hasDataStatus && (
+            {showHeaderStats && (
               <>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                   <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
@@ -368,7 +339,7 @@ function KubiosPersonalContent() {
           <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
             {t.kubios.hrvResults}
           </h3>
-          {hasDataStatus && (
+          {hasDataStatus && resultCount > 0 && (
             <span className="inline-flex w-fit items-center rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
               {resultCount} {t.kubios.measurements}
             </span>
@@ -382,13 +353,17 @@ function KubiosPersonalContent() {
               <span className="text-sm font-medium text-slate-700">{t.data.loading}</span>
             </div>
           </div>
-        ) : hrv.view.phase === 'error' ? (
+        ) : resultsError !== null ? (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-red-700">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-semibold">
-                  {errorMessage(hrv.view.error, t)}
+                  {
+                    t.kubios.personal[
+                      kubiosErrorTranslationKey(resultsError)
+                    ]
+                  }
                 </p>
                 <button
                   type="button"

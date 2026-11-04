@@ -1,75 +1,83 @@
 'use client'
 
-import { useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Lock, Mail, Activity, Shield, Users, BarChart3, User, LogIn } from 'lucide-react'
 import Image from 'next/image'
+import { Eye, EyeOff, Lock, LogIn, Mail, Shield, User } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
-import LanguageSelector from '@/components/LanguageSelector'
+import { useSession } from '@/contexts/SessionContext'
+import { ApiError, errorFrom } from '@/lib/api-client'
+import {
+  buildLoginIdentityAttempts,
+  toLoginInput,
+} from '@/components/dashboard-shell/login-identity'
 
 export default function LoginPage() {
   const { t } = useLanguage()
-  const [email, setEmail] = useState('')
+  const { session, loading: sessionLoading, login } = useSession()
+  const router = useRouter()
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const { signIn } = useAuth()
-  const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  useEffect(() => {
+    if (!sessionLoading && session !== null) {
+      router.replace('/')
+    }
+  }, [router, session, sessionLoading])
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const [attempt] = buildLoginIdentityAttempts(identifier)
+    if (attempt === undefined) return
+
+    setSubmitting(true)
     setError('')
 
     try {
-      const { error } = await signIn(email, password)
-
-      if (error) {
-        setError(error.message)
-      } else {
-        router.push('/')
-      }
-    } catch {
-      setError(t.auth.unexpectedError)
+      await login(toLoginInput(attempt, password))
+      router.replace('/')
+    } catch (caught) {
+      // El backend decide si un identificador con @ pertenece a una cuenta de
+      // correo o a un nombre de participante antiguo. Aquí no se reintenta con
+      // otro método: un 401 por ambigüedad no debe eludirse desde la UI.
+      const message =
+        caught instanceof ApiError && caught.status === 401
+          ? t.auth.invalidCredentials
+          : errorFrom(caught).message || t.auth.unexpectedError
+      setError(message)
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex relative overflow-hidden">
-      {/* Selector de idioma mejorado */}
-      <div className="absolute top-6 right-6 z-50">
-        <div className="bg-white/90 backdrop-blur-xl border border-white/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300">
-          <LanguageSelector />
-        </div>
-      </div>
-      
-      {/* Elementos decorativos de fondo */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
-        <div className="absolute top-40 left-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-500"></div>
+    <div className="relative flex min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-blue-400 opacity-20 mix-blend-multiply blur-xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-indigo-400 opacity-20 mix-blend-multiply blur-xl animate-pulse delay-1000"></div>
+        <div className="absolute left-1/2 top-40 h-80 w-80 rounded-full bg-purple-400 opacity-20 mix-blend-multiply blur-xl animate-pulse delay-500"></div>
       </div>
 
-      {/* Lado izquierdo - Información */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white p-12 flex-col justify-center items-center relative">
-        {/* Patrón de fondo */}
+      <div className="relative hidden w-1/2 flex-col items-center justify-center bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-12 text-white lg:flex">
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}></div>
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            }}
+          ></div>
         </div>
-        
-        <div className="max-w-md relative z-10">
+
+        <div className="relative z-10 max-w-md">
           <div className="mb-12">
-            <div className="flex items-center justify-center mb-6">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-3xl">
-                <Image 
-                  src="/logo-horizontal.png?v=10" 
-                  alt="H2TRAIN Logo" 
+            <div className="mb-6 flex items-center justify-center">
+              <div className="rounded-3xl bg-white/20 p-4 backdrop-blur-sm">
+                <Image
+                  src="/logo-horizontal.png?v=10"
+                  alt="H2TRAIN Logo"
                   width={700}
                   height={250}
                   className="h-32 w-auto rounded-2xl"
@@ -77,65 +85,47 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-            <h1 className="text-5xl font-bold mb-4 text-center bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+            <h1 className="mb-4 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-center text-5xl font-bold text-transparent">
               Diabetes Tracker Dashboard
             </h1>
           </div>
-          
+
           <div className="space-y-8">
-            <div className="flex items-start space-x-4 group">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl group-hover:bg-white/30 transition-all duration-300">
-                <Activity className="h-7 w-7" />
+            <div className="group flex items-start space-x-4">
+              <div className="rounded-xl bg-white/20 p-4 backdrop-blur-sm transition-all duration-300 group-hover:bg-white/30">
+                <User className="h-7 w-7" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-2">{t.auth.realtimeMonitoring}</h3>
-                <p className="text-blue-100 text-sm leading-relaxed">{t.auth.realtimeMonitoringDesc}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start space-x-4 group">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl group-hover:bg-white/30 transition-all duration-300">
-                <BarChart3 className="h-7 w-7" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg mb-2">{t.auth.intelligentAnalysis}</h3>
-                <p className="text-blue-100 text-sm leading-relaxed">{t.auth.intelligentAnalysisDesc}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start space-x-4 group">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl group-hover:bg-white/30 transition-all duration-300">
-                <Users className="h-7 w-7" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg mb-2">{t.auth.teamManagement}</h3>
-                <p className="text-blue-100 text-sm leading-relaxed">{t.auth.teamManagementDesc}</p>
+                <h2 className="mb-2 text-lg font-semibold">{t.auth.unifiedAccess}</h2>
+                <p className="text-sm leading-relaxed text-blue-100">
+                  {t.auth.unifiedAccessDescription}
+                </p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-4 group">
-              <div className="bg-white/20 backdrop-blur-sm p-4 rounded-xl group-hover:bg-white/30 transition-all duration-300">
+            <div className="group flex items-start space-x-4">
+              <div className="rounded-xl bg-white/20 p-4 backdrop-blur-sm transition-all duration-300 group-hover:bg-white/30">
                 <Shield className="h-7 w-7" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-2">{t.auth.advancedSecurity}</h3>
-                <p className="text-blue-100 text-sm leading-relaxed">{t.auth.advancedSecurityDesc}</p>
+                <h2 className="mb-2 text-lg font-semibold">{t.auth.advancedSecurity}</h2>
+                <p className="text-sm leading-relaxed text-blue-100">
+                  {t.auth.advancedSecurityDesc}
+                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Lado derecho - Formulario */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative z-10">
+      <main className="relative z-10 flex w-full items-center justify-center p-6 sm:p-8 lg:w-1/2">
         <div className="w-full max-w-md">
-          <div className="text-center mb-10">
-            {/* Logo H2TRAIN - Solo visible en móvil */}
-            <div className="flex justify-center mb-8 lg:hidden">
-              <div className="bg-white/90 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-white/20">
-                <Image 
-                  src="/logo-horizontal.png?v=10" 
-                  alt="H2TRAIN Logo" 
+          <div className="mb-10 text-center">
+            <div className="mb-8 flex justify-center lg:hidden">
+              <div className="rounded-2xl border border-white/20 bg-white/90 p-6 shadow-lg backdrop-blur-sm">
+                <Image
+                  src="/logo-horizontal.png?v=10"
+                  alt="H2TRAIN Logo"
                   width={300}
                   height={90}
                   className="h-16 w-auto rounded-xl"
@@ -143,68 +133,77 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-            
-            <h2 className="text-4xl font-bold text-gray-900 mb-3">
-              {t.auth.welcome}
-            </h2>
-            <p className="text-gray-600 text-lg">
-              {t.auth.accessAdmin}
-            </p>
+
+            <h2 className="mb-3 text-4xl font-bold text-gray-900">{t.auth.welcome}</h2>
+            <p className="text-lg text-gray-600">{t.auth.unifiedAccessDescription}</p>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-white/20 relative">
-            {/* Elemento decorativo */}
-            <div className="absolute -top-4 -right-4 w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full opacity-20"></div>
-            <div className="absolute -bottom-4 -left-4 w-6 h-6 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full opacity-20"></div>
-            <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="relative rounded-3xl border border-white/20 bg-white/80 p-6 shadow-2xl backdrop-blur-xl sm:p-10">
+            <div className="absolute -right-4 -top-4 h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 opacity-20"></div>
+            <div className="absolute -bottom-4 -left-4 h-6 w-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 opacity-20"></div>
+
+            <form onSubmit={handleSubmit} className="space-y-8" noValidate>
               {error && (
-                <div className="bg-red-50/80 backdrop-blur-sm border border-red-200 text-red-700 px-4 py-4 rounded-xl text-sm flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                <div
+                  role="alert"
+                  className="flex items-center space-x-2 rounded-xl border border-red-200 bg-red-50/80 px-4 py-4 text-sm text-red-700 backdrop-blur-sm"
+                >
+                  <div className="h-2 w-2 rounded-full bg-red-500"></div>
                   <span>{error}</span>
                 </div>
               )}
 
               <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700">
-                  {t.auth.email}
+                <label htmlFor="identifier" className="block text-sm font-semibold text-gray-700">
+                  {t.auth.identifier}
                 </label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                <div className="group relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <Mail className="h-5 w-5 text-gray-400 transition-colors group-focus-within:text-blue-500" />
                   </div>
                   <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="identifier"
+                    name="identifier"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={(event) => setIdentifier(event.target.value)}
                     required
-                    className="block w-full pl-12 pr-4 py-4 bg-white/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-900 placeholder-gray-500 hover:bg-white/70"
-                    placeholder="tu@email.com"
+                    aria-describedby="identifier-hint"
+                    className="block w-full rounded-xl border border-gray-200 bg-white/50 py-4 pl-12 pr-4 text-gray-900 placeholder-gray-500 transition-all duration-200 hover:bg-white/70 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    placeholder={t.auth.identifierPlaceholder}
                   />
                 </div>
+                <p id="identifier-hint" className="text-xs text-gray-500">
+                  {t.auth.identifierHint}
+                </p>
               </div>
 
               <div className="space-y-2">
                 <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
                   {t.auth.password}
                 </label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                <div className="group relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <Lock className="h-5 w-5 text-gray-400 transition-colors group-focus-within:text-blue-500" />
                   </div>
                   <input
                     id="password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(event) => setPassword(event.target.value)}
                     required
-                    className="block w-full pl-12 pr-14 py-4 bg-white/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-900 placeholder-gray-500 hover:bg-white/70"
+                    className="block w-full rounded-xl border border-gray-200 bg-white/50 py-4 pl-12 pr-14 text-gray-900 placeholder-gray-500 transition-all duration-200 hover:bg-white/70 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center hover:bg-gray-50 rounded-r-xl transition-colors"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? t.auth.hidePassword : t.auth.showPassword}
+                    className="absolute inset-y-0 right-0 flex items-center rounded-r-xl pr-4 transition-colors hover:bg-gray-50"
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
@@ -217,46 +216,25 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                disabled={submitting}
+                className="w-full transform rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-6 py-4 text-lg font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 hover:shadow-xl focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {loading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
+                {submitting ? (
+                  <span className="flex items-center justify-center">
+                    <span className="mr-3 h-6 w-6 animate-spin rounded-full border-b-2 border-white"></span>
                     {t.auth.loggingIn}
-                  </div>
+                  </span>
                 ) : (
-                  <div className="flex items-center justify-center">
-                    <LogIn className="h-5 w-5 mr-2" />
+                  <span className="flex items-center justify-center">
+                    <LogIn className="mr-2 h-5 w-5" />
                     {t.auth.signIn}
-                  </div>
+                  </span>
                 )}
               </button>
             </form>
-
-            <div className="mt-8 text-center">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white/80 text-gray-500">{t.auth.or}</span>
-                </div>
-              </div>
-              
-              <div className="mt-6">
-                <a
-                  href="/app-login"
-                  className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors font-medium"
-                >
-                  <User className="h-5 w-5 mr-2" />
-                  {t.auth.appUserAccess}
-                </a>
-              </div>
-            </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
-} 
+}

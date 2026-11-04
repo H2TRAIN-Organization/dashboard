@@ -10,7 +10,7 @@ import { usePermissions } from '@/components/RoleGuard'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useKubiosMe } from '@/hooks/useKubiosPersonal'
 import { isKubiosPersonalVisible } from '@/lib/kubios-personal'
-import LanguageSelector from './LanguageSelector'
+import type { UserRole } from '@/lib/api-types'
 
 interface NavigationProps {
   title: string
@@ -21,15 +21,14 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
   const { t } = useLanguage()
   const { session, logout } = useSession()
   const user = session?.user ?? null
-  const { userRole, hasPermission } = usePermissions()
+  const { userRole, hasPermission, hasRole } = usePermissions()
   const { view: kubiosView } = useKubiosMe()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleSignOut = async () => {
-    const destination = session?.method === 'username' ? '/app-login' : '/login'
     await logout()
-    router.push(destination)
+    router.push('/login')
   }
 
   // Kubios solo aparece cuando la respuesta propia confirma mediciones
@@ -43,15 +42,16 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
     )
 
   // Rutas de navegación
-  const navigationRoutes: Array<{
+  const allRoutes: Array<{
     path: string
     label: string
     icon: string
     requiresPermission?: string
+    requiresRole?: UserRole
   }> = [
     { path: '/', label: t.navigation.dashboard, icon: '🏠' },
     { path: '/users', label: t.navigation.users, icon: '👥', requiresPermission: 'view_users' },
-    { path: '/data', label: t.navigation.data, icon: '📊' },
+    { path: '/data', label: t.navigation.data, icon: '📊', requiresPermission: 'view_data' },
     ...(showPersonalKubios
       ? [
           {
@@ -62,9 +62,18 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
           },
         ]
       : []),
-    { path: '/analytics', label: t.navigation.analytics, icon: '📈' },
+    { path: '/analytics', label: t.navigation.analytics, icon: '📈', requiresPermission: 'view_analytics' },
+    { path: '/overview', label: t.dashboard.generalSummary, icon: '🗂️', requiresRole: 'doctor' },
+    { path: '/study', label: t.navigation.study, icon: '🔬', requiresPermission: 'view_study' },
     { path: '/admin', label: t.navigation.admin, icon: '⚙️', requiresPermission: 'view_admin' },
-  ].filter(route => !route.requiresPermission || hasPermission(route.requiresPermission))
+  ]
+
+  const navigationRoutes = allRoutes.filter(
+    (route) =>
+      (route.requiresPermission === undefined ||
+        hasPermission(route.requiresPermission)) &&
+      (route.requiresRole === undefined || hasRole(route.requiresRole)),
+  )
 
   return (
     <div className="relative bg-gradient-to-r from-blue-600/95 via-blue-700/95 to-blue-800/95 backdrop-blur-xl border-b border-blue-200/30 z-50">
@@ -108,9 +117,6 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
             
             {/* Acciones - Derecha */}
             <div className="flex items-center space-x-0.5 flex-shrink-0">
-              {/* Selector de idioma */}
-              <LanguageSelector compact={true} />
-              
               {/* Botón de logout */}
               <button
                 onClick={handleSignOut}
@@ -141,9 +147,9 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
                     {userRole === 'doctor' && <Stethoscope className="h-3 w-3 text-green-500" />}
                     {userRole === 'user' && <User className="h-3 w-3 text-blue-500" />}
                     <p className="text-gray-600 text-sm capitalize">
-                      {userRole === 'admin' && 'Administrador'}
-                      {userRole === 'doctor' && 'Médico'}
-                      {userRole === 'user' && 'Usuario'}
+                      {userRole === 'admin' && t.roles.administrator}
+                      {userRole === 'doctor' && t.roles.physician}
+                      {userRole === 'user' && t.roles.patient}
                     </p>
                   </div>
                 </div>
@@ -234,9 +240,9 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
                   {userRole === 'doctor' && <Stethoscope className="h-3 w-3 text-green-300 flex-shrink-0" />}
                   {userRole === 'user' && <User className="h-3 w-3 text-blue-200 flex-shrink-0" />}
                   <p className="text-blue-100/80 text-sm capitalize truncate">
-                    {userRole === 'admin' && 'Administrador'}
-                    {userRole === 'doctor' && 'Médico'}
-                    {userRole === 'user' && 'Usuario'}
+                    {userRole === 'admin' && t.roles.administrator}
+                    {userRole === 'doctor' && t.roles.physician}
+                    {userRole === 'user' && t.roles.patient}
                   </p>
                 </div>
               </div>

@@ -8,6 +8,7 @@ import type {
   RateLimitDecision,
 } from "./contracts";
 import { AuthConfigurationError, AuthInfrastructureError } from "./errors";
+import { normalizeIdentity } from "./rate-limit";
 
 export type FetchLike = typeof fetch;
 
@@ -282,6 +283,25 @@ export class SupabaseAuthStore
       user: mapUserRow(row),
       passwordHash: readPasswordHash(row.PasswordHash),
     };
+  }
+
+  async findByNormalizedUsername(username: string): Promise<readonly User[]> {
+    const normalized = normalizeIdentity(username);
+    if (normalized.length === 0) {
+      return [];
+    }
+    // `ilike` performs the case-insensitive lookup; the exact normalized
+    // comparison below removes any wildcard/locale false positive. Limit 3 is
+    // enough for the caller to distinguish "one" from "ambiguous".
+    const escaped = normalized.replace(/[\\%_*]/g, "\\$&");
+    const rows = await this.selectUsers(
+      `Username=ilike.${encodeURIComponent(escaped)}`,
+      3,
+      USER_COLUMNS,
+    );
+    return rows
+      .map(mapUserRow)
+      .filter((user) => normalizeIdentity(user.username) === normalized);
   }
 
   async findByUserId(id: string): Promise<User | null> {

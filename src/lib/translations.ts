@@ -41,6 +41,22 @@ export interface Translations {
     or: string
     adminAccess: string
     appUserAccess: string
+    identifier: string
+    identifierPlaceholder: string
+    identifierHint: string
+    unifiedAccess: string
+    unifiedAccessDescription: string
+    sessionMissingUsername: string
+    signedInAs: string
+    continueToDashboard: string
+    accessDenied: string
+    loginRequired: string
+    verifyingSession: string
+    insufficientPermissions: string
+    noPermission: string
+    needRole: string
+    currentRole: string
+    requiredPermission: string
     // Features del login
     realtimeMonitoring: string
     realtimeMonitoringDesc: string
@@ -106,6 +122,7 @@ export interface Translations {
     tracking24_7: string
     viewMetrics: string
     advancedSystem: string
+    system: string
     logout: string
     adminPanel: string
     adminDescription: string
@@ -152,6 +169,12 @@ export interface Translations {
     dataFilters: string
     clearFilters: string
     allUsers: string
+    searchUser: string
+    userSuggestions: string
+    noUserMatches: string
+    clearUserSelection: string
+    rowsPerPage: string
+    loadingUsers: string
     dataType: string
     allTypes: string
     timeRange: string
@@ -236,6 +259,8 @@ export interface Translations {
     noData: string
     loading: string
     error: string
+    missingUsername: string
+    queryTimeout: string
   }
   
   // HRV/Kubios
@@ -456,6 +481,10 @@ export interface Translations {
     dataDistributionByType: string
     daysSinceLastActivity: string
     activeUsersRate: string
+    lowMoodAlert: string
+    noDataTitle: string
+    noDataDescription: string
+    missingUsername: string
   }
   
   // Estudio
@@ -476,6 +505,63 @@ export interface Translations {
     last3Months: string
     lastMonth: string
     lastWeek: string
+    pageTitle: string
+    pageSubtitle: string
+    refreshAnalysis: string
+    filtersTitle: string
+    analysisPeriod: string
+    lastYear: string
+    analyze: string
+    exerciseMoodTitle: string
+    exerciseMoodDescription: string
+    insufficientCorrelation: string
+    insightNoData: string
+    insightsTitle: string
+    recommendationsTitle: string
+    dataSummaryTitle: string
+    exerciseRecords: string
+    mealRecords: string
+    moodRecords: string
+    insulinRecords: string
+    advancedVisualTitle: string
+    advancedVisualDescription: string
+    errorTitle: string
+    loadError: string
+    retry: string
+    kubiosNoticeTitle: string
+    kubiosNoticeDescription: string
+    viewKubiosMetrics: string
+    kubiosPending: string
+    noDataValue: string
+    noStudyData: string
+    noStudyDataDescription: string
+    insightExerciseImproves: string
+    insightIntenseAffects: string
+    insightStable: string
+    insightMoodPositive: string
+    insightMoodAttention: string
+    recommendationContinueExercise: string
+    recommendationRelaxation: string
+    recommendationVaryExercise: string
+    recommendationMonitorWeekly: string
+    recommendationMorningActivities: string
+    recommendationLogDaily: string
+    charts: {
+      evolutionTitle: string
+      evolutionDescription: string
+      date: string
+      values: string
+      duration: string
+      mood: string
+      weeklyTitle: string
+      weeklyDescription: string
+      week: string
+      averageValues: string
+      intensityTitle: string
+      intensityDescription: string
+      sessions: string
+      intensity: string
+    }
   }
   
   // Admin
@@ -497,6 +583,11 @@ export interface Translations {
     refreshStats: string
     exportData: string
     createBackup: string
+    tableExplorerDescription: string
+    exportDataDescription: string
+    createBackupDescription: string
+    refreshStatsDescription: string
+    loadingTables: string
     description: string
     databaseManagement: string
     dataManagement: string
@@ -568,6 +659,10 @@ export interface Translations {
     currentUUID: string
     noUUIDAssigned: string
     userWillBeCreated: string
+    noResults: string
+    uuidCopied: string
+    uuidCopyError: string
+    createError: string
   }
   
   // Roles
@@ -612,6 +707,9 @@ export interface Translations {
     close: string
     found: string
     language: string
+    notAvailable: string
+    noData: string
+    total: string
   }
   
   // Datepicker
@@ -630,7 +728,7 @@ export const translations: Record<Language, Translations> = {
       users: 'Usuarios',
       data: 'Datos',
       kubios: 'Kubios',
-      analytics: 'Analytics',
+      analytics: 'Analítica',
       study: 'Estudio',
       admin: 'Admin',
       settings: 'Configuración',
@@ -661,6 +759,22 @@ export const translations: Record<Language, Translations> = {
       or: 'o',
       adminAccess: 'Acceso para administradores (con email)',
       appUserAccess: 'Acceso para usuarios de la app',
+      identifier: 'Correo o nombre de participante',
+      identifierPlaceholder: 'tu@email.com o tu_usuario',
+      identifierHint: 'Puedes entrar con tu correo electrónico o con tu nombre de participante. El rol se toma siempre de la cuenta.',
+      unifiedAccess: 'Acceso unificado',
+      unifiedAccessDescription: 'Inicia sesión con la misma cuenta de siempre.',
+      sessionMissingUsername: 'La sesión no incluye un nombre de participante para consultar los datos',
+      signedInAs: 'Sesión iniciada como',
+      continueToDashboard: 'Ir al inicio',
+      accessDenied: 'Acceso denegado',
+      loginRequired: 'Debes iniciar sesión para acceder a esta sección.',
+      verifyingSession: 'Verificando autenticación...',
+      insufficientPermissions: 'Permisos insuficientes',
+      noPermission: 'No tienes permisos para acceder a esta sección.',
+      needRole: 'Necesitas el rol {role} para acceder a esta sección.',
+      currentRole: 'Rol actual',
+      requiredPermission: 'Permiso requerido',
       // Features del login
       realtimeMonitoring: 'Monitoreo en Tiempo Real',
       realtimeMonitoringDesc: 'Seguimiento continuo de datos de salud con tecnología avanzada',
@@ -675,18 +789,18 @@ export const translations: Record<Language, Translations> = {
       title: 'Diabetes Tracker',
       subtitle: 'Monitoreo inteligente de la salud con tecnología de vanguardia. Gestiona usuarios, analiza datos y supervisa métricas de variabilidad cardíaca.',
       advancedControl: 'Panel de Control Avanzado',
-      healthMonitoring: 'Mi Panel de Salud',
+      healthMonitoring: 'Panel de Salud',
       manageUsers: 'Gestiona usuarios, analiza datos y supervisa métricas de variabilidad cardíaca.',
-      analyzeData: 'Visualiza tus datos, analiza tu progreso y supervisa tus métricas de variabilidad cardíaca.',
-      monitorMetrics: 'Monitoreo personal de tu salud con tecnología de vanguardia.',
+      analyzeData: 'Visualiza los datos, analiza el progreso y supervisa las métricas de variabilidad cardíaca.',
+      monitorMetrics: 'Monitoreo personal de la salud con tecnología de vanguardia.',
       totalUsers: 'Usuarios Totales',
-      totalRecords: 'registros totales',
+      totalRecords: 'Registros totales',
       hrvUsers: 'Usuarios HRV',
       systemAccuracy: 'Precisión Sistema',
-      myRecords: 'Mis Registros',
-      myHrv: 'Mi HRV',
-      myStatus: 'Mi Estado',
-      myProgress: 'Mi Progreso',
+      myRecords: 'Registros',
+      myHrv: 'HRV',
+      myStatus: 'Estado',
+      myProgress: 'Progreso',
       healthy: 'Saludable',
       active: 'Activo',
       // Estados específicos
@@ -724,6 +838,7 @@ export const translations: Record<Language, Translations> = {
       tracking24_7: 'Seguimiento 24/7 de métricas vitales con alertas inteligentes y notificaciones personalizadas para el cuidado proactivo.',
       viewMetrics: 'Ver métricas',
       advancedSystem: 'Sistema Avanzado',
+      system: 'Sistema',
       logout: 'Cerrar sesión',
       adminPanel: 'Panel de Administración',
       adminDescription: 'Gestiona usuarios, configura el sistema y supervisa la seguridad. Herramientas avanzadas para el control total de la plataforma.',
@@ -770,6 +885,12 @@ export const translations: Record<Language, Translations> = {
       dataFilters: 'Filtros de Datos',
       clearFilters: 'Limpiar filtros',
       allUsers: 'Todos los usuarios',
+      searchUser: 'Buscar usuario...',
+      userSuggestions: 'Sugerencias de usuarios',
+      noUserMatches: 'Sin coincidencias',
+      clearUserSelection: 'Quitar selección',
+      rowsPerPage: 'Filas por página',
+      loadingUsers: 'Cargando usuarios...',
       dataType: 'Tipo de Dato',
       allTypes: 'Todos los tipos',
       timeRange: 'Rango de Tiempo',
@@ -780,7 +901,7 @@ export const translations: Record<Language, Translations> = {
       insulinData: 'Datos de Insulina',
       records: 'registros',
       showLess: 'Mostrar menos',
-      viewAll: 'Ver todos los',
+      viewAll: 'Ver todos',
       records2: 'registros',
       insulin: 'Insulina',
       meals: 'Comidas',
@@ -796,13 +917,13 @@ export const translations: Record<Language, Translations> = {
       processingCorrelations: 'Procesando correlaciones entre diabetes, ejercicio y HRV...',
       // App Dashboard específico
       appDashboard: {
-        myHealthPanel: 'Mi Panel de Salud',
+        myHealthPanel: 'Panel de Salud',
         advancedControlPanel: 'Panel de Control Avanzado',
-        myHealthData: 'Mis Datos de Salud',
-        myHrvAnalysis: 'Mi Análisis HRV',
-        myStatistics: 'Mis Estadísticas',
-        viewMyData: 'Ver mis datos',
-        viewMyHrv: 'Ver mi HRV',
+        myHealthData: 'Datos de Salud',
+        myHrvAnalysis: 'Análisis HRV',
+        myStatistics: 'Estadísticas',
+        viewMyData: 'Ver datos',
+        viewMyHrv: 'Ver HRV',
         viewStatistics: 'Ver estadísticas',
         userManagement: 'Gestión de Usuarios',
         healthData: 'Datos de Salud',
@@ -826,7 +947,7 @@ export const translations: Record<Language, Translations> = {
     },
     data: {
       title: 'Datos de Salud',
-      myData: 'Mis Datos de Salud',
+      myData: 'Datos de Salud',
       allUsers: 'Todos los usuarios',
       user: 'Usuario',
       dataType: 'Tipo de Dato',
@@ -851,7 +972,9 @@ export const translations: Record<Language, Translations> = {
       moodData: 'Datos de Estado de Ánimo',
       noData: 'No hay datos disponibles',
       loading: 'Cargando...',
-      error: 'Error al cargar los datos'
+      error: 'Error al cargar los datos',
+      missingUsername: 'La sesión no incluye un nombre de usuario para consultar los datos',
+      queryTimeout: 'La consulta de datos tardó demasiado. Inténtalo de nuevo.'
     },
     kubios: {
       title: 'Kubios HRV - Variabilidad Cardíaca',
@@ -865,27 +988,27 @@ export const translations: Record<Language, Translations> = {
       dateTo: 'Fecha hasta',
       updateUsers: 'Actualizar Usuarios',
       loadingUsers: 'Cargando usuarios...',
-      errorLoadingUsers: 'ERROR AL CARGAR USUARIOS',
+      errorLoadingUsers: 'Error al cargar usuarios',
       hrvResults: 'Resultados HRV',
       noHrvResults: 'No hay resultados HRV disponibles',
       showCharts: 'Mostrar Gráficos',
       hideCharts: 'Ocultar Gráficos',
       personal: {
-        summaryTitle: 'Mi HRV (Kubios)',
-        summaryDescription: 'Tus mediciones HRV sincronizadas. Solo tú puedes verlas.',
-        onlyOwnData: 'Solo se muestran tus propios datos de Kubios.',
+        summaryTitle: 'HRV (Kubios)',
+        summaryDescription: 'Mediciones HRV sincronizadas. Solo el titular de la cuenta puede verlas.',
+        onlyOwnData: 'Solo se muestran los datos propios de Kubios.',
         latestMeasurement: 'Última medición',
         latestReadiness: 'Readiness reciente',
         syncedAt: 'Última sincronización',
         staleWarning: 'Los datos mostrados son la última copia sincronizada y podrían no estar actualizados.',
-        viewDetails: 'Ver mi Kubios',
-        statusUnlinked: 'Tu cuenta todavía no está vinculada a Kubios. Cuando se complete la vinculación, tus mediciones aparecerán aquí.',
+        viewDetails: 'Ver Kubios',
+        statusUnlinked: 'La cuenta todavía no está vinculada a Kubios. Cuando se complete la vinculación, las mediciones aparecerán aquí.',
         statusPending: 'La vinculación con Kubios está pendiente. Vuelve a intentarlo cuando se haya completado.',
-        statusEmpty: 'Todavía no hay mediciones HRV sincronizadas en tu cuenta.',
+        statusEmpty: 'Todavía no hay mediciones HRV sincronizadas en la cuenta.',
         emptyRange: 'No hay mediciones HRV en el rango de fechas seleccionado.',
-        loadError: 'No se pudieron cargar tus resultados HRV. Inténtalo de nuevo.',
+        loadError: 'No se pudieron cargar los resultados HRV. Inténtalo de nuevo.',
         invalidResponse: 'El servicio devolvió una respuesta no válida.',
-        sessionExpired: 'Tu sesión ha caducado. Inicia sesión de nuevo para consultar tus resultados HRV.',
+        sessionExpired: 'La sesión ha caducado. Inicia sesión de nuevo para consultar los resultados HRV.',
         serviceUnavailable: 'El servicio de Kubios no está disponible en este momento. Inténtalo de nuevo más tarde.',
         invalidDateRange: 'El rango de fechas no es válido. Revisa las fechas.',
         clearFilters: 'Limpiar filtros',
@@ -894,7 +1017,7 @@ export const translations: Record<Language, Translations> = {
         artefactLevel: 'Nivel de artefactos',
         retry: 'Reintentar',
         resultsInRange: 'Resultados en el rango seleccionado',
-        filterHint: 'Filtra por fechas. Solo se consultan tus datos.'
+        filterHint: 'Filtra por fechas. Solo se consultan los datos propios.'
       },
       // Métricas HRV
       metrics: {
@@ -953,7 +1076,7 @@ export const translations: Record<Language, Translations> = {
       subtitle: 'Estadísticas detalladas y análisis de tendencias',
       statistics: 'Estadísticas',
       trends: 'Tendencias',
-      insights: 'Insights',
+      insights: 'Hallazgos',
       recommendations: 'Recomendaciones',
       charts: 'Gráficos',
       data: 'Datos',
@@ -1064,13 +1187,17 @@ export const translations: Record<Language, Translations> = {
       noRecentActivity: 'No hay actividad reciente en el sistema (más de 7 días)',
       dataDistributionByType: 'Distribución por Tipo de Dato',
       daysSinceLastActivity: 'Días desde última actividad',
-      activeUsersRate: 'Tasa de usuarios activos'
+      activeUsersRate: 'Tasa de usuarios activos',
+      lowMoodAlert: 'Promedio de estado de ánimo bajo: {value}/10',
+      noDataTitle: 'Sin datos para mostrar',
+      noDataDescription: 'Todavía no hay registros de salud que resumir con los filtros actuales.',
+      missingUsername: 'La sesión no incluye un nombre de usuario para consultar los datos'
     },
     study: {
       title: 'Estudio de Correlaciones',
       subtitle: 'Análisis de correlaciones entre ejercicio y métricas de HRV',
       correlations: 'Correlaciones',
-      insights: 'Insights del Estudio',
+      insights: 'Hallazgos',
       recommendations: 'Recomendaciones',
       dataSummary: 'Resumen de Datos',
       hrvData: 'Datos de HRV',
@@ -1082,7 +1209,64 @@ export const translations: Record<Language, Translations> = {
       intensityVsHrv: 'Intensidad de Ejercicio vs HRV',
       last3Months: 'Últimos 3 meses',
       lastMonth: 'Último mes',
-      lastWeek: 'Última semana'
+      lastWeek: 'Última semana',
+      pageTitle: 'Estudio Diabetes & Bienestar',
+      pageSubtitle: 'Análisis de correlaciones entre actividad física, estado de ánimo y datos de diabetes',
+      refreshAnalysis: 'Actualizar Análisis',
+      filtersTitle: 'Filtros del Estudio',
+      analysisPeriod: 'Período de Análisis',
+      lastYear: 'Último año',
+      analyze: 'Analizar',
+      exerciseMoodTitle: 'Ejercicio ↔ Estado de Ánimo',
+      exerciseMoodDescription: 'Impacto del ejercicio en el bienestar emocional',
+      insufficientCorrelation: 'No hay datos suficientes para calcular esta correlación.',
+      insightNoData: 'No hay datos suficientes para generar conclusiones del estudio',
+      insightsTitle: 'Hallazgos del Estudio',
+      recommendationsTitle: 'Recomendaciones',
+      dataSummaryTitle: 'Resumen de Datos',
+      exerciseRecords: 'Registros de Ejercicio',
+      mealRecords: 'Registros de Comidas',
+      moodRecords: 'Registros de Estado de Ánimo',
+      insulinRecords: 'Registros de Insulina',
+      advancedVisualTitle: 'Análisis Visual Avanzado',
+      advancedVisualDescription: 'Gráficos especializados para el estudio de la relación entre diabetes, ejercicio y estado de ánimo',
+      errorTitle: 'Error en el Estudio',
+      loadError: 'Error al cargar los datos del estudio',
+      retry: 'Reintentar',
+      kubiosNoticeTitle: 'Kubios es personal',
+      kubiosNoticeDescription: 'Las métricas de Kubios son personales y no se mezclan con los datos de este estudio colectivo. La vista personal de Kubios es el único lugar donde se pueden consultar las mediciones propias.',
+      viewKubiosMetrics: 'Ver métricas de Kubios',
+      kubiosPending: 'Cuando existan mediciones propias, se podrán consultar en la vista personal de Kubios.',
+      noDataValue: 'Sin datos',
+      noStudyData: 'No hay datos del estudio para el rango seleccionado',
+      noStudyDataDescription: 'No se han cargado registros de ejercicio, comida, estado de ánimo o insulina para este período. Prueba otro rango de fechas.',
+      insightExerciseImproves: '😊 El ejercicio regular mejora el estado de ánimo',
+      insightIntenseAffects: '😔 El ejercicio intenso puede estar afectando el estado de ánimo',
+      insightStable: '💪 Ejercicio y estado de ánimo tienen una relación estable',
+      insightMoodPositive: '😊 Estado de ánimo general muy positivo',
+      insightMoodAttention: '😔 El estado de ánimo general necesita atención',
+      recommendationContinueExercise: '💪 Continuar con el ejercicio para mantener un buen estado de ánimo',
+      recommendationRelaxation: '🧘‍♀️ Incorporar ejercicios de relajación y meditación',
+      recommendationVaryExercise: '🎯 Variar los tipos de ejercicio para optimizar el bienestar',
+      recommendationMonitorWeekly: '📊 Monitorizar patrones semanales para identificar tendencias',
+      recommendationMorningActivities: '🌅 Incorporar actividades matutinas para mejorar el estado de ánimo',
+      recommendationLogDaily: '📱 Registrar datos diariamente para mejorar el análisis',
+      charts: {
+        evolutionTitle: 'Evolución Temporal: Ejercicio y Estado de Ánimo',
+        evolutionDescription: 'Análisis temporal de la actividad física y el bienestar emocional.',
+        date: 'Fecha',
+        values: 'Valores',
+        duration: 'Duración del Ejercicio',
+        mood: 'Estado de Ánimo',
+        weeklyTitle: 'Análisis Semanal: Actividad y Estado de Ánimo',
+        weeklyDescription: 'Análisis semanal con las tendencias promedio de actividad física y estado de ánimo.',
+        week: 'Semana',
+        averageValues: 'Valores Promedio',
+        intensityTitle: 'Distribución de Intensidades de Ejercicio',
+        intensityDescription: 'Distribución de las intensidades de ejercicio registradas durante el período de estudio.',
+        sessions: 'sesiones',
+        intensity: 'Intensidad'
+      }
     },
     admin: {
       title: 'Administración',
@@ -1102,6 +1286,11 @@ export const translations: Record<Language, Translations> = {
       refreshStats: 'Actualizar Estadísticas',
       exportData: 'Exportar Datos',
       createBackup: 'Crear Respaldo',
+      tableExplorerDescription: 'Explorar y visualizar todas las tablas de la base de datos',
+      exportDataDescription: 'Exportar datos en formato JSON o CSV',
+      createBackupDescription: 'Crear un respaldo completo de la base de datos',
+      refreshStatsDescription: 'Actualizar estadísticas y métricas del sistema',
+      loadingTables: 'Cargando tablas...',
       description: 'Administra, respalda y supervisa la base de datos del sistema con herramientas profesionales diseñadas para el control completo de los datos.',
       databaseManagement: 'Administración de Base de Datos',
       dataManagement: 'Gestión de Datos',
@@ -1170,7 +1359,11 @@ export const translations: Record<Language, Translations> = {
       gdprConsent: 'Consentimiento GDPR',
       currentUUID: 'UUID Actual',
       noUUIDAssigned: 'Sin UUID asignado',
-      userWillBeCreated: 'El usuario será creado con nombre de usuario y contraseña. Podrá acceder a la aplicación móvil usando estas credenciales.'
+      userWillBeCreated: 'El usuario será creado con nombre de usuario y contraseña. Podrá acceder a la aplicación móvil usando estas credenciales.',
+      noResults: 'No se encontraron usuarios',
+      uuidCopied: 'UUID copiado al portapapeles',
+      uuidCopyError: 'Error al copiar al portapapeles',
+      createError: 'Error creando usuario: {error}'
     },
     roles: {
       admin: 'admin',
@@ -1210,7 +1403,10 @@ export const translations: Record<Language, Translations> = {
       no: 'No',
       ok: 'OK',
       found: 'encontrados',
-      language: 'Idioma'
+      language: 'Idioma',
+      notAvailable: 'No disponible',
+      noData: 'Sin datos',
+      total: 'Total'
     },
     datepicker: {
       months: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
@@ -1256,6 +1452,22 @@ export const translations: Record<Language, Translations> = {
       or: 'or',
       adminAccess: 'Admin access (with email)',
       appUserAccess: 'App user access',
+      identifier: 'Email or participant name',
+      identifierPlaceholder: 'you@email.com or your_username',
+      identifierHint: 'Sign in with your email address or your participant name. The role always comes from the account.',
+      unifiedAccess: 'Unified access',
+      unifiedAccessDescription: 'Sign in with the same account as always.',
+      sessionMissingUsername: 'The session does not include a participant name to query data',
+      signedInAs: 'Signed in as',
+      continueToDashboard: 'Go to home',
+      accessDenied: 'Access denied',
+      loginRequired: 'You must sign in to access this section.',
+      verifyingSession: 'Verifying authentication...',
+      insufficientPermissions: 'Insufficient permissions',
+      noPermission: 'You do not have permission to access this section.',
+      needRole: 'You need the {role} role to access this section.',
+      currentRole: 'Current role',
+      requiredPermission: 'Required permission',
       // Features del login
       realtimeMonitoring: 'Real-time Monitoring',
       realtimeMonitoringDesc: 'Continuous health data tracking with advanced technology',
@@ -1270,18 +1482,18 @@ export const translations: Record<Language, Translations> = {
       title: 'Diabetes Tracker',
       subtitle: 'Intelligent health monitoring with cutting-edge technology. Manage users, analyze data and monitor heart rate variability metrics.',
       advancedControl: 'Advanced Control Panel',
-      healthMonitoring: 'My Health Panel',
+      healthMonitoring: 'Health Panel',
       manageUsers: 'Manage users, analyze data and monitor heart rate variability metrics.',
-      analyzeData: 'View your data, analyze your progress and monitor your heart rate variability metrics.',
+      analyzeData: 'View data, analyze progress and monitor heart rate variability metrics.',
       monitorMetrics: 'Personal health monitoring with cutting-edge technology.',
       totalUsers: 'Total Users',
       totalRecords: 'Total Records',
       hrvUsers: 'HRV Users',
       systemAccuracy: 'System Accuracy',
-      myRecords: 'My Records',
-      myHrv: 'My HRV',
-      myStatus: 'My Status',
-      myProgress: 'My Progress',
+      myRecords: 'Records',
+      myHrv: 'HRV',
+      myStatus: 'Status',
+      myProgress: 'Progress',
       healthy: 'Healthy',
       active: 'Active',
       // Estados específicos
@@ -1319,6 +1531,7 @@ export const translations: Record<Language, Translations> = {
       tracking24_7: '24/7 vital metrics tracking with intelligent alerts and personalized notifications for proactive care.',
       viewMetrics: 'View metrics',
       advancedSystem: 'Advanced System',
+      system: 'System',
       logout: 'Logout',
       adminPanel: 'Administration Panel',
       adminDescription: 'Manage users, configure the system and monitor security. Advanced tools for total platform control.',
@@ -1365,6 +1578,12 @@ export const translations: Record<Language, Translations> = {
       dataFilters: 'Data Filters',
       clearFilters: 'Clear filters',
       allUsers: 'All users',
+      searchUser: 'Search user...',
+      userSuggestions: 'User suggestions',
+      noUserMatches: 'No matches',
+      clearUserSelection: 'Clear selection',
+      rowsPerPage: 'Rows per page',
+      loadingUsers: 'Loading users...',
       dataType: 'Data Type',
       allTypes: 'All types',
       timeRange: 'Time Range',
@@ -1391,13 +1610,13 @@ export const translations: Record<Language, Translations> = {
       processingCorrelations: 'Processing correlations between diabetes, exercise and HRV...',
       // App Dashboard específico
       appDashboard: {
-        myHealthPanel: 'My Health Panel',
+        myHealthPanel: 'Health Panel',
         advancedControlPanel: 'Advanced Control Panel',
-        myHealthData: 'My Health Data',
-        myHrvAnalysis: 'My HRV Analysis',
-        myStatistics: 'My Statistics',
-        viewMyData: 'View my data',
-        viewMyHrv: 'View my HRV',
+        myHealthData: 'Health Data',
+        myHrvAnalysis: 'HRV Analysis',
+        myStatistics: 'Statistics',
+        viewMyData: 'View data',
+        viewMyHrv: 'View HRV',
         viewStatistics: 'View statistics',
         userManagement: 'User Management',
         healthData: 'Health Data',
@@ -1421,7 +1640,7 @@ export const translations: Record<Language, Translations> = {
     },
     data: {
       title: 'Health Data',
-      myData: 'My Health Data',
+      myData: 'Health Data',
       allUsers: 'All users',
       user: 'User',
       dataType: 'Data Type',
@@ -1446,7 +1665,9 @@ export const translations: Record<Language, Translations> = {
       moodData: 'Mood Data',
       noData: 'No data available',
       loading: 'Loading...',
-      error: 'Error loading data'
+      error: 'Error loading data',
+      missingUsername: 'The session does not include a participant name to query data',
+      queryTimeout: 'The data query took too long. Please try again.'
     },
     kubios: {
       title: 'Kubios HRV - Heart Rate Variability',
@@ -1460,27 +1681,27 @@ export const translations: Record<Language, Translations> = {
       dateTo: 'Date to',
       updateUsers: 'Update Users',
       loadingUsers: 'Loading users...',
-      errorLoadingUsers: 'ERROR LOADING USERS',
+      errorLoadingUsers: 'Error loading users',
       hrvResults: 'HRV Results',
       noHrvResults: 'No HRV results available',
       showCharts: 'Show Charts',
       hideCharts: 'Hide Charts',
       personal: {
-        summaryTitle: 'My HRV (Kubios)',
-        summaryDescription: 'Your synchronized HRV measurements. Only you can see them.',
-        onlyOwnData: 'Only your own Kubios data is shown.',
+        summaryTitle: 'HRV (Kubios)',
+        summaryDescription: 'Synchronized HRV measurements. Only the account holder can see them.',
+        onlyOwnData: 'Only own Kubios data is shown.',
         latestMeasurement: 'Latest measurement',
         latestReadiness: 'Recent readiness',
         syncedAt: 'Last sync',
         staleWarning: 'The data shown is the last synchronized copy and may be out of date.',
-        viewDetails: 'View my Kubios',
-        statusUnlinked: 'Your account is not linked to Kubios yet. Your measurements will appear here once linking is complete.',
+        viewDetails: 'View Kubios',
+        statusUnlinked: 'The account is not linked to Kubios yet. Measurements will appear here once linking is complete.',
         statusPending: 'Kubios linking is pending. Try again once it has completed.',
-        statusEmpty: 'There are no synchronized HRV measurements in your account yet.',
+        statusEmpty: 'There are no synchronized HRV measurements in the account yet.',
         emptyRange: 'There are no HRV measurements in the selected date range.',
-        loadError: 'Your HRV results could not be loaded. Please try again.',
+        loadError: 'The HRV results could not be loaded. Please try again.',
         invalidResponse: 'The service returned an invalid response.',
-        sessionExpired: 'Your session has expired. Sign in again to view your HRV results.',
+        sessionExpired: 'The session has expired. Sign in again to view the HRV results.',
         serviceUnavailable: 'The Kubios service is unavailable right now. Please try again later.',
         invalidDateRange: 'The date range is invalid. Check the dates.',
         clearFilters: 'Clear filters',
@@ -1489,7 +1710,7 @@ export const translations: Record<Language, Translations> = {
         artefactLevel: 'Artefact level',
         retry: 'Retry',
         resultsInRange: 'Results in the selected range',
-        filterHint: 'Filter by date. Only your own data is queried.'
+        filterHint: 'Filter by date. Only own data is queried.'
       },
       // Métricas HRV
       metrics: {
@@ -1659,13 +1880,17 @@ export const translations: Record<Language, Translations> = {
       noRecentActivity: 'No recent activity in the system (more than 7 days)',
       dataDistributionByType: 'Data Distribution by Type',
       daysSinceLastActivity: 'Days since last activity',
-      activeUsersRate: 'Active users rate'
+      activeUsersRate: 'Active users rate',
+      lowMoodAlert: 'Low average mood: {value}/10',
+      noDataTitle: 'No data to show',
+      noDataDescription: 'There are no health records to summarize with the current filters yet.',
+      missingUsername: 'The session does not include a participant name to query data'
     },
     study: {
       title: 'Correlation Study',
       subtitle: 'Analysis of correlations between exercise and HRV metrics',
       correlations: 'Correlations',
-      insights: 'Study Insights',
+      insights: 'Findings',
       recommendations: 'Recommendations',
       dataSummary: 'Data Summary',
       hrvData: 'HRV Data',
@@ -1677,7 +1902,64 @@ export const translations: Record<Language, Translations> = {
       intensityVsHrv: 'Exercise Intensity vs HRV',
       last3Months: 'Last 3 months',
       lastMonth: 'Last month',
-      lastWeek: 'Last week'
+      lastWeek: 'Last week',
+      pageTitle: 'Diabetes & Wellbeing Study',
+      pageSubtitle: 'Analysis of correlations between physical activity, mood and diabetes data',
+      refreshAnalysis: 'Refresh Analysis',
+      filtersTitle: 'Study Filters',
+      analysisPeriod: 'Analysis Period',
+      lastYear: 'Last year',
+      analyze: 'Analyze',
+      exerciseMoodTitle: 'Exercise ↔ Mood',
+      exerciseMoodDescription: 'Impact of exercise on emotional wellbeing',
+      insufficientCorrelation: 'There is not enough data to calculate this correlation.',
+      insightNoData: 'There is not enough data to generate study conclusions',
+      insightsTitle: 'Study Findings',
+      recommendationsTitle: 'Recommendations',
+      dataSummaryTitle: 'Data Summary',
+      exerciseRecords: 'Exercise Records',
+      mealRecords: 'Meal Records',
+      moodRecords: 'Mood Records',
+      insulinRecords: 'Insulin Records',
+      advancedVisualTitle: 'Advanced Visual Analysis',
+      advancedVisualDescription: 'Specialized charts for the relationship between diabetes, exercise and mood',
+      errorTitle: 'Study error',
+      loadError: 'Error loading study data',
+      retry: 'Retry',
+      kubiosNoticeTitle: 'Kubios is personal',
+      kubiosNoticeDescription: 'Kubios metrics are personal and are not mixed with the data of this collective study. The personal Kubios view is the only place where own measurements can be consulted.',
+      viewKubiosMetrics: 'View Kubios metrics',
+      kubiosPending: 'When own measurements exist, they can be consulted in the personal Kubios view.',
+      noDataValue: 'No data',
+      noStudyData: 'No study data for the selected range',
+      noStudyDataDescription: 'No exercise, meal, mood or insulin records were loaded for this period. Try another date range.',
+      insightExerciseImproves: '😊 Regular exercise improves mood',
+      insightIntenseAffects: '😔 Intense exercise may be affecting mood',
+      insightStable: '💪 Exercise and mood have a stable relationship',
+      insightMoodPositive: '😊 Overall mood is very positive',
+      insightMoodAttention: '😔 Overall mood needs attention',
+      recommendationContinueExercise: '💪 Keep exercising to maintain a good mood',
+      recommendationRelaxation: '🧘‍♀️ Add relaxation and meditation exercises',
+      recommendationVaryExercise: '🎯 Vary exercise types to optimize wellbeing',
+      recommendationMonitorWeekly: '📊 Monitor weekly patterns to identify trends',
+      recommendationMorningActivities: '🌅 Add morning activities to improve mood',
+      recommendationLogDaily: '📱 Log data daily for better analysis',
+      charts: {
+        evolutionTitle: 'Temporal Evolution: Exercise and Mood',
+        evolutionDescription: 'Temporal analysis of physical activity and emotional wellbeing.',
+        date: 'Date',
+        values: 'Values',
+        duration: 'Exercise Duration',
+        mood: 'Mood',
+        weeklyTitle: 'Weekly Analysis: Activity and Mood',
+        weeklyDescription: 'Weekly analysis showing average physical activity and mood trends.',
+        week: 'Week',
+        averageValues: 'Average Values',
+        intensityTitle: 'Exercise Intensity Distribution',
+        intensityDescription: 'Distribution of exercise intensities recorded during the study period.',
+        sessions: 'sessions',
+        intensity: 'Intensity'
+      }
     },
     admin: {
       title: 'Administration',
@@ -1697,6 +1979,11 @@ export const translations: Record<Language, Translations> = {
       refreshStats: 'Refresh Statistics',
       exportData: 'Export Data',
       createBackup: 'Create Backup',
+      tableExplorerDescription: 'Browse and view all database tables',
+      exportDataDescription: 'Export data in JSON or CSV format',
+      createBackupDescription: 'Create a complete database backup',
+      refreshStatsDescription: 'Refresh system statistics and metrics',
+      loadingTables: 'Loading tables...',
       description: 'Manage, backup and monitor the system database with professional tools designed for complete data control.',
       databaseManagement: 'Database Administration',
       dataManagement: 'Data Management',
@@ -1765,7 +2052,11 @@ export const translations: Record<Language, Translations> = {
       gdprConsent: 'GDPR Consent',
       currentUUID: 'Current UUID',
       noUUIDAssigned: 'No UUID assigned',
-      userWillBeCreated: 'The user will be created with username and password. They will be able to access the mobile app using these credentials.'
+      userWillBeCreated: 'The user will be created with username and password. They will be able to access the mobile app using these credentials.',
+      noResults: 'No users found',
+      uuidCopied: 'UUID copied to clipboard',
+      uuidCopyError: 'Error copying to clipboard',
+      createError: 'Error creating user: {error}'
     },
     roles: {
       admin: 'admin',
@@ -1805,7 +2096,10 @@ export const translations: Record<Language, Translations> = {
       no: 'No',
       ok: 'OK',
       found: 'found',
-      language: 'Language'
+      language: 'Language',
+      notAvailable: 'Not available',
+      noData: 'No data',
+      total: 'Total'
     },
     datepicker: {
       months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],

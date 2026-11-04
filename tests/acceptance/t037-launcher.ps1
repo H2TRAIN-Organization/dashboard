@@ -3,6 +3,7 @@ param(
   [switch]$RunTests,
   [switch]$RunPlaywright,
   [switch]$RunMockPlaywright,
+  [switch]$KeepServices,
   [switch]$UseBuild,
   [switch]$SkipNode,
   [switch]$SkipPostman,
@@ -134,6 +135,9 @@ try {
       Write-Host "Running Node acceptance (15 tests, strict seeds, no skips)..."
       node (Join-Path $validation 'tests\acceptance\api.test.mjs')
       if ($LASTEXITCODE -ne 0) { throw "Node acceptance failed with exit code $LASTEXITCODE" }
+      Reset-Standin
+      node (Join-Path $validation 'tests\acceptance\dashboard-remaking.test.mjs')
+      if ($LASTEXITCODE -ne 0) { throw "Dashboard Remaking acceptance failed with exit code $LASTEXITCODE" }
     }
 
     if (-not $SkipPostman) {
@@ -170,7 +174,11 @@ try {
   }
 }
 finally {
-  Stop-OwnProcess $nextProcess 'Next backend'
-  Stop-OwnProcess $simulationProcess 'Supabase stand-in'
+  if ($KeepServices -and $null -ne $nextProcess -and $null -ne $simulationProcess) {
+    Write-Host "Review services kept: Next PID $($nextProcess.Id); Supabase PID $($simulationProcess.Id)"
+  } else {
+    Stop-OwnProcess $nextProcess 'Next backend'
+    Stop-OwnProcess $simulationProcess 'Supabase stand-in'
+  }
   Write-Host "T037 logs: $logDir"
 }

@@ -32,7 +32,7 @@ export class InMemoryUserRepository implements UserRepository {
     });
 
     const offset = filter.offset ?? 0;
-    const limit = filter.limit ?? 50;
+    const limit = filter.limit ?? 25;
     return {
       users: matching.slice(offset, offset + limit),
       total: matching.length,

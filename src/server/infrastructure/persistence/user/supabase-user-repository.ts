@@ -89,8 +89,11 @@ export class SupabaseUserRepository implements UserRepository {
   ) {}
 
   async list(filter: UserListFilter): Promise<UserPage> {
-    const limit = Math.min(Math.max(Math.trunc(filter.limit ?? 50), 1), 100);
+    const limit = Math.min(Math.max(Math.trunc(filter.limit ?? 25), 1), 100);
     const offset = Math.max(Math.trunc(filter.offset ?? 0), 0);
+    // Filters are sent before the range: PostgREST applies them and computes
+    // the exact count for the same filtered set. UserID is the primary key, so
+    // the ascending order is stable across pages.
     const filters: PersistenceFilter[] = [];
     const search = filter.search?.trim();
     if (search !== undefined && search.length > 0) {

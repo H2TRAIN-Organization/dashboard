@@ -61,11 +61,16 @@ export function createUserUseCases(
       const matchesSearch =
         search === undefined || self.username.toLocaleLowerCase().includes(search);
       const matchesRole = filter.role === undefined || self.role === filter.role;
+      const total = matchesSearch && matchesRole ? 1 : 0;
 
-      return {
-        users: matchesSearch && matchesRole ? [self] : [],
-        total: matchesSearch && matchesRole ? 1 : 0,
-      };
+      // Apply the same filter-then-page rule as the repository. `total` is the
+      // filtered total, so an out-of-range page still reports 1.
+      const limit = Math.max(1, Math.trunc(filter.limit ?? 25));
+      const offset = Math.max(0, Math.trunc(filter.offset ?? 0));
+      const visibleUsers =
+        total === 1 && offset === 0 ? [self].slice(0, limit) : [];
+
+      return { users: visibleUsers, total };
     },
 
     async get(actor: ActiveActor, id: string): Promise<User> {

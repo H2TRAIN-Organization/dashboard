@@ -84,7 +84,7 @@ describe('K52 Estudio sin Kubios colectivo ni ficticio', () => {
   it('links to personal Kubios only for ready/stale with measurements', () => {
     const ready = renderNotice(dataView('ready', 2))
     expect(ready).toContain('href="/kubios"')
-    expect(ready).toContain('Ver mis métricas de Kubios')
+    expect(ready).toContain('Ver métricas de Kubios')
 
     const stale = renderNotice(dataView('stale', 1))
     expect(stale).toContain('href="/kubios"')

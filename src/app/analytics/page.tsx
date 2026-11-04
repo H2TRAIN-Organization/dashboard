@@ -10,10 +10,10 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
-import LanguageSelector from '@/components/LanguageSelector'
 
 export default function AnalyticsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
+  const locale = language === 'en' ? 'en-US' : 'es-ES'
   const { session } = useSession()
   const [insulinData, setInsulinData] = useState<InsulinData[]>([])
   const [foodData, setFoodData] = useState<FoodData[]>([])
@@ -38,7 +38,7 @@ export default function AnalyticsPage() {
 
       const selected = isIndividualUser ? (currentUsername ?? '') : selectedUser
       if (isIndividualUser && selected.length === 0) {
-        throw new Error('La sesión no incluye un nombre de usuario para consultar los datos')
+        throw new Error(t.auth.sessionMissingUsername)
       }
 
       const data = await dataApi.getDecrypted({
@@ -58,7 +58,7 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedUser, timeRange, selectedDataType, isIndividualUser, currentUsername])
+  }, [selectedUser, timeRange, selectedDataType, isIndividualUser, currentUsername, t.auth.sessionMissingUsername])
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -92,7 +92,7 @@ export default function AnalyticsPage() {
   ): Array<{ date: string; count: number }> => {
     const grouped = data.reduce<Record<string, { date: string; count: number }>>((acc, item) => {
       const rawDate = (item as Record<string, unknown>)[dateField]
-      const date = new Date(String(rawDate)).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
+      const date = new Date(String(rawDate)).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
       if (!acc[date]) {
         acc[date] = { date, count: 0 }
       }
@@ -111,7 +111,7 @@ export default function AnalyticsPage() {
     typeField: string,
   ): Array<{ name: string; value: number }> => {
     const grouped = data.reduce<Record<string, number>>((acc, item) => {
-      const type = String((item as Record<string, unknown>)[typeField] || 'Sin especificar')
+      const type = String((item as Record<string, unknown>)[typeField] || t.common.noData)
       if (!acc[type]) {
         acc[type] = 0
       }
@@ -163,6 +163,9 @@ export default function AnalyticsPage() {
     stats.lastActivity = new Date(Math.max(...allDates.map(d => d.getTime())))
   }
 
+  const hasAnyData = stats.totalRecords > 0
+  const showData = !loading && error === null && hasAnyData
+
   // Datos para gráficos
   const insulinByDate = groupDataByDate(insulinData)
   const foodByDate = groupDataByDate(foodData)
@@ -198,13 +201,6 @@ export default function AnalyticsPage() {
         </div>
         
         <Navigation title={t.dashboard.advancedAnalytics} />
-        
-        {/* Selector de idioma */}
-        <div className="absolute top-6 right-6 z-20 hidden xl:block">
-          <div className="bg-white/90 backdrop-blur-xl border border-white/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300">
-            <LanguageSelector />
-          </div>
-        </div>
 
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8 xl:py-12 relative z-10">
           {error && (
@@ -234,7 +230,9 @@ export default function AnalyticsPage() {
                   <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                   <div>
                     <div className="text-xs sm:text-sm text-gray-600">{t.analytics.records}</div>
-                    <div className="text-lg sm:text-2xl font-bold text-gray-900">{stats.totalRecords}</div>
+                    <div className="text-lg sm:text-2xl font-bold text-gray-900">
+                      {loading ? '…' : stats.totalRecords}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -335,7 +333,9 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Estadísticas generales */}
+          {showData && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-12">
+            {insulinData.length > 0 && (
             <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -350,7 +350,9 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+            )}
 
+            {foodData.length > 0 && (
             <div className="relative bg-white/90 backdrop-blur-sm border border-green-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -365,7 +367,9 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+            )}
 
+            {exerciseData.length > 0 && (
             <div className="relative bg-white/90 backdrop-blur-sm border border-orange-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -380,7 +384,9 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+            )}
 
+            {moodData.length > 0 && (
             <div className="relative bg-white/90 backdrop-blur-sm border border-pink-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -395,10 +401,14 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+            )}
           </div>
+          )}
 
           {/* Estadísticas adicionales */}
+          {showData && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            {periodData.length > 0 && (
             <div className="relative bg-white/90 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -413,6 +423,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+            )}
 
             <div className="relative bg-white/90 backdrop-blur-sm border border-indigo-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
               <div className="flex items-center">
@@ -429,6 +440,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
+            {stats.lastActivity && (
             <div className="relative bg-white/90 backdrop-blur-sm border border-red-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -439,16 +451,23 @@ export default function AnalyticsPage() {
                 <div className="ml-4">
                   <h3 className="text-lg font-medium text-slate-800">{t.dashboard.lastActivity}</h3>
                   <p className="text-xl font-bold text-red-600">
-                    {stats.lastActivity ? 
-                      new Date(stats.lastActivity).toLocaleDateString('es-ES') : 
-                      'N/A'
-                    }
+                    {new Date(stats.lastActivity).toLocaleDateString(locale)}
                   </p>
                   <p className="text-sm text-slate-600">{t.analytics.mostRecentDate}</p>
                 </div>
               </div>
             </div>
+            )}
           </div>
+          )}
+
+          {!loading && error === null && !hasAnyData && (
+            <div className="relative mb-6 rounded-2xl border border-slate-200 bg-white/90 p-10 text-center shadow-xl">
+              <BarChart3 className="mx-auto mb-4 h-12 w-12 text-slate-400" />
+              <h2 className="text-2xl font-bold text-gray-900">{t.overview.noDataTitle}</h2>
+              <p className="mx-auto mt-3 max-w-2xl text-gray-600">{t.overview.noDataDescription}</p>
+            </div>
+          )}
 
           {/* Gráficos */}
           {loading ? (
@@ -458,7 +477,7 @@ export default function AnalyticsPage() {
                 <p className="text-slate-700 text-lg font-medium">{t.dashboard.loadingData}</p>
               </div>
             </div>
-          ) : (
+          ) : showData ? (
             <div className="space-y-8">
               {/* Gráfico de actividad general */}
               <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
@@ -591,12 +610,12 @@ export default function AnalyticsPage() {
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
                             formatter={(value) => [
-                              `${value} registros`, 
-                              'Tipo de Comida'
+                              `${value} ${t.analytics.records}`,
+                              t.analytics.mealType
                             ]}
-                            labelFormatter={(label) => `Tipo: ${label}`}
+                            labelFormatter={(label) => `${t.analytics.type}: ${label}`}
                           />
-                          <Bar dataKey="value" fill="#10B981" name="Registros de Comida" />
+                          <Bar dataKey="value" fill="#10B981" name={t.analytics.registeredMeals} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -645,12 +664,12 @@ export default function AnalyticsPage() {
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
                             formatter={(value) => [
-                              `${value} inyecciones`, 
-                              'Cantidad'
+                              `${value} ${t.analytics.injections}`,
+                              t.analytics.quantity
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Bar dataKey="count" fill="#3B82F6" name="Inyecciones de Insulina" />
+                          <Bar dataKey="count" fill="#3B82F6" name={t.analytics.insulinInjections} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -931,7 +950,7 @@ export default function AnalyticsPage() {
                 )}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </ProtectedRoute>

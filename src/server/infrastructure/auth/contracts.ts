@@ -51,6 +51,12 @@ export interface EmailAuthTransport {
 
 export interface AuthUserStore {
   findByUsername(username: string): Promise<AuthCredentialUser | null>;
+  /**
+   * All rows whose `Username` equals the normalized identity after trim, NFC
+   * and lower case. It returns up to three rows so callers can detect an
+   * ambiguous link instead of silently choosing one account.
+   */
+  findByNormalizedUsername(username: string): Promise<readonly User[]>;
   findByUserId(id: string): Promise<User | null>;
   findByUuid(uuid: string): Promise<User | null>;
 }

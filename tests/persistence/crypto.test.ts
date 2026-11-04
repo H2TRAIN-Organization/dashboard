@@ -42,6 +42,13 @@ describe("AES-256-CBC legacy decryption", () => {
     );
   });
 
+  it.each([32, 64])("preserves a legitimate %i-character hexadecimal plaintext instead of aborting a global read", (length) => {
+    const plaintext = "a".repeat(length);
+    const iv = ivHex(20 + length);
+    const ciphertext = encryptText(plaintext, CURRENT_KEY, iv);
+    expect(decryptor().decryptText(ciphertext, iv, "exercisedata.exercise_description")).toBe(plaintext);
+  });
+
   it("strips __PLAIN__ even without an IV", () => {
     expect(
       decryptor().decryptText("__PLAIN__plain text", null, "mooddata.notes"),

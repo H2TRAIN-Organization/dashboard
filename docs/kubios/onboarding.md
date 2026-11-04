@@ -10,7 +10,7 @@ lo que debe verificarse, no autoriza cambios en producción.
 ```text
 Admin crea cuenta en /users
   -> public.users (UserID, Username, PasswordHash bcrypt, role)
-  -> la persona entra por /app-login con Username + contraseña
+  -> la persona entra por /login con Username + contraseña
   -> sesión HttpOnly compartida por SessionContext
 
 Persona queda en el equipo Kubios con resultados compartidos
@@ -28,7 +28,7 @@ tampoco crea su cuenta del dashboard.
 | Identificador | Dónde vive | Para qué sirve |
 |---|---|---|
 | `UserID` | `public.users`, entero | Identidad estable de la cuenta del dashboard. Es el valor que usa el vínculo Kubios y el CLI. |
-| `Username` | `public.users` | Nombre con el que se inicia sesión en `/app-login`. Puede tener forma de correo, pero sigue siendo un usuario, no un email de Supabase Auth. |
+| `Username` | `public.users` | Nombre con el que se inicia sesión en `/login`. Puede tener forma de correo y conserva su credencial antigua. `/app-login` redirige al formulario común. |
 | `PasswordHash` | `public.users` | Hash bcrypt generado en el servidor. No se muestra ni se devuelve a la interfaz. |
 | `UUID` | `public.users` | Columna heredada. El código Kubios actual no la usa como vínculo; no la interpretes como identidad de Auth ni como `team_user_id`. |
 | `team_id` | Kubios | UUID del equipo. Debe ser el equipo autorizado `Diabetes Tracker - H2TRAIN` (o el fijado explícitamente en `KUBIOS_TEAM_ID`). |
@@ -61,8 +61,9 @@ habitual ni autoriza a desactivar esas protecciones en futuras operaciones.
 
 | Ruta | Método | Credencial | Cuándo se usa |
 |---|---|---|---|
-| `/app-login` | `username` | `Username` + contraseña contra `public.users`, verificada con bcrypt en el servidor | Cuentas creadas desde `/users`. Es el acceso habitual de este flujo. |
-| `/login` | `email` | Email + contraseña contra Supabase Auth | Solo si existe una identidad de Supabase Auth y un vínculo explícito en `app_metadata` (`role` y `app_user_id`) o un resolvedor verificado inyectado por el servidor. No lo crea `/users`. |
+| `/login` | `username` | `Username` + contraseña contra `public.users`, verificada con bcrypt en el servidor | Cuentas creadas desde `/users`; admite también nombres con forma de correo. |
+| `/login` | `email` | Email + contraseña contra Supabase Auth | Identidad confirmada y vínculo administrado válido, o coincidencia única del correo confirmado con `users.Username`. El rol procede de `users`. |
+| `/app-login` | — | Redirección a `/login` | Compatibilidad con enlaces antiguos. |
 
 Ambos modos terminan en la misma cookie HttpOnly `dashboard_session` y en
 `SessionContext`; el método (`username` o `email`) decide qué contexto de la UI
@@ -70,12 +71,13 @@ expone la sesión. `public.users` no tiene columna `Email`: un correo usado como
 `Username` es solo el texto de esa columna. El registro público no está
 disponible.
 
-Si el `Username` tiene forma de correo, se escribe **tal cual** en el campo
-`usuario` de `/app-login`, respetando mayúsculas y minúsculas. No se usa
-`/login` por el hecho de que el texto parezca un email. El login por email exige
-una identidad de Supabase Auth con metadatos explícitos; sin ese vínculo falla
-cerrado. Configurarlo queda fuera de esta guía y no debe improvisarse desde
-`/users`.
+El formulario común tiene un único campo de correo o nombre de participante.
+Si el nombre contiene `@`, el servidor resuelve las credenciales de email y
+legacy, conserva el método realmente autenticado y deniega identidades
+ambiguas. La UI no reintenta otro método tras una denegación. Un vínculo
+administrado roto no se sustituye silenciosamente por otro usuario.
+`user_metadata` y `localStorage` nunca conceden permisos. El inicio común es
+`/`; `/app-dashboard` redirige a él.
 
 En el alta desde `/users` no hay:
 
@@ -264,8 +266,9 @@ Estado de las piezas en esta revisión:
   cada sesión resuelve únicamente su propio `UserID` y su propio vínculo.
 - La página `/users` usa un guard que, sin sesión, redirige a `/login`. Las
   cuentas creadas aquí no crean identidad de Supabase Auth; su acceso es por
-  `/app-login`. Si ocurre esa redirección, vuelve a `/app-login`. Esto no cambia
-  la autorización de la API.
+  el mismo `/login` mediante su nombre de participante y contraseña. El
+  acceso de lectura y las acciones de escritura dependen del rol real de la
+  sesión y de la autorización del servidor.
 - No hay recuperación de contraseña en la UI/API ni activación por correo para
   las cuentas creadas desde `/users`. No prometas esos pasos ni los sustituyas
   por un alta nueva.
@@ -285,8 +288,8 @@ Estado de las piezas en esta revisión:
   `UserID` y bcrypt en servidor.
 - `src/contexts/SessionContext.tsx`, `AppAuthContext.tsx` y `AuthContext.tsx` —
   sesión única y modos `username`/`email`.
-- `src/app/app-login/page.tsx` y `src/app/login/page.tsx` — rutas reales de cada
-  modo.
+- `src/app/login/page.tsx` y `src/app/app-login/page.tsx` — formulario común y
+  redirección de compatibilidad.
 - `src/server/infrastructure/auth/README.md` — contrato de email, metadatos y
   bcrypt.
 - `scripts/kubios-link.mjs` — `show`, `set` y `revoke`.

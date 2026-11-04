@@ -92,16 +92,16 @@ export function createDataUseCases(
       actor: ActiveActor,
       query: DataQuery,
     ): Promise<DecryptedData> {
-      // Server-side normalization is the security boundary. Regular users are
-      // always scoped to their literal username, even when that username is the
-      // legacy value "all". Only privileged roles may turn the HTTP "all" UI
-      // sentinel into a null (global) repository query.
-      const selectedUser =
-        actor.role === "user"
-          ? actor.username
-          : query.selectedUser === "all"
-            ? null
-            : query.selectedUser;
+      // Server-side normalization is the security boundary. Any actor without
+      // the `health-data:read:all` capability is always scoped to their literal
+      // username, even when that username is the legacy value "all". Only
+      // privileged roles may turn the HTTP "all" UI sentinel into a null
+      // (global) repository query.
+      const selectedUser = canReadAllHealthData(actor)
+        ? query.selectedUser === "all"
+          ? null
+          : query.selectedUser
+        : actor.username;
 
       return repository.getDecryptedData(
         resolveDataQuery(query, selectedUser, clock.now()),

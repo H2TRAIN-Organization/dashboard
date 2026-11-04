@@ -235,14 +235,26 @@ export const authApi = {
 }
 
 export const usersApi = {
-  async list(query: UserListQuery = {}): Promise<{ users: User[]; total: number }> {
+  async list(
+    query: UserListQuery = {},
+    options: { signal?: AbortSignal } = {},
+  ): Promise<{ users: User[]; total: number }> {
+    // DR17 contract: `page`/`pageSize` and `limit`/`offset` are mutually
+    // exclusive. Prefer the explicit page contract and only fall back to the
+    // legacy aliases when no page was requested.
+    const usesPagePagination =
+      query.page !== undefined || query.pageSize !== undefined
+    const pagination = usesPagePagination
+      ? { page: query.page, pageSize: query.pageSize }
+      : { limit: query.limit, offset: query.offset }
+
     const raw = await apiRequest<unknown>(
       `/api/users${buildQuery({
         search: query.search,
         role: query.role,
-        limit: query.limit,
-        offset: query.offset,
+        ...pagination,
       })}`,
+      { signal: options.signal },
     )
     return mapUserList(raw)
   },

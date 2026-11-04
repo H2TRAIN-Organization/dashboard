@@ -57,6 +57,12 @@ export class TestAuthGateway implements AuthGateway {
     return account === undefined ? null : this.sessionFor(account, method);
   }
 
+  async hasLegacyUsername(username: string): Promise<boolean> {
+    return this.accounts.some(
+      (account) => account.method === "username" && account.user.username === username,
+    );
+  }
+
   async getSession(token: string): Promise<Session | null> {
     if (this.revoked.has(token)) {
       return null;

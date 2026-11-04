@@ -87,7 +87,9 @@ function failInfrastructure(error: unknown): never {
 /**
  * AuthGateway implementation:
  * - email: Supabase password grant + getUser() verification + explicit
- *   app_metadata link (or an injected verified link resolver).
+ *   app_metadata link, an injected verified link resolver, or a single exact
+ *   normalized public.users.Username match for the confirmed email. Ambiguous
+ *   or conflicting links fail closed; the role always comes from public.users.
  * - username: legacy public.users PasswordHash + bcrypt comparison.
  * - sessions: AES-256-GCM opaque token, persistent sid registry, role reloaded
  *   from public.users on every getSession.
@@ -167,8 +169,45 @@ export function createAuthGateway(
   }
 
   async function resolveEmailUser(identity: VerifiedEmailUser): Promise<User> {
+    const rawAppUserId = identity.appMetadata.app_user_id;
+    // `null`/absent means no explicit link; an empty or non-scalar non-null
+    // value is a malformed link and is denied below.
+    const hasExplicitAppUserId =
+      rawAppUserId !== undefined && rawAppUserId !== null;
     const appUserId = readMetadataString(identity.appMetadata, "app_user_id");
     const appRole = readMetadataRole(identity.appMetadata);
+    if (hasExplicitAppUserId && appUserId === null) {
+      throw new AuthConfigurationError(
+        "app_metadata.app_user_id está presente pero no es un identificador válido.",
+      );
+    }
+
+    // Conservative server-side link: a confirmed email may match exactly one
+    // legacy Username after trim/NFC/lower-case normalization. Zero or several
+    // matches are never guessed. The persisted Username and role come from
+    // public.users, never from user-editable metadata.
+    let usernameMatches: readonly User[] = [];
+    try {
+      usernameMatches = await users.findByNormalizedUsername(identity.email);
+    } catch (error) {
+      failInfrastructure(error);
+    }
+    if (usernameMatches.length > 1) {
+      throw new AuthConfigurationError(
+        "El email confirmado coincide con varios usuarios de public.users; vínculo ambiguo.",
+      );
+    }
+    const uniqueByUsername = usernameMatches[0] ?? null;
+
+    // The legacy UUID column is not an identity link by itself, but it must not
+    // point at a different account than the verified Auth identity: the seed
+    // script treats that as a conflict and login must fail closed as well.
+    let uuidUser: User | null = null;
+    try {
+      uuidUser = await users.findByUuid(identity.authUserId);
+    } catch (error) {
+      failInfrastructure(error);
+    }
 
     if (appUserId !== null) {
       if (appRole === null) {
@@ -188,6 +227,18 @@ export function createAuthGateway(
       if (linkedUser === null) {
         throw new AuthConfigurationError(
           "app_metadata.app_user_id no corresponde a ningún usuario de public.users.",
+        );
+      }
+      // An explicit link that contradicts the unique username match is a
+      // conflict, not a preference. Fail closed instead of choosing a role.
+      if (uniqueByUsername !== null && uniqueByUsername.id !== linkedUser.id) {
+        throw new AuthConfigurationError(
+          "app_metadata.app_user_id entra en conflicto con la coincidencia única de public.users.Username.",
+        );
+      }
+      if (uuidUser !== null && uuidUser.id !== linkedUser.id) {
+        throw new AuthConfigurationError(
+          "public.users.UUID apunta a un usuario distinto del vínculo de Auth.",
         );
       }
       if (linkedUser.role !== appRole) {
@@ -222,11 +273,30 @@ export function createAuthGateway(
           "El vínculo verificado apunta a un usuario inexistente en public.users.",
         );
       }
+      if (uniqueByUsername !== null && uniqueByUsername.id !== linkedUser.id) {
+        throw new AuthConfigurationError(
+          "El vínculo verificado entra en conflicto con la coincidencia única de public.users.Username.",
+        );
+      }
+      if (uuidUser !== null && uuidUser.id !== linkedUser.id) {
+        throw new AuthConfigurationError(
+          "public.users.UUID apunta a un usuario distinto del vínculo verificado.",
+        );
+      }
       return { ...linkedUser, email: identity.email };
     }
 
+    if (uniqueByUsername !== null) {
+      if (uuidUser !== null && uuidUser.id !== uniqueByUsername.id) {
+        throw new AuthConfigurationError(
+          "public.users.UUID y la coincidencia única de Username apuntan a usuarios distintos.",
+        );
+      }
+      return { ...uniqueByUsername, email: identity.email };
+    }
+
     throw new AuthConfigurationError(
-      "La identidad de email no tiene vínculo explícito. Configure app_metadata.role y app_metadata.app_user_id (o un resolvedor verificado) antes de habilitar el login por email.",
+      "La identidad de email no tiene un vínculo único con public.users.Username. Configure app_metadata.role y app_metadata.app_user_id (o un resolvedor verificado) antes de habilitar el login por email.",
     );
   }
 
@@ -327,6 +397,18 @@ export function createAuthGateway(
       const session = await issueSession(credential.user, "username");
       await resetLimit(limitKey);
       return session;
+    },
+
+    async hasLegacyUsername(username: string): Promise<boolean> {
+      const normalized = normalizeUsername(username);
+      if (normalized.length === 0) {
+        return false;
+      }
+      try {
+        return (await users.findByUsername(normalized)) !== null;
+      } catch (error) {
+        return failInfrastructure(error);
+      }
     },
 
     async getSession(token: string): Promise<Session | null> {

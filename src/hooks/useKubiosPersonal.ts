@@ -8,11 +8,15 @@ import {
   classifyKubiosError,
   fetchKubiosHrvResults,
   fetchKubiosMe,
+  isKubiosDataStatus,
+  isKubiosPersonalVisible,
+  sortKubiosResults,
   type KubiosDateFilter,
   type KubiosErrorKind,
   type KubiosHrvResults,
   type KubiosLatestResult,
   type KubiosMe,
+  type KubiosStatus,
 } from '@/lib/kubios-personal'
 
 export type KubiosPhase = 'idle' | 'loading' | 'data' | 'error'
@@ -241,6 +245,181 @@ export function useKubiosHrvResults(filter: KubiosDateFilter) {
         : isCurrent
           ? { phase: state.phase, data: state.data, error: state.error }
           : { phase: 'loading', data: null, error: null }
+
+  return { view, reload }
+}
+
+export type KubiosPersonalSource = 'results' | 'summary' | 'none'
+
+export type KubiosErrorTranslationKey =
+  | 'sessionExpired'
+  | 'serviceUnavailable'
+  | 'invalidDateRange'
+  | 'invalidResponse'
+  | 'loadError'
+
+/** Misma traducción de error para la tarjeta y la vista /kubios. */
+export function kubiosErrorTranslationKey(
+  error: KubiosErrorKind | null,
+): KubiosErrorTranslationKey {
+  switch (error) {
+    case 'unauthorized':
+      return 'sessionExpired'
+    case 'unavailable':
+      return 'serviceUnavailable'
+    case 'invalid-query':
+      return 'invalidDateRange'
+    case 'contract':
+      return 'invalidResponse'
+    default:
+      return 'loadError'
+  }
+}
+
+/**
+ * Estado único que consumen la tarjeta y la vista /kubios. La lista de
+ * resultados manda cuando existe; si falla, se conserva el resumen de /me
+ * (recuento y última medición) junto al error, sin presentarlo como una serie
+ * completa. Los estados vacío, pendiente y sin vincular no se rellenan con el
+ * resumen de otra respuesta.
+ */
+export interface KubiosPersonalView {
+  phase: KubiosPhase
+  status: KubiosStatus | null
+  results: KubiosLatestResult[]
+  latest: KubiosLatestResult | null
+  measurementCount: number
+  syncedAt: string | null
+  /** Error de la serie de resultados; puede convivir con un resumen en caché. */
+  error: KubiosErrorKind | null
+  source: KubiosPersonalSource
+  available: boolean
+  hasResults: boolean
+  stale: boolean
+}
+
+function emptyPersonalView(phase: KubiosPhase): KubiosPersonalView {
+  return {
+    phase,
+    status: null,
+    results: [],
+    latest: null,
+    measurementCount: 0,
+    syncedAt: null,
+    error: null,
+    source: 'none',
+    available: false,
+    hasResults: false,
+    stale: false,
+  }
+}
+
+export function deriveKubiosPersonalView(
+  me: KubiosMeView,
+  hrv: KubiosResultsView,
+  filterActive: boolean,
+): KubiosPersonalView {
+  const meData = me.phase === 'data' ? me.data : null
+  const summaryData =
+    meData !== null &&
+    isKubiosPersonalVisible(meData.status, meData.measurement_count)
+      ? meData
+      : null
+  const resultsData = hrv.phase === 'data' ? hrv.data : null
+
+  if (resultsData !== null) {
+    const status = resultsData.status
+    const results = sortKubiosResults(resultsData.results)
+    // El resumen global solo completa el estado de datos (ready/stale); un
+    // estado vacío/pendiente/sin vincular no se convierte en una serie falsa.
+    const summary =
+      summaryData !== null && isKubiosDataStatus(status) ? summaryData : null
+    const measurementCount = filterActive
+      ? results.length
+      : summary !== null
+        ? summary.measurement_count
+        : results.length
+    const latest = filterActive
+      ? (results[0] ?? null)
+      : ((summary?.latest_result ?? null) ?? results[0] ?? null)
+    const syncedAt = resultsData.synced_at ?? summary?.synced_at ?? null
+
+    return {
+      phase: 'data',
+      status,
+      results,
+      latest,
+      measurementCount,
+      syncedAt,
+      error: null,
+      source:
+        results.length > 0 ? 'results' : summary !== null ? 'summary' : 'none',
+      available: isKubiosPersonalVisible(status, measurementCount),
+      hasResults: results.length > 0,
+      stale: status === 'stale',
+    }
+  }
+
+  if (hrv.phase === 'error') {
+    // /me is an unfiltered snapshot. It cannot stand in for a failed range
+    // query without attributing global measurements to that range.
+    if (summaryData !== null && !filterActive) {
+      const status = summaryData.status
+      return {
+        phase: 'data',
+        status,
+        results: [],
+        latest: summaryData.latest_result,
+        measurementCount: summaryData.measurement_count,
+        syncedAt: summaryData.synced_at,
+        error: hrv.error,
+        source: 'summary',
+        available: isKubiosPersonalVisible(
+          status,
+          summaryData.measurement_count,
+        ),
+        hasResults: false,
+        stale: status === 'stale',
+      }
+    }
+
+    // Mientras /me puede aportar el resumen, no se declara el error definitivo.
+    if (me.phase === 'loading' || me.phase === 'idle') {
+      return emptyPersonalView('loading')
+    }
+
+    return { ...emptyPersonalView('error'), error: hrv.error }
+  }
+
+  if (hrv.phase === 'data') {
+    return { ...emptyPersonalView('error'), error: 'contract' }
+  }
+
+  if (hrv.phase === 'idle' && me.phase === 'idle') {
+    return emptyPersonalView('idle')
+  }
+
+  return emptyPersonalView('loading')
+}
+
+/**
+ * Compone ambos endpoints en una sola vista. La tarjeta y la página usan esta
+ * misma derivación, de modo que la presencia del resumen y el error de la serie
+ * no pueden divergir. Al cambiar de sesión, ambos hooks descartan su estado y
+ * la vista pasa por carga antes de aceptar la identidad nueva.
+ */
+export function useKubiosPersonal(filter: KubiosDateFilter) {
+  const me = useKubiosMe()
+  const hrv = useKubiosHrvResults(filter)
+  const filterActive = filter.from.trim().length > 0 || filter.to.trim().length > 0
+  const view = deriveKubiosPersonalView(me.view, hrv.view, filterActive)
+  const reloadMe = me.reload
+  const reloadResults = hrv.reload
+
+  const reload = useCallback(() => {
+    reloadMe()
+    reloadResults()
+  }, [reloadMe, reloadResults])
 
   return { view, reload }
 }
