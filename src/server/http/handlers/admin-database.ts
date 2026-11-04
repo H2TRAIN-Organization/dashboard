@@ -29,7 +29,7 @@ export function createAdminDatabaseHttpHandlers(
       return handle(async () => {
         const actor = await requireActor(auth, input.sessionToken);
         const query = parseInput(databaseTableQuerySchema, input.query);
-        const result = await adminDatabase.getTableData(actor, query.table, query.limit);
+        const result = await adminDatabase.getTableData(actor, query.table, query.limit, query.offset);
         return jsonResult(200, { success: true, ...result });
       });
     },

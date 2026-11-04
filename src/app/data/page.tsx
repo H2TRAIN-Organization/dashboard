@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { useState, useEffect, useCallback, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
@@ -859,6 +861,13 @@ export default function DataPage() {
         </div>
         
         <Navigation title={isIndividualUser ? t.dashboard.healthData : t.dashboard.healthData} showBackButton={true} />
+        {currentRole === 'admin' && (
+          <div className="relative z-10 mx-auto max-w-7xl px-4 pt-6">
+            <Link href="/admin/kubios" className="inline-flex rounded-xl bg-indigo-700 px-5 py-3 font-semibold text-white hover:bg-indigo-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700">
+              {t.navigation.adminKubios}
+            </Link>
+          </div>
+        )}
         
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8 xl:py-12 relative z-10">
           {/* Header con estadísticas */}

@@ -5,5 +5,5 @@ import type {
 
 export interface AdminDatabaseRepository {
   listTables(): Promise<DatabaseTablesResult>;
-  getTableData(tableName: string, limit: number): Promise<DatabaseTablePage>;
+  getTableData(tableName: string, limit: number, offset?: number): Promise<DatabaseTablePage>;
 }

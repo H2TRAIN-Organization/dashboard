@@ -1,3 +1,4 @@
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../src/lib/privacy-policy'
 import { expect, test, type Page } from '@playwright/test'
 
 /**
@@ -85,6 +86,7 @@ test.describe('Kubios personal UI', () => {
           },
           method: 'email',
           expiresAt: '2026-11-04T10:00:00.000Z',
+          privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' },
         }),
       })
     })

@@ -1,0 +1,16 @@
+$kind: http-request
+name: '14c-admin-kubios'
+method: GET
+url: '{{baseUrl}}/api/admin/kubios/participants?page=1&pageSize=10'
+order: 14300
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('expected status', () => pm.response.to.have.status(200));
+      pm.test('contract', () => pm.expect(pm.response.json().participants).to.be.an('array'));
+    language: text/javascript
+settings:
+  disableCookies: true

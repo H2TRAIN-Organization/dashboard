@@ -1,3 +1,4 @@
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../src/lib/privacy-policy'
 import { expect, test, type Page } from '@playwright/test'
 
 /**
@@ -124,6 +125,7 @@ function sessionBody(user: SyntheticUser) {
     user,
     method: 'username',
     expiresAt: '2099-01-01T00:00:00.000Z',
+    privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' },
   }
 }
 

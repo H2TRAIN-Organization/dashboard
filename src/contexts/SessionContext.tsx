@@ -12,6 +12,7 @@ import {
 } from 'react'
 import { ApiError, authApi, errorFrom } from '@/lib/api-client'
 import type { ClientSession, LoginInput } from '@/lib/api-types'
+import { initialPrivacyStatus } from '@/server/domain/privacy'
 
 interface SessionContextType {
   session: ClientSession | null
@@ -82,9 +83,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       store.set({ session: null, error: null, loading: false })
     }
     window.addEventListener('auth:unauthorized', handleUnauthorized)
+    const handlePrivacyRequired = () => {
+      const current = store.getSnapshot().session
+      if (current) store.set({ session: { ...current, privacy: initialPrivacyStatus() } })
+    }
+    window.addEventListener('privacy:required', handlePrivacyRequired)
     return () => {
       mountedRef.current = false
       window.removeEventListener('auth:unauthorized', handleUnauthorized)
+      window.removeEventListener('privacy:required', handlePrivacyRequired)
     }
   }, [store])
 

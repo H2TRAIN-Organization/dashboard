@@ -19,6 +19,7 @@ scripts:
   - type: afterResponse
     code: |-
       const body = pm.response.json();
+      pm.collectionVariables.set('privacy_version', body.privacy.policyVersion);
       pm.test('login is 200', () => pm.response.to.have.status(200));
       pm.test('username method and no token', () => {
         pm.expect(body.method).to.eql('username');

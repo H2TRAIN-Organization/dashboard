@@ -6,6 +6,7 @@ import { AppAuthProvider } from "@/contexts/AppAuthContext";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import GlobalLanguageSelector from "@/components/GlobalLanguageSelector";
+import PrivacyBoundary from '@/components/privacy/PrivacyBoundary';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -33,7 +34,7 @@ export default function RootLayout({
           <SessionProvider>
             <AuthProvider>
               <AppAuthProvider>
-                {children}
+                <PrivacyBoundary>{children}</PrivacyBoundary>
                 <GlobalLanguageSelector />
               </AppAuthProvider>
             </AuthProvider>

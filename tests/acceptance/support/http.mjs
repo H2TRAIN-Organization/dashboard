@@ -82,11 +82,28 @@ export async function request(path, options = {}) {
 }
 
 export async function loginEmail(email, password) {
-  return request("/api/auth/login", { method: "POST", body: { email, password } });
+  const result = await request("/api/auth/login", { method: "POST", body: { email, password } });
+  if (result.status === 200) await acknowledgePrivacy(result.cookie, result.body.privacy);
+  return result;
 }
 
 export async function loginUsername(username, password) {
-  return request("/api/auth/login", { method: "POST", body: { username, password } });
+  const result = await request("/api/auth/login", { method: "POST", body: { username, password } });
+  if (result.status === 200) await acknowledgePrivacy(result.cookie, result.body.privacy);
+  return result;
+}
+
+/** Existing feature regressions run after the actor explicitly accepts both notices.
+ * Privacy tests use request('/api/auth/login', ...) directly to inspect the gate.
+ */
+export async function acknowledgePrivacy(cookie, privacy) {
+  for (const surface of ['login', 'banner']) {
+    const result = await request('/api/privacy/decision', {
+      method: 'POST', cookie,
+      body: { policyVersion: privacy.policyVersion, surface, decision: 'accept', language: 'es', requestId: crypto.randomUUID() },
+    });
+    if (result.status !== 200) throw new Error(`Privacy ${surface} acknowledgment failed: ${result.status}`);
+  }
 }
 
 export function session(cookie) {

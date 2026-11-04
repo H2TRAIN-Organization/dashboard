@@ -216,6 +216,15 @@ export default function DashboardPage() {
     ...(canViewAdmin
       ? [
           {
+            href: '/admin/kubios',
+            title: t.navigation.adminKubios,
+            description: t.navigation.adminKubios,
+            action: t.dashboard.access,
+            icon: Activity,
+            iconClass: 'from-indigo-600 to-indigo-700',
+            accentClass: 'hover:border-indigo-300/70',
+          },
+          {
             href: '/admin',
             title: t.dashboard.administration,
             description: t.dashboard.administrationDescription,

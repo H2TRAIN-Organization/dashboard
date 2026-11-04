@@ -6,7 +6,7 @@ const testDir = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   testDir,
-  testMatch: 'frontend-real.spec.mjs',
+  testMatch: ['frontend-real.spec.mjs', 'frontend-admin-study-privacy.spec.mjs'],
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

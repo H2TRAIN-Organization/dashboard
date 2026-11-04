@@ -1,4 +1,5 @@
-import { UnauthorizedError, ValidationError } from "@/server/domain/errors";
+import { ServiceUnavailableError, UnauthorizedError, ValidationError } from "@/server/domain/errors";
+import type { PrivacyDecision, PrivacyDecisionResult } from '@/server/domain/privacy';
 import type { Session } from "@/server/domain/session";
 import { USERNAME_MAX_LENGTH } from "@/server/domain/user";
 import type { AuthGateway } from "../ports/auth-gateway";
@@ -8,6 +9,7 @@ export type LoginCommand =
   | { readonly kind: "username"; readonly username: string; readonly password: string };
 
 export interface AuthUseCases {
+  decidePrivacy?(token: string, decision: PrivacyDecision): Promise<PrivacyDecisionResult>;
   login(command: LoginCommand): Promise<Session>;
   getSession(token: string): Promise<Session>;
   logout(token: string): Promise<void>;
@@ -24,6 +26,11 @@ async function revokeQuietly(auth: AuthGateway, token: string): Promise<void> {
 
 export function createAuthUseCases(auth: AuthGateway): AuthUseCases {
   return {
+    async decidePrivacy(token, decision) {
+      if (!token) throw new UnauthorizedError();
+      if (!auth.decidePrivacy) throw new ServiceUnavailableError();
+      return auth.decidePrivacy(token, decision);
+    },
     async login(command: LoginCommand): Promise<Session> {
       if (command.password.length === 0) {
         throw new ValidationError("La contraseña es obligatoria");

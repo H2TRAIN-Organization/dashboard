@@ -8,6 +8,8 @@ export interface Translations {
     users: string
     data: string
     kubios: string
+    adminKubios: string
+    privacy: string
     analytics: string
     study: string
     admin: string
@@ -728,6 +730,8 @@ export const translations: Record<Language, Translations> = {
       users: 'Usuarios',
       data: 'Datos',
       kubios: 'Kubios',
+      adminKubios: 'Kubios de participantes',
+      privacy: 'Política de privacidad',
       analytics: 'Analítica',
       study: 'Estudio',
       admin: 'Admin',
@@ -1421,6 +1425,8 @@ export const translations: Record<Language, Translations> = {
       users: 'Users',
       data: 'Data',
       kubios: 'Kubios',
+      adminKubios: 'Participant Kubios data',
+      privacy: 'Privacy policy',
       analytics: 'Analytics',
       study: 'Study',
       admin: 'Admin',

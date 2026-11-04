@@ -33,28 +33,28 @@ export default function HybridNavigation({ title, showBackButton = true }: Hybri
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%230066CC%22%20fill-opacity%3D%220.1%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%221%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-30"></div>
       
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-6">
-          <div className="flex items-center space-x-6">
+        <div className="flex min-w-0 flex-col gap-5 py-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-6">
             {showBackButton && (
-              <Link href={backHref} className="group">
+              <Link href={backHref} className="group shrink-0" aria-label={t.navigation.dashboard}>
                 <div className="relative bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-2xl shadow-lg group-hover:shadow-blue-500/50 transition-all duration-300 transform group-hover:scale-110">
                   <ArrowLeft className="h-6 w-6 text-white group-hover:h-7 group-hover:w-7 transition-all duration-300 relative z-10" />
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-400/30 to-blue-500/30 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </div>
               </Link>
             )}
-            <div className="flex items-center space-x-6">
+            <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
               {/* Logo H2TRAIN - Logo horizontal, muy grande */}
               <Image
                 src="/logo-horizontal.png"
                 alt="H2TRAIN Logo"
                 width={1050}
                 height={425}
-                className="h-16 w-auto rounded-xl shadow-xl"
+                className="h-auto w-40 max-w-full shrink-0 rounded-xl shadow-xl sm:h-16 sm:w-auto"
                 style={{ maxWidth: '300px', maxHeight: '64px' }}
               />
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-white">
+              <div className="min-w-0">
+                <h1 className="break-words text-xl font-bold text-white md:text-3xl">
                   {title}
                 </h1>
                 <div className="flex items-center space-x-2 mt-1">
@@ -65,16 +65,16 @@ export default function HybridNavigation({ title, showBackButton = true }: Hybri
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-4 bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-sm border border-white/30 px-6 py-3 rounded-2xl hover:border-white/40 transition-all duration-300">
-              <div className="relative">
+          <div className="flex min-w-0 items-center gap-3 lg:shrink-0">
+            <div className="flex min-w-0 flex-1 items-center gap-3 bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-sm border border-white/30 px-3 py-3 rounded-2xl hover:border-white/40 transition-all duration-300 sm:px-6">
+              <div className="relative shrink-0">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
                   <User className="h-5 w-5 text-white" />
                 </div>
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-blue-300 to-blue-400 rounded-full border-2 border-blue-600"></div>
               </div>
-              <div className="text-sm">
-                <p className="font-semibold text-white">
+              <div className="min-w-0 text-sm">
+                <p className="break-all font-semibold text-white">
                   {user?.email || user?.username}
                 </p>
                 <div className="flex items-center space-x-1">
@@ -99,6 +99,10 @@ export default function HybridNavigation({ title, showBackButton = true }: Hybri
             </button>
           </div>
         </div>
+      </div>
+      <div className="relative mx-auto flex max-w-7xl flex-wrap gap-4 px-4 pb-3 text-sm text-white">
+        <Link href="/privacy" className="underline underline-offset-4">{t.navigation.privacy}</Link>
+        {userRole === 'admin' && <Link href="/admin/kubios" className="underline underline-offset-4">{t.navigation.adminKubios}</Link>}
       </div>
     </div>
   )

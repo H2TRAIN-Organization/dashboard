@@ -296,6 +296,7 @@ export function createAuthRuntime(options: AuthRuntimeOptions): AuthRuntime {
     passwords,
     email: emailTransport,
     sessions: store,
+    privacy: store,
     limiter: store,
     tokens,
     clock,

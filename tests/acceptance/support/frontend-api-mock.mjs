@@ -1,3 +1,4 @@
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../../src/lib/privacy-policy.ts'
 /**
  * Per-test synthetic API for the frontend mock suite only. It never replaces
  * the backend-real suite and records external attempts for the test teardown.
@@ -73,7 +74,7 @@ export function installFrontendApiMock(page, options = {}) {
   }
 
   function sessionBody(user, method) {
-    return { user, method, expiresAt: '2099-01-01T00:00:00.000Z' };
+    return { user, method, expiresAt: '2099-01-01T00:00:00.000Z', privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' } };
   }
 
   async function handle(route) {

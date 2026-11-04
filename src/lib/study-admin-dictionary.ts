@@ -1,0 +1,26 @@
+export const studyAdminDictionary = {
+  es: {
+    study: 'Estudio', kubios: 'Kubios · Administración', search: 'Buscar participante / UserID', from: 'Desde', to: 'Hasta', status: 'Estado', all: 'Todos',
+    loading: 'Cargando datos…', error: 'No se pudieron cargar los datos.', retry: 'Reintentar', empty: 'Sin mediciones',
+    previous: 'Anterior', next: 'Siguiente', detail: 'Ver participante', export: 'Exportar CSV', back: 'Volver a participantes',
+    pending: 'Pendiente de sincronización', ready: 'Disponible', stale: 'Caché desactualizada', partial: 'Datos parciales', unavailable: 'No disponible', restricted: 'Kubios colectivo reservado a administradores',
+    synced: 'Última sincronización', count: 'Mediciones', noData: 'Sin datos suficientes', sample: 'días de persona emparejados', people: 'participantes',
+    durationMood: 'Duración del ejercicio ↔ Estado de ánimo', intensityMood: 'Intensidad del ejercicio ↔ Estado de ánimo', durationRmssd: 'Duración del ejercicio ↔ RMSSD',
+    caveat: 'Asociaciones descriptivas por persona y día UTC. No demuestran causalidad ni son recomendaciones clínicas. Las medidas repetidas no son independientes.',
+    normalization: 'Duración diaria sumada; intensidad, ánimo y Kubios promediados por persona y día UTC. Valores ausentes permanecen sin datos.',
+    excluded: 'Registros excluidos por identidad o fecha no válida', period: 'Periodo', days: 'días', exercise: 'Ejercicio (minutos)', mood: 'Estado de ánimo',
+    source: 'Fuente Kubios', health: 'Registros de salud', participant: 'Participante', date: 'Fecha UTC', details: 'Historial de mediciones', missing: 'Sin fecha',
+  },
+  en: {
+    study: 'Study', kubios: 'Kubios · Administration', search: 'Search participant / UserID', from: 'From', to: 'To', status: 'Status', all: 'All',
+    loading: 'Loading data…', error: 'Data could not be loaded.', retry: 'Retry', empty: 'No measurements',
+    previous: 'Previous', next: 'Next', detail: 'View participant', export: 'Export CSV', back: 'Back to participants',
+    pending: 'Awaiting synchronization', ready: 'Available', stale: 'Outdated cache', partial: 'Partial data', unavailable: 'Unavailable', restricted: 'Collective Kubios data is restricted to administrators',
+    synced: 'Last synchronized', count: 'Measurements', noData: 'Insufficient data', sample: 'matched person-days', people: 'participants',
+    durationMood: 'Exercise duration ↔ Mood', intensityMood: 'Exercise intensity ↔ Mood', durationRmssd: 'Exercise duration ↔ RMSSD',
+    caveat: 'Descriptive associations by person and UTC day. They do not establish causation or provide clinical recommendations. Repeated measurements are not independent.',
+    normalization: 'Daily duration is summed; intensity, mood and Kubios are averaged by person and UTC day. Missing values remain missing.',
+    excluded: 'Records excluded for invalid identity or date', period: 'Period', days: 'days', exercise: 'Exercise (minutes)', mood: 'Mood',
+    source: 'Kubios source', health: 'Health records', participant: 'Participant', date: 'UTC date', details: 'Measurement history', missing: 'Missing date',
+  },
+}

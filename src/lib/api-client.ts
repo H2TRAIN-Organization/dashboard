@@ -124,6 +124,9 @@ export async function apiRequest<T>(
       window.dispatchEvent(new Event('auth:unauthorized'))
     }
     const problem = problemMessage(body, response.status)
+    if (response.status === 403 && problem.code === 'PRIVACY_ACTION_REQUIRED' && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('privacy:required'))
+    }
     throw new ApiError(response.status, problem.code, problem.message, problem.details)
   }
 
@@ -143,6 +146,16 @@ function mapClientSession(raw: unknown, fallbackMethod: 'email' | 'username'): C
     user,
     method,
     expiresAt: asString(raw.expiresAt) ?? '',
+    ...(isRecord(raw.privacy) &&
+      typeof raw.privacy.policyVersion === 'string' &&
+      typeof raw.privacy.policyHash === 'string' &&
+      (raw.privacy.state === 'initial' || raw.privacy.state === 'banner' || raw.privacy.state === 'complete')
+      ? { privacy: {
+          policyVersion: raw.privacy.policyVersion,
+          policyHash: raw.privacy.policyHash,
+          state: raw.privacy.state,
+        } }
+      : {}),
   }
 }
 
@@ -209,6 +222,8 @@ function mapTables(raw: unknown): AdminTablesResponse {
     totalRecords: asNumber(raw.totalRecords) ?? 0,
     accessibleCount: asNumber(raw.accessibleCount) ?? 0,
     totalCount: asNumber(raw.totalCount) ?? tables.length,
+    observedAt: asString(raw.observedAt) ?? undefined,
+    status: raw.status === 'complete' || raw.status === 'partial' || raw.status === 'failed' ? raw.status : undefined,
   }
 }
 
@@ -363,9 +378,9 @@ export const adminApi = {
     return mapTables(raw)
   },
 
-  async getTableData(table: string, limit = 100): Promise<AdminTableDataResponse> {
+  async getTableData(table: string, limit = 100, offset = 0): Promise<AdminTableDataResponse> {
     const raw = await apiRequest<unknown>(
-      `/api/admin/database/table-data${buildQuery({ table, limit })}`,
+      `/api/admin/database/table-data${buildQuery({ table, limit, offset })}`,
     )
     if (!isRecord(raw) || !Array.isArray(raw.data)) {
       contractError('La respuesta de la tabla no incluye el arreglo data')
@@ -377,6 +392,8 @@ export const adminApi = {
       totalRecords: asNumber(raw.totalRecords) ?? 0,
       returnedRecords: asNumber(raw.returnedRecords) ?? raw.data.length,
       limit: asNumber(raw.limit) ?? limit,
+      offset: asNumber(raw.offset) ?? offset,
+      hasMore: raw.hasMore === true,
     }
   },
 }

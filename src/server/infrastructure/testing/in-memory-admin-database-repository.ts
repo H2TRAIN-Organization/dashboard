@@ -31,18 +31,22 @@ export class InMemoryAdminDatabaseRepository implements AdminDatabaseRepository 
     };
   }
 
-  async getTableData(tableName: string, limit: number): Promise<DatabaseTablePage> {
+  async getTableData(tableName: string, limit: number, offset = 0): Promise<DatabaseTablePage> {
     const table = this.tables[tableName];
     if (table === undefined) {
       throw new NotFoundError(`Tabla no encontrada: ${tableName}`);
     }
-    const data = table.records.slice(0, limit);
+    const key = tableName === "users" ? "UserID" : "id";
+    const sorted = [...table.records].sort((a, b) => Number(a[key]) - Number(b[key]));
+    const data = sorted.slice(offset, offset + limit);
     return {
       tableName,
       data,
       totalRecords: table.records.length,
       returnedRecords: data.length,
       limit,
+      offset,
+      hasMore: offset + data.length < table.records.length,
     };
   }
 }

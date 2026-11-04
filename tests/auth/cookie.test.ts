@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { initialPrivacyStatus } from '@/server/domain/privacy';
 import { createAuthCookiePolicy } from "@/server/infrastructure/auth/cookie";
 import { createSessionTokenCodec } from "@/server/infrastructure/auth/session-token";
 import {
@@ -84,6 +85,7 @@ describe("public session DTO", () => {
       expiresAt: EXPIRES,
     });
     expect(dto).toEqual({
+      privacy: initialPrivacyStatus(),
       user,
       method: "email",
       expiresAt: EXPIRES,

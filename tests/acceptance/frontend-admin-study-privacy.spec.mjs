@@ -1,0 +1,92 @@
+import { test, expect } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
+
+const admin = { email: 'admin.acceptance@example.test', password: 'Acceptance-Admin-1!' }
+test.beforeEach(async ({ request }) => {
+  expect((await request.post('http://127.0.0.1:4900/supabase/__reset')).status()).toBe(204)
+})
+async function signIn(page, accept = true) {
+  const login = await page.request.post('/api/auth/login', { data: admin, headers: { Origin: 'http://localhost:4630' } })
+  expect(login.status()).toBe(200)
+  if (accept) {
+    const policyVersion = (await login.json()).privacy.policyVersion
+    for (const surface of ['login', 'banner']) {
+      const response = await page.request.post('/api/privacy/decision', { headers: { Origin: 'http://localhost:4630' }, data: { policyVersion, surface, decision: 'accept', language: 'es', requestId: crypto.randomUUID() } })
+      expect(response.status()).toBe(200)
+    }
+  }
+}
+
+test('real session persists the modal and lower banner choices', async ({ page }) => {
+  await signIn(page, false)
+  await page.goto('/')
+  const modal = page.getByRole('dialog', { name: 'Aviso de privacidad', exact: true })
+  await expect(modal).toBeVisible()
+  expect((await page.request.get('/api/decrypted-data')).status()).toBe(403)
+  await modal.getByRole('button', { name: 'He leído y acepto continuar' }).click()
+  const banner = page.getByRole('complementary', { name: 'Aviso de privacidad', exact: true })
+  await expect(banner).toBeVisible()
+  expect((await page.request.get('/api/decrypted-data')).status()).toBe(200)
+  await page.reload()
+  await expect(banner).toBeVisible()
+  await banner.getByRole('button', { name: 'He leído y acepto continuar' }).click()
+  await expect(banner).not.toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect((await (await page.request.get('/api/auth/session')).json()).privacy.state).toBe('complete')
+})
+
+test('admin navigates to participant Kubios, exports its cache and opens Study', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/data')
+  await page.getByRole('link', { name: 'Kubios de participantes', exact: true }).last().click()
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Kubios · Administración', exact: true })).toBeVisible()
+  await page.getByLabel('Buscar participante / UserID').fill('bcrypt')
+  await expect(page.getByRole('row', { name: /acceptance.bcrypt/ })).toBeVisible()
+  await page.getByRole('link', { name: 'Ver participante' }).click()
+  await expect(page.getByRole('heading', { name: 'acceptance.bcrypt' })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'RMSSD · UTC' })).toBeVisible()
+  const downloadEvent = page.waitForEvent('download')
+  await page.getByRole('link', { name: 'Exportar CSV', exact: true }).click()
+  const csv = await readFile(await (await downloadEvent).path(), 'utf8')
+  expect(csv).toContain('RMSSD')
+  expect(csv).not.toMatch(/internal_secret|must-not-be-exported|ciphertext/)
+  await page.goto('/study')
+  await page.getByRole('combobox', { name: 'Periodo', exact: true }).selectOption('365d')
+  await expect(page.getByRole('status').filter({ hasText: 'Fuente Kubios' })).toContainText('Kubios: 3')
+  await expect(page.getByText('Duración del ejercicio ↔ RMSSD', { exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/admin-study-real.png', fullPage: true })
+})
+
+test('mobile database controls browse, page, export, encrypt and refresh', async ({ page, request }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const rows = Array.from({ length: 120 }, (_, i) => ({ id: `browser-${String(i).padStart(4, '0')}`, username: 'acceptance.bcrypt', insulinType: '__PLAIN__synthetic', dose: '__PLAIN__0', date_time: '2026-11-01T08:00:00Z', dose_iv: null, insulintype_iv: null }))
+  expect((await request.post('http://127.0.0.1:4900/supabase/rest/v1/insulindata', { data: rows })).status()).toBe(201)
+  await signIn(page)
+  await page.goto('/admin/database')
+  await expect(page.getByText('Consulta completa', { exact: true })).toBeVisible()
+  await page.getByRole('link', { name: 'Explorar tablas', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Tabla', exact: true }).selectOption('insulindata')
+  await page.getByRole('button', { name: 'Consultar', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Siguiente', exact: true })).toBeEnabled()
+  const nextPage = page.waitForResponse(r => r.url().includes('table-data') && r.url().includes('offset=50'))
+  await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+  expect((await nextPage).status()).toBe(200)
+  await page.getByRole('link', { name: 'Exportar datos', exact: true }).click()
+  const exportEvent = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'JSON', exact: true }).click()
+  const exported = JSON.parse(await readFile(await (await exportEvent).path(), 'utf8'))
+  expect(exported.data.length).toBe(126)
+  await page.getByRole('link', { name: 'Copia lógica cifrada', exact: true }).click()
+  await page.getByLabel('Contraseña de cifrado (mínimo 12 caracteres)', { exact: true }).fill('Disposable-Download-1!')
+  await page.getByLabel('Repetir contraseña', { exact: true }).fill('Disposable-Download-1!')
+  const encryptedEvent = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Descargar copia cifrada', exact: true }).click()
+  const encrypted = JSON.parse(await readFile(await (await encryptedEvent).path(), 'utf8'))
+  expect(encrypted.cipher).toBe('aes-256-gcm')
+  expect(JSON.stringify(encrypted)).not.toContain('acceptance.bcrypt')
+  const refresh = page.waitForResponse(r => r.url().endsWith('/api/admin/database/tables'))
+  await page.getByRole('button', { name: 'Actualizar estadísticas', exact: true }).click()
+  expect((await refresh).status()).toBe(200)
+  await page.screenshot({ path: 'test-results/admin-database-mobile-real.png', fullPage: true })
+})

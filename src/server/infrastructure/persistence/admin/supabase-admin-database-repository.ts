@@ -1,6 +1,7 @@
 import type { AdminDatabaseRepository } from "@/server/application/ports/admin-database-repository";
 import {
   assertTableLimit,
+  assertTableOffset,
   type DatabaseTableInfo,
   type DatabaseTablePage,
   type DatabaseTablesResult,
@@ -59,7 +60,7 @@ export class SupabaseAdminDatabaseRepository implements AdminDatabaseRepository 
           });
           return {
             name: table.name,
-            recordCount: result.count ?? 0,
+            recordCount: requireCount(result.count),
             accessible: true,
           };
         } catch {
@@ -81,12 +82,13 @@ export class SupabaseAdminDatabaseRepository implements AdminDatabaseRepository 
     };
   }
 
-  async getTableData(tableName: string, limit: number): Promise<DatabaseTablePage> {
+  async getTableData(tableName: string, limit: number, offset = 0): Promise<DatabaseTablePage> {
     const spec = ADMIN_TABLE_BY_NAME.get(tableName);
     if (spec === undefined) {
       throw new NotFoundError(`Tabla no encontrada: ${tableName}`);
     }
     assertTableLimit(limit);
+    assertTableOffset(offset);
 
     const countResult = await this.gateway.select(spec.name, {
       columns: spec.primaryKey,
@@ -96,7 +98,7 @@ export class SupabaseAdminDatabaseRepository implements AdminDatabaseRepository 
     const dataResult = await this.gateway.select(spec.name, {
       columns: spec.kind === "users" ? USER_ADMIN_COLUMNS : "*",
       order: { column: spec.primaryKey, ascending: true },
-      limit,
+      range: { from: offset, to: offset + limit - 1 },
     });
 
     const data: HealthRecord[] = dataResult.rows.map((row) => {
@@ -116,9 +118,18 @@ export class SupabaseAdminDatabaseRepository implements AdminDatabaseRepository 
     return {
       tableName: spec.name,
       data,
-      totalRecords: countResult.count ?? 0,
+      totalRecords: requireCount(countResult.count),
       returnedRecords: data.length,
       limit,
+      offset,
+      hasMore: offset + data.length < requireCount(countResult.count),
     };
   }
+}
+
+function requireCount(count: number | null): number {
+  if (count === null || !Number.isSafeInteger(count) || count < 0) {
+    throw new PersistenceError("MAPPING_FAILED", "No se pudo verificar el recuento completo.", { operation: "admin-table-count" });
+  }
+  return count;
 }

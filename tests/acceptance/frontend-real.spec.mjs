@@ -1,3 +1,4 @@
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../src/lib/privacy-policy.ts'
 import { test, expect } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
@@ -38,6 +39,14 @@ async function waitForHydration(page) {
   await page.waitForTimeout(800)
 }
 
+async function acceptAccessNotices(page) {
+  const initial = page.getByRole('dialog', { name: /^(Aviso de privacidad|Privacy notice)$/ })
+  await initial.getByRole('button', { name: /He leído y acepto continuar|I have read and accept to continue|I have read and agree to continue/ }).click()
+  const banner = page.getByRole('complementary', { name: /^(Aviso de privacidad|Privacy notice)$/ })
+  await banner.getByRole('button', { name: /He leído y acepto continuar|I have read and accept to continue|I have read and agree to continue/ }).click()
+  await expect(banner).not.toBeVisible()
+}
+
 test('admin email login, cookie reload, Users CRUD and logout', async ({ page }) => {
   await page.goto('/login')
   await waitForHydration(page)
@@ -45,6 +54,7 @@ test('admin email login, cookie reload, Users CRUD and logout', async ({ page })
   await page.locator('#password').fill(admin.password)
   await page.locator('button[type="submit"]').click()
   await page.waitForURL('**/')
+  await acceptAccessNotices(page)
   await expect(page.locator('a[href="/users"]').first()).toBeVisible()
   await page.reload()
   await expect(page.locator('a[href="/users"]').first()).toBeVisible()
@@ -90,6 +100,7 @@ test('username login, cookie reload, app logout isolation', async ({ page }) => 
   await page.locator('#password').fill(usernameUser.password)
   await page.locator('button[type="submit"]').click()
   await page.waitForURL('**/')
+  await acceptAccessNotices(page)
   await expect(page.getByText(usernameUser.username).first()).toBeVisible()
   await page.reload()
   await expect(page.getByText(usernameUser.username).first()).toBeVisible()
@@ -110,6 +121,7 @@ test('user opens categories directly, exports hidden records, and cannot elevate
   await page.locator('#password').fill(usernameUser.password)
   await page.locator('button[type="submit"]').click()
   await page.waitForURL('**/')
+  await acceptAccessNotices(page)
   await page.goto('/data')
   await expect(page.getByRole('heading', { name: /Insulina \(4/ })).toBeVisible()
   await expect(page.getByRole('combobox')).toHaveCount(2)
@@ -145,6 +157,7 @@ test('language selector persists on login and mobile navigation', async ({ page 
   await page.locator('#password').fill(usernameUser.password)
   await page.locator('button[type="submit"]').click()
   await page.waitForURL('**/')
+  await acceptAccessNotices(page)
   await expect(page.getByTestId('global-language-selector')).toBeVisible()
   await page.goto('/data')
   await expect(page.getByRole('heading', { name: /Insulin.*\(4/ })).toBeVisible()
@@ -164,6 +177,7 @@ test('admin pages the same users on desktop and mobile and synchronizes horizont
   await page.locator('#password').fill(admin.password)
   await page.locator('button[type="submit"]').click()
   await page.waitForURL('**/')
+  await acceptAccessNotices(page)
   await page.goto('/users')
   await expect(page.locator('#users-page-size')).toHaveValue('25')
   await expect(page.locator('tbody tr')).toHaveCount(25)
@@ -192,7 +206,7 @@ test('renders the verified 24-row live readback in the UI with a synthetic sessi
   test.skip(!existsSync(fixturePath), 'Optional: run the read-only live seed verification first')
   const data = JSON.parse(await readFile(fixturePath, 'utf8'))
   const username = data.insulinData[0].username
-  await page.route('**/api/auth/session', route => route.fulfill({ json: { user: { id: 'synthetic-display-only', username, email: null, role: 'user', uuid: null, gdprConsent: false, gdprConsentAt: null, createdAt: null }, method: 'username', expiresAt: '2099-01-01T00:00:00.000Z' } }))
+  await page.route('**/api/auth/session', route => route.fulfill({ json: { user: { id: 'synthetic-display-only', username, email: null, role: 'user', uuid: null, gdprConsent: false, gdprConsentAt: null, createdAt: null }, method: 'username', expiresAt: '2099-01-01T00:00:00.000Z', privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' } } }))
   await page.route(/\/api\/users(?:\?.*)?$/, route => route.fulfill({ json: { users: [{ id: 'synthetic-display-only', username, email: null, role: 'user', uuid: null, gdprConsent: false, gdprConsentAt: null, createdAt: null }], total: 1 } }))
   await page.route('**/api/decrypted-data?**', route => route.fulfill({ json: data }))
   await page.goto('/data')

@@ -11,6 +11,7 @@ import {
 import { assertServiceRoleKey } from '@/server/infrastructure/auth/supabase-auth-store'
 import type { ServerApplication } from './container'
 import { getServerRuntime } from './runtime'
+import { assertPrivacyAcknowledged } from '@/server/domain/privacy'
 
 /**
  * K50 - Composición del adaptador HTTP de Kubios con la sesión de producción.
@@ -113,6 +114,20 @@ export async function resolveKubiosRequestIdentity(
 ): Promise<KubiosIdentityResult> {
   const getRuntime = deps.getRuntime ?? getServerRuntime
   const createService = deps.createService ?? createKubiosRpcClient
+
+  // Resolve before the Kubios adapter so its generic dependency-error mapping
+  // cannot hide the actionable privacy 403. No service is constructed first.
+  if (sessionToken) {
+    let session
+    try {
+      const application = await getRuntime()
+      session = await application.useCases.auth.getSession(sessionToken)
+    } catch (error) {
+      return resolveKubiosIdentity(sessionToken, { getSession: async () => { throw error }, createService })
+    }
+    assertPrivacyAcknowledged(session)
+    return resolveKubiosIdentity(sessionToken, { getSession: async () => session, createService })
+  }
 
   return resolveKubiosIdentity(sessionToken, {
     getSession: async (token) => {

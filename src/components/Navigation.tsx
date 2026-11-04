@@ -52,6 +52,7 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
     { path: '/', label: t.navigation.dashboard, icon: '🏠' },
     { path: '/users', label: t.navigation.users, icon: '👥', requiresPermission: 'view_users' },
     { path: '/data', label: t.navigation.data, icon: '📊', requiresPermission: 'view_data' },
+    { path: '/admin/kubios', label: t.navigation.adminKubios, icon: '❤️', requiresPermission: 'view_admin' },
     ...(showPersonalKubios
       ? [
           {
@@ -66,6 +67,7 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
     { path: '/overview', label: t.dashboard.generalSummary, icon: '🗂️', requiresRole: 'doctor' },
     { path: '/study', label: t.navigation.study, icon: '🔬', requiresPermission: 'view_study' },
     { path: '/admin', label: t.navigation.admin, icon: '⚙️', requiresPermission: 'view_admin' },
+    { path: '/privacy', label: t.navigation.privacy, icon: '🔒' },
   ]
 
   const navigationRoutes = allRoutes.filter(

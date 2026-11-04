@@ -13,6 +13,8 @@ export interface DatabaseTablesResult {
   readonly totalRecords: number;
   readonly accessibleCount: number;
   readonly totalCount: number;
+  readonly observedAt?: string;
+  readonly status?: "complete" | "partial" | "failed";
 }
 
 export interface DatabaseTablePage {
@@ -21,6 +23,8 @@ export interface DatabaseTablePage {
   readonly totalRecords: number;
   readonly returnedRecords: number;
   readonly limit: number;
+  readonly offset?: number;
+  readonly hasMore?: boolean;
 }
 
 const TABLE_NAME_PATTERN = /^[a-z][a-z0-9_]{0,62}$/;
@@ -36,5 +40,11 @@ export function assertSafeTableName(tableName: string): void {
 export function assertTableLimit(limit: number): void {
   if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
     throw new BadRequestError("El límite debe ser un entero entre 1 y 1000.");
+  }
+}
+
+export function assertTableOffset(offset: number): void {
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > Number.MAX_SAFE_INTEGER - 1000) {
+    throw new BadRequestError("El desplazamiento debe ser un entero positivo o cero.");
   }
 }

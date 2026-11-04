@@ -28,3 +28,24 @@ fingerprints:
     date: '2026-11-03'
     commit: '3575aac4884f541c4e081e916325c85e6e91efb4'
     cli: 'Postman CLI 1.74.0; Node 24.16.0'
+administration_study_privacy:
+  updated_at: '2026-11-04'
+  scope: Real dashboard HTTP adapters against a disposable Supabase-shaped HTTP dependency.
+  modeled:
+    - Session privacy stages, decision audit, rejection and idempotency RPC shapes.
+    - Service-only Kubios link listing, paged listing, individual link and encrypted snapshot response shapes.
+    - Synthetic AES-GCM snapshots with authenticated team/member context and a disposable fixture key.
+    - Ordered table paging, complete exports beyond 1000 rows and encrypted logical copies.
+  verified:
+    - The new API suite checks all private route families before initial acknowledgement, then banner access, rejection, session revocation and unchanged external consent.
+    - An administrator without a personal Kubios link reads participant history while a regular user is denied.
+    - The local Postman collection executes 32 requests and 68 assertions without failures.
+  limits:
+    - The HTTP stand-in is not evidence of production RLS, real external consent, provider availability or real participant login.
+    - The stand-in models sequential decision behavior; transaction rollback, concurrent terminal rejection and grants are separately tested on isolated PostgreSQL.
+    - Synthetic fixture secrets and health values must never be reused outside local tests.
+    - A logical copy is a sanitized paged read, not a transactional PostgreSQL backup.
+  evidence:
+    - tests/acceptance/admin-study-privacy.test.mjs
+    - tests/auth/sql/run-privacy-sql.mjs
+    - tests/sql/run-kubios-admin-sql.mjs

@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { AuthGateway } from "@/server/application/ports/auth-gateway";
 import { systemClock, type Clock } from "@/server/application/ports/clock";
-import { isAppError } from "@/server/domain/errors";
+import { isAppError, UnauthorizedError, ServiceUnavailableError, ConflictError } from "@/server/domain/errors";
+import { initialPrivacyStatus, PRIVACY_POLICY_VERSION } from '@/server/domain/privacy';
 import type { Session } from "@/server/domain/session";
 import { isUserRole, type User, type UserRole } from "@/server/domain/user";
 import type {
@@ -12,6 +13,7 @@ import type {
   VerifiedEmailLinkResolver,
   VerifiedEmailUser,
   AuthSessionStore,
+  PrivacyStore,
 } from "./contracts";
 import { AuthConfigurationError, AuthInfrastructureError } from "./errors";
 import {
@@ -37,6 +39,7 @@ export interface EmailLinkOptions {
 }
 
 export interface AuthGatewayDependencies {
+  readonly privacy?: PrivacyStore;
   readonly users: AuthUserStore;
   readonly passwords: PasswordVerifier;
   readonly email: EmailAuthTransport;
@@ -147,7 +150,7 @@ export function createAuthGateway(
       failInfrastructure(error);
     }
 
-    return { user, token, method, expiresAt };
+    return { user, token, method, expiresAt, privacy: initialPrivacyStatus() };
   }
 
   async function consumeLimit(keyHash: string): Promise<boolean> {
@@ -301,6 +304,15 @@ export function createAuthGateway(
   }
 
   return {
+    async decidePrivacy(token, decision) {
+      if (decision.policyVersion !== PRIVACY_POLICY_VERSION) throw new ConflictError('CONFLICT', 'Versión del aviso obsoleta');
+      const payload = tokens.open(token, clock.now());
+      if (!payload) throw new UnauthorizedError();
+      if (!dependencies.privacy) throw new ServiceUnavailableError();
+      try {
+        return await dependencies.privacy.decidePrivacy(sha256Hex(payload.sid), payload.uid, decision);
+      } catch (error) { return failInfrastructure(error); }
+    },
     async authenticateByEmail(
       emailAddress: string,
       password: string,
@@ -448,9 +460,17 @@ export function createAuthGateway(
         return null;
       }
 
+      let privacy;
+      try {
+        privacy = dependencies.privacy
+          ? await dependencies.privacy.readPrivacy(sidHash, payload.uid)
+          : initialPrivacyStatus();
+      } catch (error) { return failInfrastructure(error); }
+
       return {
         user,
         token,
+        privacy,
         method: payload.method,
         expiresAt: new Date(payload.exp * 1000).toISOString(),
       };

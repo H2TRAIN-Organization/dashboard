@@ -6,6 +6,23 @@
  * synthetic. It is intentionally local-only and must never be deployed.
  */
 const http = require("http");
+const { createCipheriv, randomBytes } = require('crypto');
+
+const KUBIOS_TEAM = '10000000-0000-4000-8000-000000000001';
+const KUBIOS_MEMBER = '20000000-0000-4000-8000-000000000003';
+function syntheticSnapshot() {
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', Buffer.alloc(32, 0x12), nonce);
+  cipher.setAAD(Buffer.from(`kubios-crypto-aad:v1|teamId:36:${KUBIOS_TEAM}|memberId:36:${KUBIOS_MEMBER}|purpose:8:snapshot`));
+  const results = [0, 1, 2].map(day => ({
+    measured_timestamp: new Date(Date.now() - day * 86400000).toISOString(), daily_result: 'normal',
+    result: { readiness: 65 + day, mean_hr_bpm: 60, rmssd_ms: 40 + day, pns_index: 0, sns_index: -1 },
+    internal_secret: 'must-not-be-exported',
+  }));
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify({ results })), cipher.final()]);
+  const bytea = value => '\\x' + value.toString('hex');
+  return { key_version: 1, nonce: bytea(nonce), tag: bytea(cipher.getAuthTag()), ciphertext: bytea(ciphertext), updated_at: new Date().toISOString() };
+}
 
 const PORT = Number(process.env.PORT || 4910);
 const JSON_HEADER = { "Content-Type": "application/json" };
@@ -19,6 +36,7 @@ const PUBLIC_SCHEMA_TABLES = [
   "polar_data",
   "auth_sessions",
   "auth_login_limits",
+  "auth_privacy_decisions",
 ];
 const HEALTH_TABLES = ["insulindata", "fooddata", "exercisedata", "periodrecords", "mooddata"];
 const RESERVED_QUERY = new Set(["select", "order", "limit", "offset", "apikey"]);
@@ -132,6 +150,8 @@ function seed() {
     mooddata: [],
     polar_data: [],
     auth_sessions: [],
+    auth_privacy_decisions: [],
+    kubiosSnapshot: syntheticSnapshot(),
     auth_login_limits: [],
     authAccounts: [
       {
@@ -350,6 +370,50 @@ function publicUserRow(user) {
 
 async function handleRpc(req, res, path) {
   const db = await getDb();
+  if (path === '/rest/v1/rpc/auth_privacy_decide' && req.method === 'POST') {
+    const b = await readJson(req);
+    const session = db.auth_sessions.find(s => s.sid_hash === b.p_sid_hash && s.user_id === b.p_user_id);
+    if (!session || Date.parse(session.expires_at) <= Date.now()) return send(res, 401, { message: 'Session unavailable' });
+    const previous = db.auth_privacy_decisions.find(d => d.sid_hash === b.p_sid_hash && d.request_id === b.p_request_id);
+    if (previous) {
+      if (previous.decision !== b.p_decision || previous.surface !== b.p_surface || previous.policy_version !== b.p_policy_version || previous.policy_hash !== b.p_policy_hash || previous.language !== b.p_language) return send(res, 409, { message: 'Idempotency key reused' });
+      if (session.revoked_at && previous.decision !== 'reject') return send(res, 401, { message: 'Session revoked' });
+      return send(res, 200, [{ stage: previous.resulting_stage, rejected: previous.decision === 'reject' }]);
+    }
+    if (session.revoked_at) return send(res, 401, { message: 'Session revoked' });
+    let stage = session.privacy_version === b.p_policy_version && session.privacy_hash === b.p_policy_hash ? session.privacy_stage : 0;
+    if (b.p_decision === 'accept') {
+      if (b.p_surface === 'login' && stage === 0) stage = 1;
+      else if (b.p_surface === 'banner' && stage === 1) stage = 2;
+      else if (!(b.p_surface === 'login' && stage >= 1) && !(b.p_surface === 'banner' && stage === 2)) return send(res, 409, { message: 'Privacy surface is out of order' });
+    }
+    db.auth_privacy_decisions.push({ sid_hash: b.p_sid_hash, user_id: b.p_user_id, request_id: b.p_request_id, policy_version: b.p_policy_version, policy_hash: b.p_policy_hash, surface: b.p_surface, decision: b.p_decision, language: b.p_language, resulting_stage: stage, decided_at: new Date().toISOString() });
+    Object.assign(session, { privacy_version: b.p_policy_version, privacy_hash: b.p_policy_hash, privacy_stage: stage });
+    if (b.p_decision === 'reject') session.revoked_at = new Date().toISOString();
+    await saveDb(db);
+    return send(res, 200, [{ stage, rejected: b.p_decision === 'reject' }]);
+  }
+  if (path === '/rest/v1/rpc/kubios_admin_list_links' && req.method === 'POST') {
+    const b = await readJson(req);
+    return send(res, 200, Number(b.p_after_user_id) < 3 ? [{ user_id: 3, username: 'acceptance.bcrypt', team_id: KUBIOS_TEAM, kubios_member_id: KUBIOS_MEMBER }] : []);
+  }
+  if (path === '/rest/v1/rpc/kubios_admin_page_links' && req.method === 'POST') {
+    const b = await readJson(req);
+    const links = [{ user_id: 3, username: 'acceptance.bcrypt', team_id: KUBIOS_TEAM, kubios_member_id: KUBIOS_MEMBER }].filter(row => !b.p_search || row.username.includes(String(b.p_search).toLowerCase()) || String(row.user_id).includes(String(b.p_search)));
+    return send(res, 200, { links: links.slice(Number(b.p_offset), Number(b.p_offset) + Number(b.p_limit)), total: links.length });
+  }
+  if (path === '/rest/v1/rpc/kubios_admin_get_link' && req.method === 'POST') {
+    const b = await readJson(req);
+    return send(res, 200, Number(b.p_user_id) === 3 ? [{ user_id: 3, username: 'acceptance.bcrypt', team_id: KUBIOS_TEAM, kubios_member_id: KUBIOS_MEMBER }] : []);
+  }
+  if (path === '/rest/v1/rpc/kubios_get_user_member_link' && req.method === 'POST') {
+    const b = await readJson(req);
+    return send(res, 200, Number(b.p_user_id) === 3 ? [{ user_id: 3, team_id: KUBIOS_TEAM, kubios_member_id: KUBIOS_MEMBER }] : []);
+  }
+  if (path === '/rest/v1/rpc/kubios_get_snapshot' && req.method === 'POST') {
+    const b = await readJson(req);
+    return send(res, 200, b.p_team_id === KUBIOS_TEAM && b.p_member_id === KUBIOS_MEMBER ? [db.kubiosSnapshot] : []);
+  }
   if (path === "/rest/v1/rpc/t009_user_has_health_data" && req.method === "POST") {
     const body = await readJson(req);
     const user = db.users.find((item) => String(item.UserID) === String(body.p_user_id));
@@ -507,6 +571,7 @@ async function handleRest(req, res, path, url) {
       } else if (table === "auth_sessions") {
         const row = {
           ...input,
+          privacy_stage: 0, privacy_version: null, privacy_hash: null,
           revoked_at: input.revoked_at ?? null,
           created_at: input.created_at ?? new Date().toISOString(),
         };

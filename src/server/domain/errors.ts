@@ -1,4 +1,5 @@
 export type ErrorCode =
+  | "PRIVACY_ACTION_REQUIRED"
   | "BAD_REQUEST"
   | "VALIDATION_ERROR"
   | "UNAUTHORIZED"

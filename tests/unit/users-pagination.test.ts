@@ -1,3 +1,4 @@
+import { initialPrivacyStatus } from '@/server/domain/privacy';
 import { describe, expect, it } from "vitest";
 
 import { createAuthUseCases } from "@/server/application/auth/auth-use-cases";
@@ -48,7 +49,7 @@ function setup() {
   ];
 
   const handlers = createUsersHttpHandlers(
-    createAuthUseCases(new TestAuthGateway(accounts)),
+    createAuthUseCases(new TestAuthGateway(accounts.map(account => ({ ...account, privacy: { ...initialPrivacyStatus(), state: 'complete' } })))),
     createUserUseCases(
       new InMemoryUserRepository(users),
       new InMemoryUserDataPresence(),

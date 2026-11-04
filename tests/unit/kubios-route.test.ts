@@ -1,3 +1,4 @@
+import { initialPrivacyStatus } from '@/server/domain/privacy'
 import { NextRequest } from 'next/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -54,7 +55,7 @@ const LINK_ROW = {
   kubios_member_id: MEMBER_A
 }
 
-const getSession = vi.fn(async () => ({ user: { id: String(USER_A), role: 'admin' } }))
+const getSession = vi.fn(async () => ({ user: { id: String(USER_A), role: 'admin' }, privacy: { ...initialPrivacyStatus(), state: 'complete' as const } }))
 const fetchMock = vi.fn()
 const rpcCalls: { name: string; body: Record<string, unknown> }[] = []
 
@@ -83,7 +84,7 @@ function cookieRequest(path: string): NextRequest {
 beforeEach(() => {
   rpcCalls.length = 0
   getSession.mockReset()
-  getSession.mockResolvedValue({ user: { id: String(USER_A), role: 'admin' } })
+  getSession.mockResolvedValue({ user: { id: String(USER_A), role: 'admin' }, privacy: { ...initialPrivacyStatus(), state: 'complete' as const } })
 
   vi.stubEnv('SUPABASE_URL', 'https://synthetic.supabase.co')
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', jwt({ role: 'service_role', ref: 'synthetic' }))
@@ -156,8 +157,8 @@ describe('K50 route wiring', () => {
 
   it('keeps two session cookies isolated and rechecks a revoked session before any RPC', async () => {
     getSession.mockImplementation(async (token?: string) => {
-      if (token === 'session-a') return { user: { id: String(USER_A), role: 'admin' } }
-      if (token === 'session-b') return { user: { id: String(USER_B), role: 'user' } }
+      if (token === 'session-a') return { user: { id: String(USER_A), role: 'admin' }, privacy: { ...initialPrivacyStatus(), state: 'complete' as const } }
+      if (token === 'session-b') return { user: { id: String(USER_B), role: 'user' }, privacy: { ...initialPrivacyStatus(), state: 'complete' as const } }
       throw new UnauthorizedError('Sesión revocada')
     })
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {

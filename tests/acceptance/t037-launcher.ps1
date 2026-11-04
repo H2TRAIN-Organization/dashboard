@@ -102,6 +102,7 @@ try {
     AUTH_SESSION_SECRET = ('ab' * 32)
     ENCRYPTION_SECRET_KEY = ('cd' * 32)
     ENCRYPTION_SECRET_KEY0 = ('ef' * 32)
+    KUBIOS_ENCRYPTION_KEY_V1 = [Convert]::ToBase64String([byte[]](1..32 | ForEach-Object { 0x12 }))
     APP_ORIGIN = "http://localhost:$BackendPort"
     APP_ORIGINS = "http://localhost:$BackendPort"
     ACCEPTANCE_BASE_URL = "http://localhost:$BackendPort"
@@ -138,6 +139,9 @@ try {
       Reset-Standin
       node (Join-Path $validation 'tests\acceptance\dashboard-remaking.test.mjs')
       if ($LASTEXITCODE -ne 0) { throw "Dashboard Remaking acceptance failed with exit code $LASTEXITCODE" }
+      Reset-Standin
+      node (Join-Path $validation 'tests\acceptance\admin-study-privacy.test.mjs')
+      if ($LASTEXITCODE -ne 0) { throw "Administration/Study/Privacy acceptance failed with exit code $LASTEXITCODE" }
     }
 
     if (-not $SkipPostman) {
