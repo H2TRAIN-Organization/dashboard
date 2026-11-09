@@ -26,6 +26,25 @@ describe('Admin Kubios complete cache read',()=>{
     expect(JSON.stringify(result)).not.toMatch(/access_token|team_id|kubios_member_id|hidden/)
     expect(rpc).toHaveBeenCalledWith('kubios_admin_list_links',{p_after_user_id:100,p_limit:100})
   })
+  it('allows exactly the internal participant limit and rejects only the first extra row',async()=>{
+    function pages(rows:Record<number,number[]>) {
+      let snapshots=0
+      const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>{
+        if(name==='kubios_admin_list_links') return {data:(rows[Number(args.p_after_user_id)]??[]).map(link)}
+        snapshots++
+        return {data:[snapshot]}
+      })
+      return {rpc,snapshots:()=>snapshots}
+    }
+    const exact=pages({0:[1,2],2:[]})
+    const allowed=await readAllAdminKubios(actor,{...deps(exact.rpc),maxParticipants:2})
+    expect(allowed.map(p=>p.userId)).toEqual([1,2])
+    expect(exact.snapshots()).toBe(2)
+    const over=pages({0:[1,2],2:[3]})
+    await expect(readAllAdminKubios(actor,{...deps(over.rpc),maxParticipants:2})).rejects.toMatchObject({statusCode:503})
+    expect(over.snapshots()).toBe(2)
+    expect(over.rpc).toHaveBeenCalledWith('kubios_admin_list_links',{p_after_user_id:2,p_limit:100})
+  })
   it('aborts malformed pages, repeated pages, RPC failures and invalid snapshot payload',async()=>{
     await expect(readAllAdminKubios(actor,deps(vi.fn().mockResolvedValue({data:null})))).rejects.toMatchObject({statusCode:503})
     const repeated=vi.fn(async(name:string)=>({data:name==='kubios_admin_list_links' ? Array.from({length:100},(_,i)=>link(i+1)) : [snapshot]}))
@@ -33,6 +52,10 @@ describe('Admin Kubios complete cache read',()=>{
     await expect(readAllAdminKubios(actor,deps(vi.fn().mockRejectedValue(new Error('private'))))).rejects.toMatchObject({statusCode:503})
     const rpc=vi.fn(async(name:string)=>({data:name==='kubios_admin_list_links' ? [link(1)] : [snapshot]}))
     await expect(readAllAdminKubios(actor,deps(rpc,'bad JSON'))).rejects.toMatchObject({statusCode:503})
+  })
+  it('rejects a repeated page whose first user cannot belong to the requested offset',async()=>{
+    const rpc=vi.fn(async(name:string)=>name==='kubios_admin_page_links'? {data:{links:[link(1)],total:2}} : {data:[snapshot]})
+    await expect(listAdminKubios(actor,adminKubiosQuerySchema.parse({page:2,pageSize:1}),deps(rpc))).rejects.toMatchObject({statusCode:503})
   })
   it('reads only the selected page snapshots and checks exact page completeness',async()=>{
     const rpc=vi.fn(async(name:string)=>name==='kubios_admin_page_links'? {data:{links:[link(201)],total:201}} : {data:[snapshot]})
@@ -52,6 +75,8 @@ describe('Admin Kubios complete cache read',()=>{
   })
   it('allowlists nested metrics and enforces real ordered calendar date filters',()=>{
     expect(sanitizeAdminMeasurement({timestamp:'2026-01-01T10:00:00Z',result:{rmssd_ms:0,mean_hr_bpm:Infinity,token:'secret',freq_domain:{HF_power:2,token:'secret'}}})).toEqual({measured_timestamp:'2026-01-01T10:00:00.000Z',daily_result:null,result:{rmssd_ms:0,freq_domain:{HF_power:2}}})
+    expect(sanitizeAdminMeasurement({measured_timestamp:'invalid',timestamp:'2026-01-01T10:00:00Z',result:{}}).measured_timestamp).toBe('2026-01-01T10:00:00.000Z')
+    expect(sanitizeAdminMeasurement({measured_timestamp:'invalid',result:{}}).measured_timestamp).toBeNull()
     expect(adminKubiosQuerySchema.safeParse({from:'2026-02-30'}).success).toBe(false)
     expect(adminKubiosQuerySchema.safeParse({from:'2026-02-03',to:'2026-01-01'}).success).toBe(false)
     expect(adminKubiosQuerySchema.safeParse({pageSize:101}).success).toBe(false)

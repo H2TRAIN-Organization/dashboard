@@ -1,7 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
 import { PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '../../src/lib/privacy-policy'
 
-async function mockPrivacy(page: Page, initialStage: 'initial' | 'banner' | 'complete' = 'initial') {
+async function mockPrivacy(
+  page: Page,
+  initialStage: 'initial' | 'banner' | 'complete' = 'initial',
+  policy: { readonly version: string; readonly hash: string } = { version: PRIVACY_POLICY_VERSION, hash: PRIVACY_POLICY_HASH },
+) {
   let stage = initialStage
   let signedIn = true
   let fail = false
@@ -14,7 +18,7 @@ async function mockPrivacy(page: Page, initialStage: 'initial' | 'banner' | 'com
       return route.fulfill(signedIn ? { json: {
         user: { id: '42', username: 'synthetic_participant', email: null, role: 'user', uuid: null, gdprConsent: true, gdprConsentAt: '2026-01-01T00:00:00Z', createdAt: null },
         method: 'username', expiresAt: '2030-01-01T00:00:00Z',
-        privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: stage },
+        privacy: { policyVersion: policy.version, policyHash: policy.hash, state: stage },
       } } : { status: 401, json: { error: { code: 'UNAUTHORIZED', message: 'Synthetic signed out' } } })
     }
     if (path === '/api/privacy/decision') {
@@ -86,6 +90,40 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       expect(mock.logoutCalls()).toBe(0)
       expect(mock.decisions[0]).toMatchObject({ surface: 'banner', decision: 'reject' })
     })
+    test('banner rejection recovers its confirmation after a failed decision', async ({ page }) => {
+      const mock = await mockPrivacy(page, 'banner')
+      mock.fail()
+      await page.goto('/')
+      const banner = page.getByRole('complementary', { name: 'Aviso de privacidad', exact: true })
+      await expect(banner).toBeVisible()
+      await banner.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Rechazar y cerrar sesión', exact: true })
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Confirmar rechazo', exact: true }).click()
+      await expect(page.getByRole('alert').filter({ hasText: 'acceso a datos permanece bloqueado' })).toBeVisible()
+      expect(mock.decisions).toHaveLength(1)
+      expect(mock.decisions[0]).toMatchObject({ surface: 'banner', decision: 'reject' })
+      await page.getByRole('button', { name: 'Reintentar', exact: true }).click()
+      await expect(banner).toBeVisible()
+      await banner.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
+      await expect(dialog).toBeVisible()
+      expect(mock.decisions).toHaveLength(1)
+      await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click()
+      await expect(dialog).not.toBeVisible()
+      await expect(banner).toBeVisible()
+    })
+    for (const stale of [
+      { name: 'version', version: '2026-01-01-obsolete', hash: PRIVACY_POLICY_HASH },
+      { name: 'hash', version: PRIVACY_POLICY_VERSION, hash: 'obsolete-hash' },
+    ]) {
+      test(`public policy shows initial for an obsolete policy ${stale.name}`, async ({ page }) => {
+        await mockPrivacy(page, 'complete', { version: stale.version, hash: stale.hash })
+        await page.goto('/privacy')
+        const status = page.getByRole('status')
+        await expect(status).toContainText('lectura inicial pendiente')
+        await expect(status).not.toContainText('lectura completada')
+      })
+    }
     test('failed decision blocks data and public policy remains accessible', async ({ page }) => {
       const mock = await mockPrivacy(page)
       mock.fail()

@@ -69,7 +69,7 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
       requestRef.current = null
       setForced(false)
       await refresh()
-    } catch { setFailed(true) } finally { setBusy(false) }
+    } catch { setFailed(true); setConfirmReject(false) } finally { setBusy(false) }
   }
 
   if (path === '/privacy') return children

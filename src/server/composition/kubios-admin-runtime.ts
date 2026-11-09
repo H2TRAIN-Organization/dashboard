@@ -18,14 +18,17 @@ export interface AdminKubiosDeps {
   decryptSnapshot: KubiosMeDeps['decryptSnapshot']
   cryptoEnv: KubiosMeDeps['cryptoEnv']
   now?: () => Date
+  /** Internal read budget; only tests lower it. The HTTP contract keeps the default. */
+  maxParticipants?: number
 }
+const ADMIN_KUBIOS_MAX_PARTICIPANTS = 100000
 const defaults: AdminKubiosDeps = { createService: createKubiosRpcClient, decryptSnapshot: decryptKubiosSnapshot, cryptoEnv: process.env }
 const numericFields = ['readiness', 'mean_hr_bpm', 'rmssd_ms', 'pns_index', 'sns_index', 'physiological_age', 'respiratory_rate', 'stress_index'] as const
 
 /** Allowlist only: provider identifiers and arbitrary nested keys never cross this boundary. */
 export function sanitizeAdminMeasurement(row: Record<string, unknown>): AdminKubiosMeasurement {
-  const time = row.measured_timestamp ?? row.timestamp
-  const timestamp = utcTimestamp(time)
+  // Match the personal reader: the alias is used when measured_timestamp is absent or invalid.
+  const timestamp = utcTimestamp(row.measured_timestamp) ?? utcTimestamp(row.timestamp)
   const measured_timestamp = timestamp === null ? null : new Date(timestamp).toISOString()
   const raw = typeof row.result === 'object' && row.result !== null ? row.result as Record<string, unknown> : {}
   const result: Record<string, number | string | null | Record<string, number>> = {}
@@ -76,6 +79,7 @@ export async function readAllAdminKubios(actor: ActiveActor, deps: AdminKubiosDe
   assertAdmin(actor)
   const service = adminService(deps)
   const participants: AdminKubiosParticipant[] = []
+  const maxParticipants = deps.maxParticipants ?? ADMIN_KUBIOS_MAX_PARTICIPANTS
   let after = 0
   while (true) {
     let response: unknown
@@ -83,13 +87,13 @@ export async function readAllAdminKubios(actor: ActiveActor, deps: AdminKubiosDe
     catch { throw new ServiceUnavailableError('Kubios no disponible') }
     const envelope = z.object({ data: z.array(linkSchema).max(100), error: z.null().optional() }).safeParse(response)
     if (!envelope.success) throw new ServiceUnavailableError('Kubios no disponible')
+    if (envelope.data.data.length === 0) return participants
     for (const link of envelope.data.data) {
       if (link.user_id <= after) throw new ServiceUnavailableError('Listado Kubios incompleto')
+      if (participants.length >= maxParticipants) throw new ServiceUnavailableError('Listado Kubios excede el limite de lectura')
       after = link.user_id
       participants.push(await loadAdminParticipant(link, deps, service))
     }
-    if (envelope.data.data.length === 0) return participants
-    if (participants.length >= 100000) throw new ServiceUnavailableError('Listado Kubios excede el limite de lectura')
   }
 }
 
@@ -120,14 +124,16 @@ export async function listAdminKubios(actor: ActiveActor, query: AdminKubiosQuer
     return { participants: rows.slice((query.page - 1) * query.pageSize, query.page * query.pageSize).map(summary), page: query.page, pageSize: query.pageSize, total: rows.length }
   }
   const service = adminService(deps)
+  const offset = (query.page - 1) * query.pageSize
   let response: unknown
-  try { response = await service.rpc('kubios_admin_page_links', { p_search: query.search, p_offset: (query.page - 1) * query.pageSize, p_limit: query.pageSize }) }
+  try { response = await service.rpc('kubios_admin_page_links', { p_search: query.search, p_offset: offset, p_limit: query.pageSize }) }
   catch { throw new ServiceUnavailableError('Kubios no disponible') }
   const parsed = z.object({ data: z.object({ links: z.array(linkSchema).max(100), total: z.number().int().nonnegative() }), error: z.null().optional() }).safeParse(response)
   if (!parsed.success) throw new ServiceUnavailableError('Kubios no disponible')
   const { links, total } = parsed.data.data
-  const expected = Math.min(query.pageSize, Math.max(0, total - (query.page - 1) * query.pageSize))
-  if (links.length !== expected || links.some((link, i) => i > 0 && link.user_id <= links[i-1]!.user_id)) throw new ServiceUnavailableError('Listado Kubios incompleto')
+  const expected = Math.min(query.pageSize, Math.max(0, total - offset))
+  // A page at offset `o` must start after at least o distinct positive ids.
+  if (links.length !== expected || links.some((link, i) => link.user_id <= (i === 0 ? offset : links[i-1]!.user_id))) throw new ServiceUnavailableError('Listado Kubios incompleto')
   const participants = []
   for (const link of links) participants.push(summary(await loadAdminParticipant(link, deps, service)))
   return { participants, page: query.page, pageSize: query.pageSize, total }

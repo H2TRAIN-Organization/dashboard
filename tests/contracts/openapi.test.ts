@@ -197,4 +197,24 @@ describe("authoritative OpenAPI contract", () => {
     expect(String(operation.description)).toContain("completo UTC");
     expect(String(operation.description)).toContain("YYYY-MM-DD");
   });
+
+  it("matches admin download failure statuses and Kubios paging bounds", async () => {
+    const spec = await loadSpec();
+    const exportResponses = recordAt(spec, "paths", "/api/admin/database/export", "get", "responses");
+    expect(exportResponses).toHaveProperty("400");
+    expect(exportResponses).toHaveProperty("401");
+    expect(exportResponses).toHaveProperty("403");
+    expect(exportResponses).toHaveProperty("404");
+    expect(exportResponses).toHaveProperty("409");
+    expect(exportResponses).toHaveProperty("503");
+
+    const backupResponses = recordAt(spec, "paths", "/api/admin/database/logical-backup", "post", "responses");
+    for (const status of ["200", "400", "401", "403", "409", "503"]) {
+      expect(backupResponses).toHaveProperty(status);
+    }
+
+    const page = recordAt(spec, "components", "schemas", "AdminKubiosPage", "properties");
+    expect(recordAt(page, "page").minimum).toBe(1);
+    expect(recordAt(page, "pageSize")).toMatchObject({ minimum: 1, maximum: 100 });
+  });
 });
