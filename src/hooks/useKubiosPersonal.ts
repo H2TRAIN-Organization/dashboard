@@ -86,15 +86,20 @@ export function useKubiosMe() {
   const sessionKey = sessionScopeKey(session)
   const [state, setState] = useState<MeState>(IDLE_ME)
   const [revision, setRevision] = useState(0)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     if (loading || sessionKey === null) return
 
     const controller = new AbortController()
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+    const isStale = () =>
+      controller.signal.aborted || requestIdRef.current !== requestId
 
     void fetchKubiosMe({ signal: controller.signal })
       .then((data) => {
-        if (controller.signal.aborted) return
+        if (isStale()) return
         setState({
           ownerSessionKey: sessionKey,
           phase: 'data',
@@ -103,7 +108,7 @@ export function useKubiosMe() {
         })
       })
       .catch((caught: unknown) => {
-        if (controller.signal.aborted) return
+        if (isStale()) return
         const error = classifyKubiosError(caught)
         if (error === 'aborted') return
         setState({
@@ -120,8 +125,19 @@ export function useKubiosMe() {
   }, [sessionKey, loading, revision])
 
   const reload = useCallback(() => {
+    if (loading || sessionKey === null) return
+    // Invalida cualquier respuesta anterior antes de que el efecto arranque la
+    // petición nueva. El estado de carga se publica en el mismo clic para que
+    // el botón y la vista respondan de inmediato, aunque el snapshot no cambie.
+    requestIdRef.current += 1
+    setState({
+      ownerSessionKey: sessionKey,
+      phase: 'loading',
+      data: null,
+      error: null,
+    })
     setRevision((value) => value + 1)
-  }, [])
+  }, [loading, sessionKey])
 
   const isCurrent = state.ownerSessionKey === sessionKey
   const view: KubiosMeView = isCurrent
@@ -158,6 +174,7 @@ export function useKubiosHrvResults(filter: KubiosDateFilter) {
     error: null,
   })
   const [revision, setRevision] = useState(0)
+  const requestIdRef = useRef(0)
   const snapshotRef = useRef<{
     key: string
     results: KubiosLatestResult[]
@@ -183,10 +200,14 @@ export function useKubiosHrvResults(filter: KubiosDateFilter) {
     if (query === null) return
 
     const controller = new AbortController()
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+    const isStale = () =>
+      controller.signal.aborted || requestIdRef.current !== requestId
 
     void fetchKubiosHrvResults({ from, to }, { signal: controller.signal })
       .then((response) => {
-        if (controller.signal.aborted) return
+        if (isStale()) return
 
         let results = response.results
         if (
@@ -214,7 +235,7 @@ export function useKubiosHrvResults(filter: KubiosDateFilter) {
         })
       })
       .catch((caught: unknown) => {
-        if (controller.signal.aborted) return
+        if (isStale()) return
         const error = classifyKubiosError(caught)
         if (error === 'aborted') return
         setState({
@@ -232,8 +253,20 @@ export function useKubiosHrvResults(filter: KubiosDateFilter) {
   }, [sessionKey, loading, from, to, filterKey, query, revision])
 
   const reload = useCallback(() => {
+    if (loading || sessionKey === null || query === null) return
+    // Igual que en el resumen: se invalida la petición en curso y se publica
+    // la carga inmediatamente. El rango activo se conserva en filterKey y es
+    // el mismo que usa el efecto al volver a consultar.
+    requestIdRef.current += 1
+    setState({
+      ownerSessionKey: sessionKey,
+      filterKey,
+      phase: 'loading',
+      data: null,
+      error: null,
+    })
     setRevision((value) => value + 1)
-  }, [])
+  }, [filterKey, loading, query, sessionKey])
 
   const isCurrent =
     state.ownerSessionKey === sessionKey && state.filterKey === filterKey

@@ -141,7 +141,7 @@ test.describe('Kubios personal UI', () => {
 
     await page.goto('/kubios')
 
-    await expect(page.getByText('Solo se muestran tus propios datos de Kubios.')).toBeVisible()
+    await expect(page.getByText('Solo se muestran los datos propios de Kubios.')).toBeVisible()
     await expect(page.getByText('2 mediciones')).toBeVisible()
     await expect(page.getByText('72.0%', { exact: false }).first()).toBeVisible()
 
@@ -280,21 +280,13 @@ test.describe('Kubios personal UI', () => {
       page.getByText(/No hay mediciones HRV en el rango de fechas seleccionado/i),
     ).toBeVisible()
     await expect(page.locator('article')).toHaveCount(0)
-    await expect(page.getByText('0 mediciones')).toBeVisible()
 
-    const totalCard = page.getByText('mediciones', { exact: true }).locator('..')
-    await expect(totalCard.getByText('0', { exact: true })).toBeVisible()
-
-    const latestCard = page.getByText('Última medición', { exact: true }).locator('..')
-    await expect(latestCard).toContainText('N/D')
-    await expect(latestCard).not.toContainText(/1 nov 2026/)
-
+    // Sin mediciones en el rango, la cabecera no anuncia un contador 0 y no
+    // reutiliza el resumen global.
+    await expect(page.getByText('0 mediciones')).toHaveCount(0)
+    await expect(page.getByText('mediciones', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/72\.0%/)).toHaveCount(0)
     await expect(page.getByText(/1 nov 2026/)).toHaveCount(0)
-
-    // synced_at sigue siendo la fecha del snapshot global.
-    const syncedCard = page.getByText('Última sincronización', { exact: true }).locator('..')
-    await expect(syncedCard).toContainText(/3 nov 2026/)
   })
 
   test('shows the compact personal summary on the main dashboard', async ({ page }) => {
@@ -324,7 +316,7 @@ test.describe('Kubios personal UI', () => {
 
     await page.goto('/')
 
-    await expect(page.getByText('Mi HRV (Kubios)')).toBeVisible()
+    await expect(page.getByText('HRV (Kubios)', { exact: true })).toBeVisible()
     await expect(page.locator('a[href="/kubios"]')).toHaveCount(1)
     await expect(page.getByText('mediciones', { exact: true })).toBeVisible()
     await expect(page.getByText('72.0%', { exact: true })).toBeVisible()
@@ -364,7 +356,7 @@ test.describe('Kubios personal UI', () => {
 
     await page.goto('/')
 
-    await expect(page.getByText('Mi HRV (Kubios)')).toHaveCount(0)
+    await expect(page.getByText('HRV (Kubios)', { exact: true })).toHaveCount(0)
     await page.locator('button:has(svg.lucide-menu)').click()
     await expect(page.locator('a[href="/kubios"]')).toHaveCount(0)
   })
