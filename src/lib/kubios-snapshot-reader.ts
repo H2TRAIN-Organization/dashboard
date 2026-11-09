@@ -247,6 +247,15 @@ interface ValidSnapshotRow {
 }
 
 /**
+ * Reuse export for the administrative reader. Does not change the personal
+ * contract: the same validated envelope and timestamps are exposed.
+ */
+export type KubiosValidatedSnapshotRow = ValidSnapshotRow
+
+/** Ventana de frescura compartida con el lector personal. */
+export const KUBIOS_SNAPSHOT_STALE_AFTER_MS = STALE_AFTER_MS
+
+/**
  * Valida la única fila esperada de `kubios_get_snapshot` y reconstruye el sobre
  * del cifrado. `key_version` debe ser exactamente el número 1 y las longitudes
  * de nonce, tag y ciphertext deben respetar el formato de K25.
@@ -343,6 +352,25 @@ function resultTimestamp(result: Record<string, unknown>): number | null {
   }
 
   return readTimestamp(result.timestamp)
+}
+
+/** Wrapper de reutilización admin; misma validación que el lector personal. */
+export function parseKubiosValidatedSnapshotRow(
+  row: unknown
+): KubiosValidatedSnapshotRow | null {
+  return parseSnapshotRow(row)
+}
+
+/** Wrapper de reutilización admin; mismo JSON estricto que el lector personal. */
+export function parseKubiosSnapshotPayload(
+  plaintext: string
+): Record<string, unknown>[] | null {
+  return parseSnapshotPayload(plaintext)
+}
+
+/** Wrapper de reutilización admin; `measured_timestamp` o alias `timestamp`. */
+export function readKubiosResultTimestamp(result: Record<string, unknown>): number | null {
+  return resultTimestamp(result)
 }
 
 /**

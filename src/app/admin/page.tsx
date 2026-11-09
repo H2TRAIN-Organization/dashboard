@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Database, Shield, Users, TrendingUp, CheckCircle } from 'lucide-react'
+import { Database, Shield, Users, TrendingUp, CheckCircle, HeartPulse } from 'lucide-react'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
 import HybridNavigation from '@/components/HybridNavigation'
@@ -72,7 +72,15 @@ export default function AdminNewPage() {
       stats: stats.totalRecords === null
         ? null
         : `${stats.totalRecords.toLocaleString(locale)} ${t.admin.records}`
-     }
+     },
+    {
+      title: t.admin.kubios.title,
+      description: t.admin.kubios.description,
+      icon: HeartPulse,
+      href: '/admin/kubios',
+      color: 'from-rose-500 to-pink-500',
+      stats: null
+    }
   ]
 
   const formatCount = (value: number | null) =>

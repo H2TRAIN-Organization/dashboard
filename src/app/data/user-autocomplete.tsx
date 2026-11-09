@@ -14,21 +14,32 @@ import type { User } from '@/lib/api-types'
 import { getDisplayUsername } from '@/lib/user-mapper'
 import { useLanguage } from '@/contexts/LanguageContext'
 
-interface UserAutocompleteProps {
-  users: readonly User[]
-  /** Selected username, or the `all` sentinel. */
+export interface UserAutocompleteItem {
+  /** Stable React key for the option. */
+  key: string
+  /** Value committed by `onChange`; callers may use a stable identifier. */
   value: string
-  onChange: (username: string) => void
+  primary: string
+  secondary?: string | null
+}
+
+interface UserAutocompleteProps {
+  /** Dashboard user list. Omit when `items` is provided. */
+  users?: readonly User[]
+  /** Pre-mapped options for callers whose identifiers are not usernames. */
+  items?: readonly UserAutocompleteItem[]
+  /** Selected value, or the `all` sentinel. */
+  value: string
+  onChange: (value: string) => void
   label: string
   allUsersLabel: string
+  placeholder?: string
   loading?: boolean
   error?: string | null
   disabled?: boolean
 }
 
-interface UserOption {
-  key: string
-  username: string
+interface UserOption extends UserAutocompleteItem {
   primary: string
   secondary: string | null
 }
@@ -49,11 +60,13 @@ function normalizeSearchValue(value: string): string {
 }
 
 export default function UserAutocomplete({
-  users,
+  users = [],
+  items,
   value,
   onChange,
   label,
   allUsersLabel,
+  placeholder,
   loading = false,
   error = null,
   disabled = false,
@@ -69,49 +82,54 @@ export default function UserAutocomplete({
   const [activeIndex, setActiveIndex] = useState(-1)
   const [position, setPosition] = useState<PopupPosition | null>(null)
 
-  const selectableUsers = useMemo(
-    () => users.filter((user) => user.Username.trim().length > 0),
-    [users],
-  )
-
-  const displayNameFor = useCallback(
-    (username: string): string => {
-      const match = selectableUsers.find((user) => user.Username === username)
-      return match ? getDisplayUsername(match) : username
-    },
-    [selectableUsers],
-  )
+  const optionItems = useMemo<UserAutocompleteItem[]>(() => {
+    if (items !== undefined) {
+      return items.filter((item) => item.primary.trim().length > 0)
+    }
+    return users
+      .filter((user) => user.Username.trim().length > 0)
+      .map((user) => ({
+        key: user.UserID,
+        value: user.Username,
+        primary: getDisplayUsername(user),
+        secondary:
+          user.Email && user.Email !== user.Username ? user.Email : null,
+      }))
+  }, [items, users])
 
   // The input is derived from the committed selection unless the user is
   // typing a draft. This avoids synchronizing state from an effect.
-  const selectedLabel = value === 'all' ? '' : displayNameFor(value)
+  const selectedLabel =
+    value === 'all'
+      ? ''
+      : (optionItems.find((item) => item.value === value)?.primary ??
+        // Keep the dashboard fallback of showing the stored username while the
+        // catalogue is still loading.
+        (items === undefined ? value : ''))
   const query = draft ?? selectedLabel
 
   const matches = useMemo(() => {
     const needle = normalizeSearchValue(query)
-    if (needle.length === 0) return selectableUsers
-    return selectableUsers.filter((user) => {
-      const primary = normalizeSearchValue(getDisplayUsername(user))
-      const secondary = normalizeSearchValue(user.Email ?? '')
+    if (needle.length === 0) return optionItems
+    return optionItems.filter((item) => {
+      const primary = normalizeSearchValue(item.primary)
+      const secondary = normalizeSearchValue(item.secondary ?? '')
       return primary.includes(needle) || secondary.includes(needle)
     })
-  }, [query, selectableUsers])
+  }, [query, optionItems])
 
   const options: UserOption[] = useMemo(() => {
     const allOption: UserOption = {
       key: 'all',
-      username: 'all',
+      value: 'all',
       primary: allUsersLabel,
       secondary: null,
     }
     return [
       allOption,
-      ...matches.map((user) => ({
-        key: user.UserID,
-        username: user.Username,
-        primary: getDisplayUsername(user),
-        secondary:
-          user.Email && user.Email !== user.Username ? user.Email : null,
+      ...matches.map((item) => ({
+        ...item,
+        secondary: item.secondary ?? null,
       })),
     ]
   }, [allUsersLabel, matches])
@@ -178,8 +196,8 @@ export default function UserAutocomplete({
   }, [activeIndex, open])
 
   const select = useCallback(
-    (username: string) => {
-      onChange(username)
+    (nextValue: string) => {
+      onChange(nextValue)
       setDraft(null)
       setOpen(false)
       setActiveIndex(-1)
@@ -221,10 +239,10 @@ export default function UserAutocomplete({
     if (event.key === 'Enter') {
       if (open && activeIndex >= 0 && options[activeIndex]) {
         event.preventDefault()
-        select(options[activeIndex].username)
+        select(options[activeIndex].value)
       } else if (open && matches.length === 1) {
         event.preventDefault()
-        select(matches[0].Username)
+        select(matches[0].value)
       }
       return
     }
@@ -281,9 +299,9 @@ export default function UserAutocomplete({
                 {options.map((option, index) => {
                   const isActive = index === activeIndex
                   const isSelected =
-                    option.username === 'all'
+                    option.value === 'all'
                       ? value === 'all'
-                      : option.username === value
+                      : option.value === value
                   return (
                     <li
                       key={option.key}
@@ -296,10 +314,10 @@ export default function UserAutocomplete({
                       } ${isSelected ? 'font-semibold text-blue-900' : 'text-slate-700'}`}
                       onMouseDown={(event) => event.preventDefault()}
                       onMouseEnter={() => setActiveIndex(index)}
-                      onClick={() => select(option.username)}
+                      onClick={() => select(option.value)}
                     >
                       <span aria-hidden="true" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
-                        {option.username === 'all' ? (
+                        {option.value === 'all' ? (
                           <Users className="h-4 w-4" />
                         ) : (
                           <span className="text-xs font-bold">
@@ -360,7 +378,7 @@ export default function UserAutocomplete({
           spellCheck={false}
           disabled={disabled}
           value={query}
-          placeholder={t.dashboard.searchUser}
+          placeholder={placeholder ?? t.dashboard.searchUser}
           onChange={(event) => {
             setDraft(event.target.value)
             setActiveIndex(-1)
