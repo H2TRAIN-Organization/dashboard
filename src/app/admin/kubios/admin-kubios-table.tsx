@@ -9,7 +9,6 @@ import type { AdminKubiosMeasurement } from './api'
 
 interface AdminKubiosTableProps {
   measurements: readonly AdminKubiosMeasurement[]
-  unavailableCount: number
 }
 
 const FREQUENCY_COLUMNS = [
@@ -32,7 +31,6 @@ const METRIC_COLUMNS = [
 
 export default function AdminKubiosTable({
   measurements,
-  unavailableCount,
 }: AdminKubiosTableProps) {
   const { t, language } = useLanguage()
   const notAvailable = t.kubios.personal.notAvailable
@@ -174,18 +172,6 @@ export default function AdminKubiosTable({
           </tbody>
         </table>
       </div>
-
-      {unavailableCount > 0 ? (
-        <p
-          role="status"
-          className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-        >
-          {t.admin.kubios.unavailableCount.replace(
-            '{count}',
-            String(unavailableCount),
-          )}
-        </p>
-      ) : null}
     </div>
   )
 }

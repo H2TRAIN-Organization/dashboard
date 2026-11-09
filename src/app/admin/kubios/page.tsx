@@ -279,11 +279,8 @@ function AdminKubiosContent() {
               </div>
             </div>
           ) : hasMeasurements ? (
-            <AdminKubiosTable
-              measurements={visibleMeasurements}
-              unavailableCount={visibleUnavailableCount}
-            />
-          ) : (
+            <AdminKubiosTable measurements={visibleMeasurements} />
+          ) : visibleUnavailableCount > 0 ? null : (
             <StatusPanel
               title={t.admin.kubios.title}
               message={
@@ -295,6 +292,15 @@ function AdminKubiosContent() {
               }
             />
           )}
+
+          {!loading && !phaseError && visibleUnavailableCount > 0 ? (
+            <p
+              role="status"
+              className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
+            >
+              {t.admin.kubios.unavailableCount}
+            </p>
+          ) : null}
         </section>
       </main>
     </div>

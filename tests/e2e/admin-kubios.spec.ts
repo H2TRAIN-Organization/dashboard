@@ -319,9 +319,11 @@ test.describe("Admin Kubios overview", () => {
     await expect(
       page.getByText(/Algunas mediciones son la última copia sincronizada/i),
     ).toBeVisible();
-    await expect(
-      page.getByText(/1 mediciones no están disponibles/i),
-    ).toBeVisible();
+    const unavailableWarning = page.getByText(
+      /Algunos historiales de participantes vinculados no se pudieron leer/i,
+    );
+    await expect(unavailableWarning).toBeVisible();
+    await expect(unavailableWarning).toHaveCount(1);
     await expect(
       page.getByTestId("admin-kubios-page-count"),
     ).toHaveText("2");
@@ -649,7 +651,14 @@ test.describe("Admin Kubios overview", () => {
         return route.fulfill({
           json: measurementsPage([measurementRow(1, "alice")], {
             nextCursor: "cursor-1",
-            unavailableCount: 5,
+          }),
+        });
+      }
+      if (cursor === "cursor-1") {
+        return route.fulfill({
+          json: measurementsPage([], {
+            nextCursor: "cursor-2",
+            unavailableCount: 1,
           }),
         });
       }
@@ -664,11 +673,18 @@ test.describe("Admin Kubios overview", () => {
     await page.goto("/admin/kubios");
     await expect(page.getByTestId("admin-kubios-row")).toContainText("alice");
 
-    const expiredRequest = page.waitForRequest((request) => {
+    const sparseRequest = page.waitForRequest((request) => {
       const url = new URL(request.url());
       return (
         url.pathname.endsWith("/api/admin/kubios/measurements") &&
         url.searchParams.get("cursor") === "cursor-1"
+      );
+    });
+    const expiredRequest = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return (
+        url.pathname.endsWith("/api/admin/kubios/measurements") &&
+        url.searchParams.get("cursor") === "cursor-2"
       );
     });
     const restartedRequest = page.waitForRequest((request) => {
@@ -681,14 +697,17 @@ test.describe("Admin Kubios overview", () => {
     });
 
     await page.getByRole("button", { name: "Siguiente" }).click();
+    await sparseRequest;
     await expiredRequest;
     await restartedRequest;
 
     await expect(page.getByTestId("admin-kubios-row")).toContainText("alice");
     await expect(page.getByText("Página 1")).toBeVisible();
     await expect(
-      page.getByText(/5 mediciones no están disponibles/i),
-    ).toBeVisible();
+      page.getByText(
+        /Algunos historiales de participantes vinculados no se pudieron leer/i,
+      ),
+    ).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Anterior" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Siguiente" })).toBeEnabled();
 
@@ -699,7 +718,7 @@ test.describe("Admin Kubios overview", () => {
             .filter((url) => url.pathname.endsWith("/measurements"))
             .map((url) => url.searchParams.get("cursor")),
       )
-      .toEqual([null, "cursor-1", null]);
+      .toEqual([null, "cursor-1", "cursor-2", null]);
   });
 
   test("pages through sparse cursor batches and keeps cursor history", async ({
@@ -716,7 +735,6 @@ test.describe("Admin Kubios overview", () => {
         return route.fulfill({
           json: measurementsPage([measurementRow(1, "page-one")], {
             nextCursor: "cursor-1",
-            unavailableCount: 3,
           }),
         });
       }
@@ -730,9 +748,7 @@ test.describe("Admin Kubios overview", () => {
       }
       if (cursor === "cursor-2") {
         return route.fulfill({
-          json: measurementsPage([measurementRow(2, "page-two")], {
-            unavailableCount: 1,
-          }),
+          json: measurementsPage([measurementRow(2, "page-two")]),
         });
       }
       return route.fulfill({
@@ -746,8 +762,10 @@ test.describe("Admin Kubios overview", () => {
       "page-one",
     );
     await expect(
-      page.getByText(/3 mediciones no están disponibles/i),
-    ).toBeVisible();
+      page.getByText(
+        /Algunos historiales de participantes vinculados no se pudieron leer/i,
+      ),
+    ).toHaveCount(0);
 
     const sparseRequests: string[] = [];
     page.on("request", (request) => {
@@ -767,8 +785,10 @@ test.describe("Admin Kubios overview", () => {
     expect(sparseRequests).toEqual(["cursor-1", "cursor-2"]);
     await expect(page.getByText("Página 2")).toBeVisible();
     await expect(
-      page.getByText(/2 mediciones no están disponibles/i),
-    ).toBeVisible();
+      page.getByText(
+        /Algunos historiales de participantes vinculados no se pudieron leer/i,
+      ),
+    ).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Siguiente" })).toBeDisabled();
 
     await page.getByRole("button", { name: "Anterior" }).click();
@@ -777,8 +797,10 @@ test.describe("Admin Kubios overview", () => {
     );
     await expect(page.getByText("Página 1")).toBeVisible();
     await expect(
-      page.getByText(/3 mediciones no están disponibles/i),
-    ).toBeVisible();
+      page.getByText(
+        /Algunos historiales de participantes vinculados no se pudieron leer/i,
+      ),
+    ).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Anterior" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Siguiente" })).toBeEnabled();
 
@@ -848,6 +870,36 @@ test.describe("Admin Kubios overview", () => {
       page.getByText(/No hay mediciones Kubios para la selección actual/i),
     ).toBeVisible();
     await expect(page.getByTestId("admin-kubios-row")).toHaveCount(0);
+  });
+
+  test("shows unavailable participant histories when the page has no measurements", async ({
+    page,
+  }) => {
+    await mockSession(page);
+    await mockParticipantPages(page, [
+      participantsPage([{ userId: 1, username: "alice" }], null),
+    ]);
+    await page.route("**/api/admin/kubios/measurements*", (route) =>
+      route.fulfill({
+        json: measurementsPage([], {
+          status: "empty",
+          unavailableCount: 3,
+        }),
+      }),
+    );
+
+    await page.goto("/admin/kubios");
+
+    await expect(page.getByTestId("admin-kubios-row")).toHaveCount(0);
+    await expect(page.getByRole("table")).toHaveCount(0);
+    await expect(
+      page.getByText(/No hay mediciones Kubios para la selección actual/i),
+    ).toHaveCount(0);
+    const warning = page.getByText(
+      /Algunos historiales de participantes vinculados no se pudieron leer/i,
+    );
+    await expect(warning).toBeVisible();
+    await expect(warning).toHaveCount(1);
   });
 
   test("shows a measurement error and recovers on retry", async ({ page }) => {
