@@ -140,6 +140,9 @@ export function useKubiosMe() {
   }, [loading, sessionKey])
 
   const isCurrent = state.ownerSessionKey === sessionKey
+  // Solo la recarga manual marca el estado interno como loading; la vista de
+  // espera de sesión no cuenta como refresco en curso.
+  const refreshing = isCurrent && state.phase === 'loading'
   const view: KubiosMeView = isCurrent
     ? { phase: state.phase, data: state.data, error: state.error }
     : {
@@ -148,7 +151,7 @@ export function useKubiosMe() {
         error: null,
       }
 
-  return { view, reload }
+  return { view, reload, refreshing }
 }
 
 /**
@@ -270,6 +273,9 @@ export function useKubiosHrvResults(filter: KubiosDateFilter) {
 
   const isCurrent =
     state.ownerSessionKey === sessionKey && state.filterKey === filterKey
+  // El estado loading propio solo lo publica reload(); el fallback de la vista
+  // por sesión/filtro no debe mantener el refresco manual en curso.
+  const refreshing = isCurrent && state.phase === 'loading'
   const view: KubiosResultsView =
     sessionKey === null
       ? { phase: 'idle', data: null, error: null }
@@ -279,7 +285,7 @@ export function useKubiosHrvResults(filter: KubiosDateFilter) {
           ? { phase: state.phase, data: state.data, error: state.error }
           : { phase: 'loading', data: null, error: null }
 
-  return { view, reload }
+  return { view, reload, refreshing }
 }
 
 export type KubiosPersonalSource = 'results' | 'summary' | 'none'
@@ -454,5 +460,9 @@ export function useKubiosPersonal(filter: KubiosDateFilter) {
     reloadResults()
   }, [reloadMe, reloadResults])
 
-  return { view, reload }
+  // La recarga manual termina cuando ambos endpoints han asentado su estado;
+  // la vista derivada puede pasar a datos en cuanto llega solo uno de ellos.
+  const refreshing = me.refreshing || hrv.refreshing
+
+  return { view, reload, refreshing }
 }

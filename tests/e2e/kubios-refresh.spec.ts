@@ -250,8 +250,18 @@ test.describe('Kubios personal manual refresh', () => {
     await expect.poll(() => resultRequests.length).toBe(resultsBefore + 1)
     expect(resultRequests.at(-1)).toBe('?from=2026-10-01&to=2026-10-31')
 
-    meGate.resolve()
+    // hrv-results puede terminar antes que /me. La cabecera ya refleja el
+    // recuento filtrado, pero la recarga manual sigue en curso: no se debe
+    // habilitar Actualizar ni retirar la carga hasta que /me asiente.
     resultsGate.resolve()
+    const totalCard = page.getByText('mediciones', { exact: true }).locator('..')
+    await expect(totalCard.getByText('3', { exact: true })).toBeVisible()
+
+    await expect(page.getByText('Cargando...', { exact: true })).toBeVisible()
+    await expect(button).toBeDisabled()
+    await expect(button.locator('svg.animate-spin')).toBeVisible()
+
+    meGate.resolve()
 
     await expect(page.getByText('Cargando...', { exact: true })).toHaveCount(0)
     await expect(button).toBeEnabled()

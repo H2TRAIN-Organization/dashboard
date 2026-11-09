@@ -157,7 +157,8 @@ function KubiosPersonalContent() {
     }
   }
 
-  const loading = view.phase === 'loading' || view.phase === 'idle'
+  const loading =
+    view.phase === 'loading' || view.phase === 'idle' || personal.refreshing
 
   return (
     <>

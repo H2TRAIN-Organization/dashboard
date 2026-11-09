@@ -69,6 +69,8 @@ export default function Calendar({
 
   const selectedDate = parseDateValue(selectedValue)
   const selectedLabel = selectedDate ? formatDateValue(selectedDate) : ''
+  const todayValue = formatDateValue(todayDate)
+  const todayAllowed = isDateValueInRange(todayValue, minValue, maxValue)
 
   const initialFocus = useMemo(() => {
     if (selectedDate && isSameMonth(selectedDate, month)) return selectedDate
@@ -292,8 +294,9 @@ export default function Calendar({
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-200 pt-3">
         <button
           type="button"
-          onClick={() => onSelect(formatDateValue(new Date()))}
-          className="rounded-lg px-3 py-2 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          onClick={() => onSelect(todayValue)}
+          disabled={!todayAllowed}
+          className="rounded-lg px-3 py-2 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
         >
           {t.datepicker.today}
         </button>

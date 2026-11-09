@@ -344,6 +344,43 @@ test.describe('Kubios personal UI', () => {
     await expect(fromInput).toBeFocused()
   })
 
+  test('disables Hoy outside the active range without changing the filter', async ({
+    page,
+  }) => {
+    await mockSession(page)
+    await mockMe(page, readySummary)
+    await mockResultsByRange(page, ({ from, to }) =>
+      from === null && to === null ? readyResults : filteredResults,
+    )
+
+    await page.goto('/kubios')
+    await expect(page.getByText('2 mediciones')).toBeVisible()
+
+    const fromInput = page.locator('#kubios-date-from')
+    const toInput = page.locator('#kubios-date-to')
+    const dialog = page.getByRole('dialog', { name: 'Fecha Específica' })
+
+    // Un máximo pasado deja hoy fuera del rango del campo «desde».
+    await toInput.fill('2020-01-31')
+    await page.getByRole('button', { name: 'Fecha desde: Seleccionar fecha' }).click()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Hoy' })).toBeDisabled()
+    await dialog.getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await expect(fromInput).toHaveValue('')
+    await expect(toInput).toHaveValue('2020-01-31')
+
+    // Un mínimo futuro deja hoy fuera del rango del campo «hasta».
+    await page.getByRole('button', { name: 'Limpiar filtros', exact: true }).click()
+    await fromInput.fill('2030-01-01')
+    await expect(fromInput).toHaveValue('2030-01-01')
+    await page.getByRole('button', { name: 'Fecha hasta: Seleccionar fecha' }).click()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Hoy' })).toBeDisabled()
+    await dialog.getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await expect(fromInput).toHaveValue('2030-01-01')
+    await expect(toInput).toHaveValue('')
+  })
+
   test('shows the compact personal summary on the main dashboard', async ({ page }) => {
     await mockSession(page)
     await mockMe(page, readySummary)
