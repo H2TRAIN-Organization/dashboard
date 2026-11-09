@@ -12,6 +12,7 @@ import {
   TrendingUp,
   X,
 } from 'lucide-react'
+import CalendarDateField from '@/components/calendar/CalendarDateField'
 import HRVCharts from '@/components/HRVCharts'
 import Navigation from '@/components/Navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -258,54 +259,24 @@ function KubiosPersonalContent() {
               {t.kubios.personal.filterHint}
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-              <div>
-                <label
-                  htmlFor="kubios-date-from"
-                  className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-600"
-                >
-                  {t.kubios.dateFrom}
-                </label>
-                <div className="relative">
-                  <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    id="kubios-date-from"
-                    type="date"
-                    value={filter.from}
-                    max={filter.to.length > 0 ? filter.to : undefined}
-                    onChange={(event) =>
-                      setFilter((previous) => ({
-                        ...previous,
-                        from: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm font-medium text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="kubios-date-to"
-                  className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-600"
-                >
-                  {t.kubios.dateTo}
-                </label>
-                <div className="relative">
-                  <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    id="kubios-date-to"
-                    type="date"
-                    value={filter.to}
-                    min={filter.from.length > 0 ? filter.from : undefined}
-                    onChange={(event) =>
-                      setFilter((previous) => ({
-                        ...previous,
-                        to: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm font-medium text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-              </div>
+              <CalendarDateField
+                id="kubios-date-from"
+                label={t.kubios.dateFrom}
+                value={filter.from}
+                max={filter.to.length > 0 ? filter.to : undefined}
+                onChange={(value) =>
+                  setFilter((previous) => ({ ...previous, from: value }))
+                }
+              />
+              <CalendarDateField
+                id="kubios-date-to"
+                label={t.kubios.dateTo}
+                value={filter.to}
+                min={filter.from.length > 0 ? filter.from : undefined}
+                onChange={(value) =>
+                  setFilter((previous) => ({ ...previous, to: value }))
+                }
+              />
               <button
                 type="button"
                 onClick={() => setFilter({ from: '', to: '' })}

@@ -289,6 +289,61 @@ test.describe('Kubios personal UI', () => {
     await expect(page.getByText(/1 nov 2026/)).toHaveCount(0)
   })
 
+  test('selects and clears a date with the shared calendar field', async ({
+    page,
+  }) => {
+    await mockSession(page)
+    await mockMe(page, readySummary)
+    await mockResultsByRange(page, ({ from, to }) =>
+      from === null && to === null ? readyResults : filteredResults,
+    )
+
+    await page.goto('/kubios')
+    await expect(page.getByText('2 mediciones')).toBeVisible()
+
+    const fromInput = page.locator('#kubios-date-from')
+    const trigger = page.getByRole('button', {
+      name: 'Fecha desde: Seleccionar fecha',
+    })
+    await trigger.click()
+
+    const dialog = page.getByRole('dialog', { name: 'Fecha Específica' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator('[data-date][tabindex="0"]')).toBeFocused()
+
+    // Las flechas mueven el foco del calendario y Enter selecciona el día.
+    await page.keyboard.press('ArrowRight')
+    const target = dialog.locator('[data-date][tabindex="0"]')
+    await expect(target).toBeFocused()
+    const targetValue = await target.getAttribute('data-date')
+    expect(targetValue).not.toBeNull()
+
+    const selectedRequest = page.waitForRequest((request) => {
+      if (!request.url().includes('/api/kubios/hrv-results')) return false
+      const url = new URL(request.url())
+      return (
+        url.searchParams.get('from') === targetValue &&
+        url.searchParams.get('to') === null
+      )
+    })
+    await page.keyboard.press('Enter')
+    await selectedRequest
+
+    await expect(dialog).toHaveCount(0)
+    await expect(fromInput).toHaveValue(targetValue ?? '')
+    await expect(trigger).toBeFocused()
+
+    const clearedRequest = page.waitForRequest((request) => {
+      if (!request.url().includes('/api/kubios/hrv-results')) return false
+      return !new URL(request.url()).searchParams.has('from')
+    })
+    await page.getByRole('button', { name: 'Limpiar', exact: true }).click()
+    await clearedRequest
+
+    await expect(fromInput).toHaveValue('')
+    await expect(fromInput).toBeFocused()
+  })
+
   test('shows the compact personal summary on the main dashboard', async ({ page }) => {
     await mockSession(page)
     await mockMe(page, readySummary)
@@ -333,6 +388,7 @@ test.describe('Kubios personal UI', () => {
       synced_at: null,
       latest_result: null,
     })
+    await mockResults(page, emptyResults)
     await page.route('**/api/users/count', async (route) => {
       await route.fulfill({
         status: 200,
