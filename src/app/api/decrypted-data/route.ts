@@ -10,11 +10,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  return runApiRoute(request, async () => {
-    const app = await getServerRuntime();
-    return app.http.data.decrypted({
-      sessionToken: sessionTokenFrom(request),
-      query: queryObject(request),
-    });
-  });
+  return runApiRoute(
+    request,
+    async () => {
+      const app = await getServerRuntime();
+      return app.http.data.decrypted({
+        sessionToken: sessionTokenFrom(request),
+        query: queryObject(request),
+      });
+    },
+    { route: "/api/decrypted-data" },
+  );
 }

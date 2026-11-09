@@ -4,6 +4,7 @@ import {
   ValidationError,
 } from "@/server/domain/errors";
 import type { HttpCookie } from "./cookies";
+import { reportServerError, type ErrorStage } from "./error-diagnostics";
 
 export interface ProblemBody {
   readonly error: {
@@ -46,7 +47,10 @@ export function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
   return result.data;
 }
 
-export function toProblem(error: unknown): HttpResult {
+export function toProblem(
+  error: unknown,
+  stage: ErrorStage = "response",
+): HttpResult {
   if (error instanceof AppError) {
     const body: ProblemBody = {
       error: {
@@ -61,6 +65,7 @@ export function toProblem(error: unknown): HttpResult {
   }
 
   // Never expose stack traces, database errors or secret values to clients.
+  reportServerError(error, stage);
   const body: ProblemBody = {
     error: {
       code: "INTERNAL_ERROR",
@@ -76,6 +81,6 @@ export async function handle(
   try {
     return await operation();
   } catch (error) {
-    return toProblem(error);
+    return toProblem(error, "handler");
   }
 }

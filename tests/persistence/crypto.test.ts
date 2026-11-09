@@ -55,6 +55,12 @@ describe("AES-256-CBC legacy decryption", () => {
     ).toBe("plain text");
   });
 
+  it("preserves legacy plaintext when its IV column is empty", () => {
+    expect(decryptor().decryptText("Bolus", null, "insulindata.insulinType")).toBe(
+      "Bolus",
+    );
+  });
+
   it("rejects a missing IV instead of returning ciphertext as text", () => {
     const ciphertext = encryptText("secret", CURRENT_KEY, ivHex(4));
     try {
