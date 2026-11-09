@@ -1,7 +1,7 @@
 {
-  "buildCommand": "npm run check && npm run build",
+  "buildCommand": "unset npm_config_cache_dir NPM_CONFIG_CACHE_DIR && npm run check && npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "npm ci",
+  "installCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR npm ci",
   "ignoreCommand": "exit 1"
 }
