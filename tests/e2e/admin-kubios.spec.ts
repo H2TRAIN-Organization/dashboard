@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from "../../src/lib/privacy-policy";
 
 /**
  * UI de la vista administrativa de Kubios.
@@ -58,6 +59,7 @@ function sessionBody(role: Role, username: string) {
     },
     method: "email" as const,
     expiresAt: "2026-12-01T00:00:00.000Z",
+    privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: "complete" },
   };
 }
 

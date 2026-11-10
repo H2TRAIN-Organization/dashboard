@@ -83,6 +83,7 @@ async function mockSession(page: Page, role: 'admin' | 'doctor' | 'user') {
 
 test.describe('dashboard shell', () => {
   test('las rutas antiguas redirigen al acceso y al inicio comunes', async ({ page }) => {
+    await mockUnauthenticated(page)
     await page.goto('/app-login')
     await expect(page).toHaveURL(/\/login$/)
 

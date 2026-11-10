@@ -35,7 +35,7 @@ async function mockPrivacy(
     if (path.includes('count')) return route.fulfill({ json: { count: 0 } })
     return route.fulfill({ json: { users: [], total: 0, insulinData: [], foodData: [], exerciseData: [], periodData: [], moodData: [] } })
   })
-  return { decisions, reads: () => privateReads, logoutCalls: () => logoutCalls, fail: () => { fail = true } }
+  return { decisions, reads: () => privateReads, logoutCalls: () => logoutCalls, succeed: () => { fail = false }, fail: () => { fail = true } }
 }
 
 for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }]] as const) {
@@ -70,6 +70,42 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       await expect(page.getByRole('complementary', { name: 'Privacy notice', exact: true })).toHaveCount(0)
       expect(mock.decisions[1]).toMatchObject({ surface: 'banner', decision: 'accept', language: 'en' })
       expect(mock.decisions[1]!.requestId).not.toBe(mock.decisions[0]!.requestId)
+    })
+    test('initial popup rejection signs the user out without private reads', async ({ page }) => {
+      const mock = await mockPrivacy(page)
+      await page.goto('/')
+      const dialog = page.getByRole('dialog', { name: 'Aviso de privacidad', exact: true })
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
+      await expect(page).toHaveURL(/\/login$/)
+      expect(mock.decisions).toHaveLength(1)
+      expect(mock.decisions[0]).toMatchObject({ surface: 'login', decision: 'reject', language: 'es', requestId: expect.any(String) })
+      expect(mock.logoutCalls()).toBe(0)
+      expect(mock.reads()).toBe(0)
+    })
+    test('initial popup rejection can be retried after a failed decision', async ({ page }) => {
+      const mock = await mockPrivacy(page)
+      mock.fail()
+      await page.goto('/')
+      const dialog = page.getByRole('dialog', { name: 'Aviso de privacidad', exact: true })
+      await dialog.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
+      await expect(page.getByRole('alert').filter({ hasText: 'acceso a datos permanece bloqueado' })).toBeVisible()
+      expect(mock.decisions).toHaveLength(1)
+      mock.succeed()
+      await page.getByRole('button', { name: 'Reintentar', exact: true }).click()
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
+      await expect(page).toHaveURL(/\/login$/)
+      expect(mock.decisions).toHaveLength(2)
+      expect(mock.reads()).toBe(0)
+    })
+    test('the user panel links its privacy policy section', async ({ page }) => {
+      await mockPrivacy(page, 'complete')
+      await page.goto('/')
+      await page.getByRole('link', { name: /Política de privacidad/ }).click()
+      await expect(page).toHaveURL(/\/privacy$/)
+      await expect(page.getByRole('heading', { name: 'Aviso de privacidad', exact: true })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'htrain@proton.me', exact: true })).toBeVisible()
     })
     test('banner rejection needs a cancellable confirmation before signing out', async ({ page }) => {
       const mock = await mockPrivacy(page, 'banner')
