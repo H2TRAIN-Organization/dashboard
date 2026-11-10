@@ -648,6 +648,13 @@ export interface Translations {
       next: string
       page: string
       readiness: string
+      sync: string
+      syncBusy: string
+      syncDone: string
+      syncPartial: string
+      syncLocked: string
+      syncThrottled: string
+      syncError: string
     }
   }
   
@@ -1389,6 +1396,13 @@ export const translations: Record<Language, Translations> = {
         next: 'Siguiente',
         page: 'Página',
         readiness: 'Readiness',
+        sync: 'Sincronizar copia',
+        syncBusy: 'Sincronizando con Kubios…',
+        syncDone: 'Copia sincronizada con Kubios. Los datos mostrados ya son la copia más reciente.',
+        syncPartial: 'La sincronización no se completó del todo; la copia puede seguir desactualizada.',
+        syncLocked: 'Otra sincronización de Kubios tiene el turno ahora mismo. Inténtalo de nuevo en unos segundos.',
+        syncThrottled: 'Kubios limitó la tasa de peticiones. Espera el plazo indicado antes de volver a sincronizar.',
+        syncError: 'No se pudo sincronizar la copia con Kubios.',
       }
     },
     users: {
@@ -2120,6 +2134,13 @@ export const translations: Record<Language, Translations> = {
         next: 'Next',
         page: 'Page',
         readiness: 'Readiness',
+        sync: 'Synchronize copy',
+        syncBusy: 'Synchronizing with Kubios…',
+        syncDone: 'Copy synchronized with Kubios. The data shown is now the freshest copy.',
+        syncPartial: 'The synchronization did not fully complete; the copy may still be outdated.',
+        syncLocked: 'Another Kubios synchronization holds the turn right now. Try again in a few seconds.',
+        syncThrottled: 'Kubios rate limited the requests. Wait for the indicated deadline before syncing again.',
+        syncError: 'The participant copy could not be synchronized with Kubios.',
       }
     },
     users: {

@@ -1952,14 +1952,23 @@ function readConfig(env: KubiosEnvSource): KubiosConfig | null {
 }
 
 /**
- * Ejecuta una sincronización Kubios por equipo.
- *
- * Sin argumentos usa la configuración y la clave de servicio del entorno; con
- * `deps` permite sustituir RPC, reloj, UUID, cifrado y ambos `fetch` para
- * pruebas sin red. No lanza errores al llamador: cualquier fallo se degrada a
- * `partial` (salvo `locked`, que solo indica que otro trabajador tiene el lease).
+ * Preparación común de una pasada leaseada: presupuesto → cliente de servicio
+ * → owner → equipo → lease. Concentra las mismas comprobaciones fail-closed
+ * que hacía la pasada del cron, de modo que cualquier flujo nuevo compartido
+ * con ella no pueda saltarse ninguna.
  */
-export async function runKubiosSync(deps: KubiosSyncDeps = {}): Promise<KubiosSyncResult> {
+type PreparedTeamRun =
+  | { readonly kind: 'failure' }
+  | { readonly kind: 'locked' }
+  | { readonly kind: 'team-unavailable' }
+  | {
+      readonly kind: 'ready'
+      readonly context: SyncContext
+      /** Token recién autenticado durante el descubrimiento del equipo. */
+      readonly resolvedToken: ResolvedTeamToken | null
+    }
+
+async function prepareTeamRun(deps: KubiosSyncDeps): Promise<PreparedTeamRun> {
   const startedAt = Date.now()
   const budgetMs = resolveBudgetMs(deps.budgetMs)
   const responseReserveMs = resolveReserveMs(
@@ -1975,12 +1984,12 @@ export async function runKubiosSync(deps: KubiosSyncDeps = {}): Promise<KubiosSy
   const deadlines = resolveDeadlines(startedAt, budgetMs, finishReserveMs, responseReserveMs)
 
   // Sin tiempo de trabajo no se toca la base: no hay lease que cerrar.
-  if (!hasRemaining(deadlines.work)) return internalFailureResult()
+  if (!hasRemaining(deadlines.work)) return { kind: 'failure' }
 
   const env = resolveEnv(deps)
 
   const config = readConfig(env)
-  if (config === null) return internalFailureResult()
+  if (config === null) return { kind: 'failure' }
 
   let service: KubiosSyncRpcClient | null
   try {
@@ -1989,12 +1998,12 @@ export async function runKubiosSync(deps: KubiosSyncDeps = {}): Promise<KubiosSy
       deadlines.work
     )
   } catch {
-    return internalFailureResult()
+    return { kind: 'failure' }
   }
-  if (service === null) return internalFailureResult()
+  if (service === null) return { kind: 'failure' }
 
   const owner = createOwner(deps.randomUUID)
-  if (owner === null) return internalFailureResult()
+  if (owner === null) return { kind: 'failure' }
 
   const common: SyncCommonContext = {
     service,
@@ -2020,12 +2029,7 @@ export async function runKubiosSync(deps: KubiosSyncDeps = {}): Promise<KubiosSy
     const resolution = await resolveTeamAndToken(common)
     if (!resolution.ok) {
       // Sin lease no hay finish ni escrituras; un 429 aquí no persiste pausa.
-      return toPublicResult({
-        status: 'partial',
-        synced: 0,
-        failed: 1,
-        errorCode: 'team.unavailable'
-      })
+      return { kind: 'team-unavailable' }
     }
     resolvedToken = resolution.token
     teamId = resolution.token.teamId
@@ -2047,34 +2051,40 @@ export async function runKubiosSync(deps: KubiosSyncDeps = {}): Promise<KubiosSy
   // un intento ajeno. Si la RPC agotó el plazo, el lease (si se llegó a tomar)
   // caduca solo y ninguna escritura posterior queda autorizada.
   if (!lease.ok || (lease.data !== true && lease.data !== false)) {
-    return internalFailureResult()
+    return { kind: 'failure' }
   }
-  if (lease.data === false) return { status: 'locked', synced: 0, failed: 0 }
+  if (lease.data === false) return { kind: 'locked' }
 
   const acquiredAt = readClock(deps.now) ?? Date.now()
-  const context: SyncContext = {
-    ...common,
-    teamId,
-    leaseExpiresAt: acquiredAt + leaseSeconds * 1_000
+  return {
+    kind: 'ready',
+    resolvedToken,
+    context: {
+      ...common,
+      teamId,
+      leaseExpiresAt: acquiredAt + leaseSeconds * 1_000
+    }
   }
+}
 
+/**
+ * Ejecuta el cuerpo de una pasada ya leaseada y cierra el intento en `finally`
+ * con el `outcome` producido. Un cierre que no confirme la escritura degrada el
+ * resultado: nunca se publica `ok`/`throttled` sin cierre bajo el `owner`.
+ */
+async function runLeasedPass(
+  context: SyncContext,
+  execute: (context: SyncContext) => Promise<SyncOutcome>
+): Promise<SyncOutcome> {
   let outcome: SyncOutcome = { status: 'partial', synced: 0, failed: 1, errorCode: 'sync.internal' }
   try {
-    if (resolvedToken !== null) {
-      // El token se persiste solo después del lease y bajo el equipo resuelto.
-      const persisted = await persistResolvedToken(context, resolvedToken)
-      outcome = persisted
-        ? await synchronize(context, resolvedToken)
-        : { status: 'partial', synced: 0, failed: 1, errorCode: 'token.unavailable' }
-    } else {
-      outcome = await synchronize(context)
-    }
+    outcome = await execute(context)
   } catch {
     outcome = {
       status: 'partial',
       synced: 0,
       failed: 1,
-      errorCode: hasRemaining(deadlines.work) ? 'sync.internal' : 'sync.deadline_exceeded'
+      errorCode: hasRemaining(context.deadlines.work) ? 'sync.internal' : 'sync.deadline_exceeded'
     }
   } finally {
     try {
@@ -2085,6 +2095,135 @@ export async function runKubiosSync(deps: KubiosSyncDeps = {}): Promise<KubiosSy
       outcome = degradeAfterFinishFailure(outcome)
     }
   }
+  return outcome
+}
+
+/**
+ * Ejecuta una sincronización Kubios por equipo.
+ *
+ * Sin argumentos usa la configuración y la clave de servicio del entorno; con
+ * `deps` permite sustituir RPC, reloj, UUID, cifrado y ambos `fetch` para
+ * pruebas sin red. No lanza errores al llamador: cualquier fallo se degrada a
+ * `partial` (salvo `locked`, que solo indica que otro trabajador tiene el lease).
+ */
+export async function runKubiosSync(deps: KubiosSyncDeps = {}): Promise<KubiosSyncResult> {
+  const prepared = await prepareTeamRun(deps)
+
+  if (prepared.kind === 'failure') return internalFailureResult()
+  if (prepared.kind === 'locked') return { status: 'locked', synced: 0, failed: 0 }
+  if (prepared.kind === 'team-unavailable') {
+    return toPublicResult({
+      status: 'partial',
+      synced: 0,
+      failed: 1,
+      errorCode: 'team.unavailable'
+    })
+  }
+
+  const resolvedToken = prepared.resolvedToken
+  const outcome = await runLeasedPass(prepared.context, async (context) => {
+    if (resolvedToken !== null) {
+      // El token se persiste solo después del lease y bajo el equipo resuelto.
+      const persisted = await persistResolvedToken(context, resolvedToken)
+      return persisted
+        ? await synchronize(context, resolvedToken)
+        : { status: 'partial', synced: 0, failed: 1, errorCode: 'token.unavailable' }
+    }
+    return synchronize(context)
+  })
 
   return toPublicResult(outcome)
+}
+
+/**
+ * Resultado de un refresco dirigido: los mismos campos públicos de la pasada
+ * por equipo más `memberSynced`, que es `true` únicamente cuando la descarga y
+ * la escritura fenceada del propio miembro quedaron confirmadas.
+ */
+export interface KubiosMemberRefreshResult extends KubiosSyncResult {
+  readonly memberSynced: boolean
+}
+
+/**
+ * Refresco dirigido de un solo miembro (SYNC-04).
+ *
+ * Reutiliza exactamente la maquinaria de la pasada por equipo (presupuesto,
+ * lease, token, descarga K13 y escritura fenceada K10) con dos diferencias
+ * deliberadas: solo descarga a ese miembro y **no** toca el cursor durable, de
+ * modo que el plan del cron no se adelanta ni se rearma con un refresco manual.
+ * El lease impide escribir mientras una pasada programada está activa; el
+ * cierre sigue siendo obligatorio y degrada el resultado si no confirma.
+ */
+export async function runKubiosMemberRefresh(
+  memberId: string,
+  deps: KubiosSyncDeps = {}
+): Promise<KubiosMemberRefreshResult> {
+  const prepared = await prepareTeamRun(deps)
+  const notSynced = (result: KubiosSyncResult): KubiosMemberRefreshResult => ({
+    ...result,
+    memberSynced: false
+  })
+
+  if (prepared.kind === 'failure') return notSynced(internalFailureResult())
+  if (prepared.kind === 'locked') {
+    return notSynced({ status: 'locked', synced: 0, failed: 0 })
+  }
+  if (prepared.kind === 'team-unavailable') {
+    return notSynced(
+      toPublicResult({
+        status: 'partial',
+        synced: 0,
+        failed: 1,
+        errorCode: 'team.unavailable'
+      })
+    )
+  }
+
+  const resolvedToken = prepared.resolvedToken
+  const outcome = await runLeasedPass(prepared.context, async (context) => {
+    let idToken: string
+    if (resolvedToken !== null) {
+      const persisted = await persistResolvedToken(context, resolvedToken)
+      if (!persisted) {
+        return { status: 'partial', synced: 0, failed: 1, errorCode: 'token.unavailable' }
+      }
+      idToken = resolvedToken.idToken
+    } else {
+      const token = await acquireIdToken(context)
+      if (!token.ok) {
+        if (token.rateLimited) {
+          return {
+            status: 'throttled',
+            synced: 0,
+            failed: 1,
+            retryAfterMs: token.retryAfterMs
+          }
+        }
+        if (token.deadlineExceeded) {
+          return { status: 'partial', synced: 0, failed: 1, errorCode: 'sync.deadline_exceeded' }
+        }
+        return { status: 'partial', synced: 0, failed: 1, errorCode: 'token.unavailable' }
+      }
+      idToken = token.idToken
+    }
+
+    const member = await syncMember(context, memberId, idToken)
+    switch (member.kind) {
+      case 'synced':
+        return { status: 'ok', synced: 1, failed: 0 }
+      case 'failed':
+        return { status: 'partial', synced: 0, failed: 1, errorCode: 'members.partial' }
+      case 'rate_limited':
+        return {
+          status: 'throttled',
+          synced: 0,
+          failed: 1,
+          retryAfterMs: member.retryAfterMs
+        }
+      case 'deadline':
+        return { status: 'partial', synced: 0, failed: 1, errorCode: 'sync.deadline_exceeded' }
+    }
+  })
+
+  return { ...toPublicResult(outcome), memberSynced: outcome.status === 'ok' }
 }

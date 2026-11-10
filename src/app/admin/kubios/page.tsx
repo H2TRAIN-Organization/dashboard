@@ -56,6 +56,8 @@ function AdminKubiosContent() {
     goPrevious,
     reloadMeasurements,
     reloadParticipants,
+    sync,
+    syncParticipant,
   } = useAdminKubios(isAdmin, selectedUserId)
 
   const participantItems = useMemo<UserAutocompleteItem[]>(
@@ -200,6 +202,26 @@ function AdminKubiosContent() {
               </h2>
             </div>
             <div className="flex items-center gap-2">
+              {isAdmin && selectedUserId !== null ? (
+                <button
+                  type="button"
+                  onClick={() => void syncParticipant()}
+                  disabled={sync.phase === 'busy' || loading}
+                  data-testid="admin-kubios-sync"
+                  className="inline-flex items-center gap-1 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <RefreshCw
+                    className={
+                      sync.phase === 'busy'
+                        ? 'h-4 w-4 animate-spin'
+                        : 'h-4 w-4'
+                    }
+                  />
+                  {sync.phase === 'busy'
+                    ? t.admin.kubios.syncBusy
+                    : t.admin.kubios.sync}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={goPrevious}
@@ -223,6 +245,38 @@ function AdminKubiosContent() {
               </button>
             </div>
           </div>
+
+          {sync.phase !== 'idle' && sync.message !== null ? (
+            <div
+              role={sync.phase === 'error' ? 'alert' : 'status'}
+              data-testid="admin-kubios-sync-message"
+              className={
+                sync.phase === 'error'
+                  ? 'mb-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 sm:flex-row sm:items-center sm:justify-between'
+                  : sync.phase === 'done' && sync.message === 'syncDone'
+                    ? 'mb-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800'
+                    : 'mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800'
+              }
+            >
+              {sync.phase === 'done' && sync.message === 'syncDone' ? (
+                <ShieldCheck className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              ) : (
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              )}
+              <span className="flex-1">{t.admin.kubios[sync.message]}</span>
+              {sync.phase === 'error' ? (
+                <button
+                  type="button"
+                  onClick={() => void syncParticipant()}
+                  data-testid="admin-kubios-sync-retry"
+                  className="inline-flex items-center gap-2 self-start rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {t.admin.kubios.retry}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {visibleStatus === 'stale' ? (
             <div
