@@ -110,6 +110,7 @@ export interface Translations {
     hrvAnalysisDescription: string
     correlationStudyDescription: string
     administrationDescription: string
+    privacyCard: string
     generalSummary: string
     cuttingEdgeTechnology: string
     intelligentMonitoring: string
@@ -714,6 +715,7 @@ export interface Translations {
   // Común
   common: {
     loading: string
+    menu: string
     error: string
     success: string
     warning: string
@@ -862,6 +864,7 @@ export const translations: Record<Language, Translations> = {
       hrvAnalysisDescription: 'Análisis de variabilidad cardíaca con tecnología Kubios',
       correlationStudyDescription: 'Correlaciones entre actividad física, HRV y control glucémico',
       administrationDescription: 'Configuración del sistema, base de datos y roles de usuario',
+      privacyCard: 'Consulta el aviso de privacidad, tus derechos y el contacto del responsable',
       generalSummary: 'Resumen General',
       cuttingEdgeTechnology: 'Tecnología de Vanguardia',
       intelligentMonitoring: 'Monitoreo Inteligente',
@@ -1447,6 +1450,7 @@ export const translations: Record<Language, Translations> = {
     },
     common: {
       loading: 'Cargando...',
+      menu: 'Abrir menú de navegación',
       error: 'Error',
       success: 'Éxito',
       warning: 'Advertencia',
@@ -1591,6 +1595,7 @@ export const translations: Record<Language, Translations> = {
       hrvAnalysisDescription: 'Heart rate variability analysis with Kubios technology',
       correlationStudyDescription: 'Correlations between physical activity, HRV and glycemic control',
       administrationDescription: 'System configuration, database and user roles',
+      privacyCard: 'Read the privacy notice, your rights and the controller contact',
       generalSummary: 'General Summary',
       cuttingEdgeTechnology: 'Cutting-Edge Technology',
       intelligentMonitoring: 'Intelligent Monitoring',
@@ -2176,6 +2181,7 @@ export const translations: Record<Language, Translations> = {
     },
     common: {
       loading: 'Loading...',
+      menu: 'Open navigation menu',
       error: 'Error',
       success: 'Success',
       warning: 'Warning',

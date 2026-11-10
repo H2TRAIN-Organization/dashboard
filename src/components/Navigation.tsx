@@ -102,6 +102,7 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
           <div className="flex items-center justify-between space-x-1">
             {/* Botón del menú - Izquierda */}
             <button
+              aria-label={t.common.menu}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="flex items-center justify-center w-8 h-8 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-lg transition-all duration-200 hover:scale-105"
             >

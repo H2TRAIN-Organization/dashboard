@@ -8,6 +8,7 @@ import {
   BookOpen,
   Home,
   Settings,
+  ShieldCheck,
   Sparkles,
   Users,
   Zap,
@@ -235,6 +236,15 @@ export default function DashboardPage() {
           },
         ]
       : []),
+    {
+      href: '/privacy',
+      title: t.navigation.privacy,
+      description: t.dashboard.privacyCard,
+      action: t.dashboard.access,
+      icon: ShieldCheck,
+      iconClass: 'from-slate-500 to-slate-600',
+      accentClass: 'hover:border-slate-300/70',
+    },
   ]
 
   return (
