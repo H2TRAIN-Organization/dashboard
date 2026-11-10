@@ -295,6 +295,71 @@ test('SYNC-04 lease ocupado: locked, sin descarga y sin finish propio', async ()
   assert.equal(callsNamed('kubios_finish_sync').length, 0)
 })
 
+test('SYNC-04 configuración de Kubios ausente: config.invalid sin tocar la red', async () => {
+  const missingConfigEnv = Object.fromEntries(
+    Object.entries(SYNC_ENV).filter(([name]) => name !== 'KUBIOS_USERNAME')
+  )
+  const { service, callsNamed } = createService({})
+  const { apiFetch, calls } = createApiFetch({})
+
+  const result = await runKubiosMemberRefresh(MEMBER_A, {
+    service,
+    env: missingConfigEnv,
+    apiFetch,
+    now: () => NOW_MS
+  })
+
+  assert.deepEqual(result, {
+    status: 'partial',
+    synced: 0,
+    failed: 1,
+    memberSynced: false,
+    errorCode: 'config.invalid'
+  })
+  assert.equal(calls.results.length, 0)
+  assert.equal(callsNamed('kubios_try_acquire_sync').length, 0, 'sin config no hay lease')
+  assert.equal(callsNamed('kubios_finish_sync').length, 0)
+})
+
+test('SYNC-04 RPC de lease indescifrable: lease.unavailable y cierre honesto', async () => {
+  const seeded = seedToken()
+  const state = { tokenRow: seeded.row, snapshots: new Map(), leaseOwner: null, finish: null, cursor: null }
+  const calls = []
+  const service = {
+    async rpc(name, args) {
+      calls.push({ name, args })
+      if (name === 'kubios_try_acquire_sync') return { data: null, error: null }
+      if (name === 'kubios_get_token') return { data: [], error: null }
+      if (name === 'kubios_finish_sync') {
+        state.finish = args
+        return { data: true, error: null }
+      }
+      return { data: null, error: { message: 'rpc_no_soportada' } }
+    }
+  }
+
+  const result = await runKubiosMemberRefresh(MEMBER_A, {
+    service,
+    env: SYNC_ENV,
+    apiFetch: (async () => {
+      throw new Error('no debe haber descarga sin lease resoluble')
+    }),
+    now: () => NOW_MS
+  })
+
+  assert.deepEqual(result, {
+    status: 'partial',
+    synced: 0,
+    failed: 1,
+    memberSynced: false,
+    errorCode: 'lease.unavailable'
+  })
+  // Semántica heredada de la pasada del cron: un lease de resultado
+  // indescifrable no se cierra (podría pertenecer a otro intento); caduca solo.
+  const finish = calls.filter((call) => call.name === 'kubios_finish_sync')
+  assert.equal(finish.length, 0)
+})
+
 test('SYNC-04 miembro con fallo HTTP: partial fail-closed y cierre con error', async () => {
   const seeded = seedToken()
   const { service, callsNamed } = createService({ tokenRow: seeded.row })

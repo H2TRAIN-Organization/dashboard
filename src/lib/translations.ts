@@ -1410,7 +1410,7 @@ export const translations: Record<Language, Translations> = {
         syncDeadline: 'El refresco agotó su plazo antes de terminar; la copia puede seguir desactualizada.',
         syncLocked: 'Otra sincronización de Kubios tiene el turno ahora mismo. Inténtalo de nuevo en unos segundos.',
         syncThrottled: 'Kubios limitó la tasa de peticiones. Espera el plazo indicado antes de volver a sincronizar.',
-        syncError: 'No se pudo sincronizar la copia con Kubios.',
+        syncError: 'Fallo interno del refresco en este despliegue; la copia no cambió. Vuelve a intentarlo y, si persiste, revisa el despliegue.',
       }
     },
     users: {
@@ -2152,7 +2152,7 @@ export const translations: Record<Language, Translations> = {
         syncDeadline: 'The refresh ran out of time before finishing; the copy may still be outdated.',
         syncLocked: 'Another Kubios synchronization holds the turn right now. Try again in a few seconds.',
         syncThrottled: 'Kubios rate limited the requests. Wait for the indicated deadline before syncing again.',
-        syncError: 'The participant copy could not be synchronized with Kubios.',
+        syncError: 'Internal refresh failure in this deployment; the copy did not change. Try again and check the deployment if it persists.',
       }
     },
     users: {

@@ -102,12 +102,13 @@ function adminKubiosSyncMessageKey(
         case 'members.partial':
           return 'syncCopy'
         case 'sync.deadline_exceeded':
+          return 'syncDeadline'
         case 'finish.failed':
         case 'sync.internal':
         case 'lease.unavailable':
         case 'service.unavailable':
         case 'team_members.unavailable':
-          return 'syncDeadline'
+          return 'syncError'
         default:
           return 'syncPartial'
       }

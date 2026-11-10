@@ -1958,7 +1958,7 @@ function readConfig(env: KubiosEnvSource): KubiosConfig | null {
  * con ella no pueda saltarse ninguna.
  */
 type PreparedTeamRun =
-  | { readonly kind: 'failure' }
+  | { readonly kind: 'failure'; readonly errorCode: KubiosSyncErrorCode }
   | { readonly kind: 'locked' }
   | { readonly kind: 'team-unavailable' }
   | {
@@ -1984,12 +1984,16 @@ async function prepareTeamRun(deps: KubiosSyncDeps): Promise<PreparedTeamRun> {
   const deadlines = resolveDeadlines(startedAt, budgetMs, finishReserveMs, responseReserveMs)
 
   // Sin tiempo de trabajo no se toca la base: no hay lease que cerrar.
-  if (!hasRemaining(deadlines.work)) return { kind: 'failure' }
+  if (!hasRemaining(deadlines.work)) {
+    return { kind: 'failure', errorCode: 'sync.deadline_exceeded' }
+  }
 
   const env = resolveEnv(deps)
 
   const config = readConfig(env)
-  if (config === null) return { kind: 'failure' }
+  if (config === null) {
+    return { kind: 'failure', errorCode: 'config.invalid' }
+  }
 
   let service: KubiosSyncRpcClient | null
   try {
@@ -1998,12 +2002,16 @@ async function prepareTeamRun(deps: KubiosSyncDeps): Promise<PreparedTeamRun> {
       deadlines.work
     )
   } catch {
-    return { kind: 'failure' }
+    return { kind: 'failure', errorCode: 'service.unavailable' }
   }
-  if (service === null) return { kind: 'failure' }
+  if (service === null) {
+    return { kind: 'failure', errorCode: 'service.unavailable' }
+  }
 
   const owner = createOwner(deps.randomUUID)
-  if (owner === null) return { kind: 'failure' }
+  if (owner === null) {
+    return { kind: 'failure', errorCode: 'sync.internal' }
+  }
 
   const common: SyncCommonContext = {
     service,
@@ -2051,7 +2059,7 @@ async function prepareTeamRun(deps: KubiosSyncDeps): Promise<PreparedTeamRun> {
   // un intento ajeno. Si la RPC agotó el plazo, el lease (si se llegó a tomar)
   // caduca solo y ninguna escritura posterior queda autorizada.
   if (!lease.ok || (lease.data !== true && lease.data !== false)) {
-    return { kind: 'failure' }
+    return { kind: 'failure', errorCode: 'lease.unavailable' }
   }
   if (lease.data === false) return { kind: 'locked' }
 
@@ -2171,7 +2179,12 @@ export async function runKubiosMemberRefresh(
     errorCode
   })
 
-  if (prepared.kind === 'failure') return notSynced('sync.internal', internalFailureResult())
+  if (prepared.kind === 'failure') {
+    return notSynced(
+      prepared.errorCode,
+      prepared.errorCode === 'sync.internal' ? internalFailureResult() : undefined
+    )
+  }
   if (prepared.kind === 'locked') {
     return {
       status: 'locked',
