@@ -134,6 +134,39 @@ describe('syncAdminKubiosMember (SYNC-04)', () => {
       failed: 0,
     })
   })
+
+  it('expone solo la categoría del fallo con partial y nunca con ok', async () => {
+    mocks.refresh.mockResolvedValue({
+      status: 'partial',
+      synced: 0,
+      failed: 1,
+      memberSynced: false,
+      errorCode: 'config.invalid',
+    })
+    const partial = await syncAdminKubiosMember('opaque', '2')
+    expect(partial).toEqual({
+      status: 'partial',
+      memberSynced: false,
+      synced: 0,
+      failed: 1,
+      errorCode: 'config.invalid',
+    })
+
+    mocks.refresh.mockResolvedValue({
+      status: 'ok',
+      synced: 1,
+      failed: 0,
+      memberSynced: true,
+      errorCode: 'sync.internal',
+    })
+    const ok = await syncAdminKubiosMember('opaque', '2')
+    expect(ok).toEqual({
+      status: 'ok',
+      memberSynced: true,
+      synced: 1,
+      failed: 0,
+    })
+  })
 })
 
 describe('POST /api/admin/kubios/participants/[userId]/sync', () => {

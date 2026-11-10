@@ -44,11 +44,26 @@ const USER_ID_PATTERN = /^[1-9]\d{0,9}$/
 
 export type AdminKubiosSyncStatus = 'ok' | 'partial' | 'locked' | 'throttled'
 
+/** Solo códigos K09; nunca mensajes, cuerpos ni identificadores externos. */
+export type AdminKubiosSyncErrorCode =
+  | 'config.invalid'
+  | 'service.unavailable'
+  | 'lease.unavailable'
+  | 'token.unavailable'
+  | 'team.unavailable'
+  | 'team_members.unavailable'
+  | 'members.partial'
+  | 'finish.failed'
+  | 'sync.deadline_exceeded'
+  | 'sync.internal'
+
 export interface AdminKubiosSyncResult {
   readonly status: AdminKubiosSyncStatus
   readonly memberSynced: boolean
   readonly synced: number
   readonly failed: number
+  /** Código de la categoría de fallo; solo con `partial`. */
+  readonly errorCode?: AdminKubiosSyncErrorCode
   /** `Retry-After` finito de la pausa Kubios, en segundos; solo con `throttled`. */
   readonly retryAfterSeconds?: number
 }
@@ -133,14 +148,37 @@ export async function syncAdminKubiosMember(
   const syncedCount = Number.isInteger(synced) && synced >= 0 ? synced : 0
   const failedCount = Number.isInteger(failed) && failed >= 0 ? failed : 1
 
+  const errorCode =
+    isSafeErrorCode(refresh.errorCode) && status === 'partial'
+      ? refresh.errorCode
+      : undefined
+
   const result: AdminKubiosSyncResult = {
     status,
     memberSynced: status === 'ok' && refresh.memberSynced === true,
     synced: status === 'ok' ? syncedCount : 0,
     failed: failedCount,
+    ...(errorCode !== undefined ? { errorCode } : {}),
     ...(status === 'throttled' && typeof refresh.retryAfterSeconds === 'number'
       ? { retryAfterSeconds: refresh.retryAfterSeconds }
       : {}),
   }
   return result
+}
+
+const SAFE_ERROR_CODES: readonly string[] = [
+  'config.invalid',
+  'service.unavailable',
+  'lease.unavailable',
+  'token.unavailable',
+  'team.unavailable',
+  'team_members.unavailable',
+  'members.partial',
+  'finish.failed',
+  'sync.deadline_exceeded',
+  'sync.internal',
+]
+
+function isSafeErrorCode(value: unknown): value is AdminKubiosSyncErrorCode {
+  return (SAFE_ERROR_CODES as readonly unknown[]).includes(value)
 }

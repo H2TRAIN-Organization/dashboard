@@ -303,7 +303,7 @@ const ISO_TIMESTAMP_WITH_ZONE_PATTERN =
  * el formato de K09 (`^[a-z0-9]+([._:-][a-z0-9]+)*$`, máximo 64 caracteres) y
  * nunca contienen valores externos.
  */
-type KubiosSyncErrorCode =
+export type KubiosSyncErrorCode =
   | 'config.invalid'
   | 'service.unavailable'
   | 'lease.unavailable'
@@ -2142,6 +2142,12 @@ export async function runKubiosSync(deps: KubiosSyncDeps = {}): Promise<KubiosSy
  */
 export interface KubiosMemberRefreshResult extends KubiosSyncResult {
   readonly memberSynced: boolean
+  /**
+   * Código de error seguro K09 cuando el resultado no es `ok`: solo la
+   * categoría del fallo (config.invalid, token.unavailable, members.partial…),
+   * nunca mensajes, cuerpos ni identificadores externos.
+   */
+  readonly errorCode?: KubiosSyncErrorCode
 }
 
 /**
@@ -2159,25 +2165,23 @@ export async function runKubiosMemberRefresh(
   deps: KubiosSyncDeps = {}
 ): Promise<KubiosMemberRefreshResult> {
   const prepared = await prepareTeamRun(deps)
-  const notSynced = (result: KubiosSyncResult): KubiosMemberRefreshResult => ({
-    ...result,
-    memberSynced: false
+  const notSynced = (errorCode: KubiosSyncErrorCode, result?: KubiosSyncResult): KubiosMemberRefreshResult => ({
+    ...(result ?? { status: 'partial' as const, synced: 0, failed: 1 }),
+    memberSynced: false,
+    errorCode
   })
 
-  if (prepared.kind === 'failure') return notSynced(internalFailureResult())
+  if (prepared.kind === 'failure') return notSynced('sync.internal', internalFailureResult())
   if (prepared.kind === 'locked') {
-    return notSynced({ status: 'locked', synced: 0, failed: 0 })
+    return {
+      status: 'locked',
+      synced: 0,
+      failed: 0,
+      memberSynced: false,
+      errorCode: 'lease.unavailable'
+    }
   }
-  if (prepared.kind === 'team-unavailable') {
-    return notSynced(
-      toPublicResult({
-        status: 'partial',
-        synced: 0,
-        failed: 1,
-        errorCode: 'team.unavailable'
-      })
-    )
-  }
+  if (prepared.kind === 'team-unavailable') return notSynced('team.unavailable')
 
   const resolvedToken = prepared.resolvedToken
   const outcome = await runLeasedPass(prepared.context, async (context) => {
@@ -2185,7 +2189,7 @@ export async function runKubiosMemberRefresh(
     if (resolvedToken !== null) {
       const persisted = await persistResolvedToken(context, resolvedToken)
       if (!persisted) {
-        return { status: 'partial', synced: 0, failed: 1, errorCode: 'token.unavailable' }
+        return { status: 'partial', synced: 0, failed: 1, errorCode: 'token.unavailable' as const }
       }
       idToken = resolvedToken.idToken
     } else {
@@ -2200,9 +2204,9 @@ export async function runKubiosMemberRefresh(
           }
         }
         if (token.deadlineExceeded) {
-          return { status: 'partial', synced: 0, failed: 1, errorCode: 'sync.deadline_exceeded' }
+          return { status: 'partial', synced: 0, failed: 1, errorCode: 'sync.deadline_exceeded' as const }
         }
-        return { status: 'partial', synced: 0, failed: 1, errorCode: 'token.unavailable' }
+        return { status: 'partial', synced: 0, failed: 1, errorCode: 'token.unavailable' as const }
       }
       idToken = token.idToken
     }
@@ -2212,7 +2216,7 @@ export async function runKubiosMemberRefresh(
       case 'synced':
         return { status: 'ok', synced: 1, failed: 0 }
       case 'failed':
-        return { status: 'partial', synced: 0, failed: 1, errorCode: 'members.partial' }
+        return { status: 'partial', synced: 0, failed: 1, errorCode: 'members.partial' as const }
       case 'rate_limited':
         return {
           status: 'throttled',
@@ -2221,9 +2225,14 @@ export async function runKubiosMemberRefresh(
           retryAfterMs: member.retryAfterMs
         }
       case 'deadline':
-        return { status: 'partial', synced: 0, failed: 1, errorCode: 'sync.deadline_exceeded' }
+        return { status: 'partial', synced: 0, failed: 1, errorCode: 'sync.deadline_exceeded' as const }
     }
   })
 
-  return { ...toPublicResult(outcome), memberSynced: outcome.status === 'ok' }
+  const publicResult = toPublicResult(outcome)
+  return {
+    ...publicResult,
+    memberSynced: outcome.status === 'ok',
+    ...(outcome.status === 'partial' ? { errorCode: outcome.errorCode } : {})
+  }
 }

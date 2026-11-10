@@ -61,6 +61,10 @@ const INITIAL_PAGE: AdminKubiosPageState = {
 export type AdminKubiosSyncMessageKey =
   | 'syncDone'
   | 'syncPartial'
+  | 'syncNoConfig'
+  | 'syncAuth'
+  | 'syncCopy'
+  | 'syncDeadline'
   | 'syncLocked'
   | 'syncThrottled'
   | 'syncError'
@@ -88,6 +92,25 @@ function adminKubiosSyncMessageKey(
       return 'syncLocked'
     case 'throttled':
       return 'syncThrottled'
+    case 'partial':
+      switch (result.errorCode) {
+        case 'config.invalid':
+          return 'syncNoConfig'
+        case 'token.unavailable':
+        case 'team.unavailable':
+          return 'syncAuth'
+        case 'members.partial':
+          return 'syncCopy'
+        case 'sync.deadline_exceeded':
+        case 'finish.failed':
+        case 'sync.internal':
+        case 'lease.unavailable':
+        case 'service.unavailable':
+        case 'team_members.unavailable':
+          return 'syncDeadline'
+        default:
+          return 'syncPartial'
+      }
     default:
       return 'syncPartial'
   }

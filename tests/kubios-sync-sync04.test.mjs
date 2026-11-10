@@ -1,11 +1,11 @@
-/**
- * Pruebas sintéticas del refresco dirigido de un miembro (subtarea SYNC-04).
+﻿/**
+ * Pruebas sintÃ©ticas del refresco dirigido de un miembro (subtarea SYNC-04).
  *
  * No usan red, ni Supabase remoto, ni credenciales reales: las RPC, los dos
  * `fetch`, el reloj y el UUID se inyectan, igual que en `kubios-sync.k14`.
- * Reutiliza el loader de K14 para resolver los imports relativos sin extensión.
+ * Reutiliza el loader de K14 para resolver los imports relativos sin extensiÃ³n.
  *
- * Ejecutar desde la raíz del repositorio:
+ * Ejecutar desde la raÃ­z del repositorio:
  *
  *   node --conditions=react-server \
  *     --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
@@ -29,7 +29,7 @@ const NOW_MS = 1_800_000_000_000
 
 const SYNC_ENV = Object.freeze({
   KUBIOS_USERNAME: 'usuario.sintetico@example.invalid',
-  KUBIOS_PASSWORD: ' contraseña sintética con espacios ',
+  KUBIOS_PASSWORD: ' contraseÃ±a sintÃ©tica con espacios ',
   KUBIOS_CLIENT_ID: 'cliente-sintetico',
   KUBIOS_TEAM_ID: TEAM_ID,
   KUBIOS_ENCRYPTION_KEY_V1: Buffer.alloc(32, 0x5a).toString('base64')
@@ -41,7 +41,7 @@ const SYNC_ENV_WITHOUT_TEAM = Object.freeze(
   )
 )
 
-/* Utilidades: réplica reducida del doble de servicio de K14. */
+/* Utilidades: rÃ©plica reducida del doble de servicio de K14. */
 
 function syntheticJwt(expSeconds) {
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
@@ -212,10 +212,10 @@ function loginRedirect({ idToken }) {
 }
 
 /* ---------------------------------------------------------------- *
- * 1. Éxito del refresco dirigido
+ * 1. Ã‰xito del refresco dirigido
  * ---------------------------------------------------------------- */
 
-test('SYNC-04 éxito: sincroniza solo el miembro objetivo y no toca el cursor', async () => {
+test('SYNC-04 Ã©xito: sincroniza solo el miembro objetivo y no toca el cursor', async () => {
   const seeded = seedToken()
   const { service, state, callsNamed } = createService({ tokenRow: seeded.row })
   const { apiFetch, calls } = createApiFetch({
@@ -290,7 +290,7 @@ test('SYNC-04 lease ocupado: locked, sin descarga y sin finish propio', async ()
     now: () => NOW_MS
   })
 
-  assert.deepEqual(result, { status: 'locked', synced: 0, failed: 0, memberSynced: false })
+  assert.deepEqual(result, { status: 'locked', synced: 0, failed: 0, memberSynced: false, errorCode: 'lease.unavailable' })
   assert.equal(calls.results.length, 0)
   assert.equal(callsNamed('kubios_finish_sync').length, 0)
 })
@@ -309,7 +309,7 @@ test('SYNC-04 miembro con fallo HTTP: partial fail-closed y cierre con error', a
     now: () => NOW_MS
   })
 
-  assert.deepEqual(result, { status: 'partial', synced: 0, failed: 1, memberSynced: false })
+  assert.deepEqual(result, { status: 'partial', synced: 0, failed: 1, memberSynced: false, errorCode: 'members.partial' })
   const finish = callsNamed('kubios_finish_sync')
   assert.equal(finish.length, 1)
   assert.equal(finish[0].args.p_success, false)
@@ -327,12 +327,12 @@ test('SYNC-04 identificador no UUID: fallo sin descargar y cierre completo', asy
     now: () => NOW_MS
   })
 
-  assert.deepEqual(result, { status: 'partial', synced: 0, failed: 1, memberSynced: false })
+  assert.deepEqual(result, { status: 'partial', synced: 0, failed: 1, memberSynced: false, errorCode: 'members.partial' })
   assert.equal(calls.results.length, 0)
   assert.equal(callsNamed('kubios_finish_sync').length, 1)
 })
 
-test('SYNC-04 cierre fallido degrada el resultado: nunca ok sin confirmación', async () => {
+test('SYNC-04 cierre fallido degrada el resultado: nunca ok sin confirmaciÃ³n', async () => {
   const seeded = seedToken()
   const { service } = createService({ tokenRow: seeded.row, finishResult: false })
   const { apiFetch } = createApiFetch({
@@ -350,7 +350,7 @@ test('SYNC-04 cierre fallido degrada el resultado: nunca ok sin confirmación', 
   assert.equal(result.memberSynced, false)
 })
 
-test('la pasada por equipo del cron sigue intacta tras el refactor de preparación', async () => {
+test('la pasada por equipo del cron sigue intacta tras el refactor de preparaciÃ³n', async () => {
   const seeded = seedToken()
   const { service, callsNamed } = createService({ tokenRow: seeded.row })
   const { apiFetch } = createApiFetch({

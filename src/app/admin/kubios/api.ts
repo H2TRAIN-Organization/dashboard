@@ -324,12 +324,42 @@ export const ADMIN_KUBIOS_SYNC_PATH = '/api/admin/kubios/participants'
 
 export type AdminKubiosSyncStatus = 'ok' | 'partial' | 'locked' | 'throttled'
 
+export type AdminKubiosSyncErrorCode =
+  | 'config.invalid'
+  | 'service.unavailable'
+  | 'lease.unavailable'
+  | 'token.unavailable'
+  | 'team.unavailable'
+  | 'team_members.unavailable'
+  | 'members.partial'
+  | 'finish.failed'
+  | 'sync.deadline_exceeded'
+  | 'sync.internal'
+
 export interface AdminKubiosSyncResult {
   status: AdminKubiosSyncStatus
   memberSynced: boolean
   synced: number
   failed: number
+  errorCode?: AdminKubiosSyncErrorCode
   retryAfterSeconds?: number
+}
+
+const SYNC_ERROR_CODES: readonly string[] = [
+  'config.invalid',
+  'service.unavailable',
+  'lease.unavailable',
+  'token.unavailable',
+  'team.unavailable',
+  'team_members.unavailable',
+  'members.partial',
+  'finish.failed',
+  'sync.deadline_exceeded',
+  'sync.internal',
+]
+
+function isSafeSyncErrorCode(value: unknown): value is AdminKubiosSyncErrorCode {
+  return (SYNC_ERROR_CODES as readonly string[]).includes(value as string)
 }
 
 function isKubiosSyncStatus(value: unknown): value is AdminKubiosSyncStatus {
@@ -358,11 +388,18 @@ export function parseAdminKubiosSyncResult(
     retryAfterSeconds = value
   }
 
+  let errorCode: AdminKubiosSyncErrorCode | undefined
+  if (payload.errorCode !== undefined) {
+    if (!isSafeSyncErrorCode(payload.errorCode)) return null
+    errorCode = payload.errorCode
+  }
+
   return {
     status: payload.status,
     memberSynced: payload.memberSynced,
     synced,
     failed,
+    ...(errorCode !== undefined ? { errorCode } : {}),
     ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
   }
 }

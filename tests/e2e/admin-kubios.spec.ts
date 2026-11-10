@@ -1100,6 +1100,39 @@ test.describe("Admin Kubios overview", () => {
     );
   });
 
+  test("a partial sync explains which internal step failed", async ({ page }) => {
+    await mockSession(page);
+    await mockParticipantPages(page, [
+      participantsPage([{ userId: 1, username: "alice" }], null),
+    ]);
+    await page.route("**/api/admin/kubios/measurements*", (route) =>
+      route.fulfill({ json: measurementsPage([measurementRow(1, "alice")]) }),
+    );
+    await page.route("**/api/admin/kubios/participants/1/sync", (route) =>
+      route.fulfill({
+        json: {
+          status: "partial",
+          memberSynced: false,
+          synced: 0,
+          failed: 1,
+          errorCode: "config.invalid",
+        },
+      }),
+    );
+
+    await page.goto("/admin/kubios");
+    await expect(page.getByTestId("admin-kubios-row")).toContainText("alice");
+    await selectParticipant(page, "alice");
+
+    await page.getByTestId("admin-kubios-sync").click();
+    await expect(page.getByTestId("admin-kubios-sync-message")).toContainText(
+      "Este despliegue no tiene la configuración de Kubios",
+    );
+    await expect(page.getByTestId("admin-kubios-sync-message")).not.toContainText(
+      "config.invalid",
+    );
+  });
+
   test("a failed sync shows a recoverable alert without exposing secrets", async ({ page }) => {
     await mockSession(page);
     await mockParticipantPages(page, [

@@ -652,6 +652,10 @@ export interface Translations {
       syncBusy: string
       syncDone: string
       syncPartial: string
+      syncNoConfig: string
+      syncAuth: string
+      syncCopy: string
+      syncDeadline: string
       syncLocked: string
       syncThrottled: string
       syncError: string
@@ -1400,6 +1404,10 @@ export const translations: Record<Language, Translations> = {
         syncBusy: 'Sincronizando con Kubios…',
         syncDone: 'Copia sincronizada con Kubios. Los datos mostrados ya son la copia más reciente.',
         syncPartial: 'La sincronización no se completó del todo; la copia puede seguir desactualizada.',
+        syncNoConfig: 'Este despliegue no tiene la configuración de Kubios; no se puede sincronizar.',
+        syncAuth: 'No se pudo autenticar en Kubios con la configuración del despliegue; la copia no cambió.',
+        syncCopy: 'Kubios no entregó los resultados de este participante; la copia no cambió.',
+        syncDeadline: 'El refresco agotó su plazo antes de terminar; la copia puede seguir desactualizada.',
         syncLocked: 'Otra sincronización de Kubios tiene el turno ahora mismo. Inténtalo de nuevo en unos segundos.',
         syncThrottled: 'Kubios limitó la tasa de peticiones. Espera el plazo indicado antes de volver a sincronizar.',
         syncError: 'No se pudo sincronizar la copia con Kubios.',
@@ -2138,6 +2146,10 @@ export const translations: Record<Language, Translations> = {
         syncBusy: 'Synchronizing with Kubios…',
         syncDone: 'Copy synchronized with Kubios. The data shown is now the freshest copy.',
         syncPartial: 'The synchronization did not fully complete; the copy may still be outdated.',
+        syncNoConfig: 'This deployment has no Kubios configuration; synchronization is not possible.',
+        syncAuth: 'Kubios authentication failed with this deployment configuration; the copy did not change.',
+        syncCopy: 'Kubios did not deliver this participant results; the copy did not change.',
+        syncDeadline: 'The refresh ran out of time before finishing; the copy may still be outdated.',
         syncLocked: 'Another Kubios synchronization holds the turn right now. Try again in a few seconds.',
         syncThrottled: 'Kubios rate limited the requests. Wait for the indicated deadline before syncing again.',
         syncError: 'The participant copy could not be synchronized with Kubios.',
