@@ -614,6 +614,40 @@ export interface Translations {
     tableContent: string
     databaseOperations: string
     systemMetrics: string
+    kubios: {
+      title: string
+      description: string
+      adminOnly: string
+      participants: string
+      participantFilter: string
+      allParticipants: string
+      searchParticipants: string
+      participantsLoading: string
+      participantsError: string
+      retryParticipants: string
+      tableCaption: string
+      participant: string
+      measuredAt: string
+      syncedAt: string
+      status: string
+      pageMeasurements: string
+      statusReady: string
+      statusStale: string
+      statusPending: string
+      statusEmpty: string
+      statusUnlinked: string
+      pageStatusStale: string
+      pageStatusPending: string
+      pageStatusUnlinked: string
+      empty: string
+      unavailableCount: string
+      loadError: string
+      retry: string
+      previous: string
+      next: string
+      page: string
+      readiness: string
+    }
   }
   
   // Usuarios
@@ -1318,7 +1352,41 @@ export const translations: Record<Language, Translations> = {
       tableStructure: 'Estructura y contenido de las tablas',
       tableContent: 'Contenido de las tablas',
       databaseOperations: 'Operaciones de base de datos',
-      systemMetrics: 'Métricas del sistema'
+      systemMetrics: 'Métricas del sistema',
+      kubios: {
+        title: 'Kubios (Equipo)',
+        description: 'Consulta las mediciones Kubios de todos los participantes. Acceso exclusivo para administradores.',
+        adminOnly: 'Solo administradores',
+        participants: 'Participantes',
+        participantFilter: 'Filtrar por participante',
+        allParticipants: 'Todos los participantes',
+        searchParticipants: 'Buscar participante...',
+        participantsLoading: 'Cargando participantes...',
+        participantsError: 'No se pudieron cargar los participantes.',
+        retryParticipants: 'Reintentar participantes',
+        tableCaption: 'Mediciones Kubios de los participantes',
+        participant: 'Participante',
+        measuredAt: 'Medición',
+        syncedAt: 'Sincronización',
+        status: 'Estado',
+        pageMeasurements: 'Mediciones en esta página',
+        statusReady: 'Actualizado',
+        statusStale: 'Desactualizado',
+        statusPending: 'Sincronización pendiente',
+        statusEmpty: 'Sin mediciones',
+        statusUnlinked: 'Sin vincular',
+        pageStatusStale: 'Algunas mediciones son la última copia sincronizada y podrían no estar actualizadas.',
+        pageStatusPending: 'La sincronización de Kubios está pendiente; las mediciones podrían no estar disponibles todavía.',
+        pageStatusUnlinked: 'Hay participantes sin vincular a Kubios.',
+        empty: 'No hay mediciones Kubios para la selección actual.',
+        unavailableCount: 'Algunos historiales de participantes vinculados no se pudieron leer.',
+        loadError: 'No se pudieron cargar las mediciones de Kubios.',
+        retry: 'Reintentar',
+        previous: 'Anterior',
+        next: 'Siguiente',
+        page: 'Página',
+        readiness: 'Readiness',
+      }
     },
     users: {
       title: 'Gestión de Usuarios',
@@ -2013,7 +2081,41 @@ export const translations: Record<Language, Translations> = {
       tableStructure: 'Table structure and content',
       tableContent: 'Table content',
       databaseOperations: 'Database operations',
-      systemMetrics: 'System metrics'
+      systemMetrics: 'System metrics',
+      kubios: {
+        title: 'Kubios (Team)',
+        description: 'Browse Kubios measurements for every participant. Administrator access only.',
+        adminOnly: 'Administrators only',
+        participants: 'Participants',
+        participantFilter: 'Filter by participant',
+        allParticipants: 'All participants',
+        searchParticipants: 'Search participant...',
+        participantsLoading: 'Loading participants...',
+        participantsError: 'The participants could not be loaded.',
+        retryParticipants: 'Retry participants',
+        tableCaption: 'Kubios measurements for participants',
+        participant: 'Participant',
+        measuredAt: 'Measurement',
+        syncedAt: 'Synchronization',
+        status: 'Status',
+        pageMeasurements: 'Measurements on this page',
+        statusReady: 'Up to date',
+        statusStale: 'Out of date',
+        statusPending: 'Sync pending',
+        statusEmpty: 'No measurements',
+        statusUnlinked: 'Not linked',
+        pageStatusStale: 'Some measurements are the last synchronized copy and may be out of date.',
+        pageStatusPending: 'Kubios synchronization is pending; measurements may not be available yet.',
+        pageStatusUnlinked: 'Some participants are not linked to Kubios.',
+        empty: 'There are no Kubios measurements for the current selection.',
+        unavailableCount: 'Some linked participant histories could not be read.',
+        loadError: 'The Kubios measurements could not be loaded.',
+        retry: 'Retry',
+        previous: 'Previous',
+        next: 'Next',
+        page: 'Page',
+        readiness: 'Readiness',
+      }
     },
     users: {
       title: 'User Management',

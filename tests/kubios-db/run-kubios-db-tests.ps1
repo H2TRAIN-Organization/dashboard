@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Runner reproducible de la capa de datos Kubios (migracion consolidada K49).
+  Runner reproducible de la capa de datos Kubios (nucleo K49 + listados AK-01).
 
 .DESCRIPTION
   Levanta un PostgreSQL 16 efimero en Docker local, sin red remota, sin puertos publicados
@@ -41,7 +41,8 @@ $script:ContainerPrefix = 'cerbero-kubios-db-'
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $script:MigrationsDir = Join-Path $script:RepoRoot 'supabase\migrations'
 $script:ExpectedMigrations = @(
-  '20261103100413_kubios_production_core.sql'
+  '20261103100413_kubios_production_core.sql',
+  '20261109120000_kubios_admin_list_rpcs.sql'
 )
 # Migraciones de privacidad reales que deben aplicarse antes de Kubios para
 # probar que T025/T053 cierran la exposicion heredada de users y salud.
@@ -754,8 +755,8 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname ~ '^kubios_';
 
-  perform kubios_test.record('B0', 'B', 'superficie Kubios esperada: 5 tablas privadas + 12 funciones publicas',
-    v_tables = 5 and v_functions = 12,
+  perform kubios_test.record('B0', 'B', 'superficie Kubios esperada: 5 tablas privadas + 14 funciones publicas',
+    v_tables = 5 and v_functions = 14,
     format('tablas=%s funciones=%s', v_tables, v_functions));
 
   select coalesce(jsonb_agg(x), '[]'::jsonb) into v
@@ -834,7 +835,7 @@ begin
     join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname ~ '^kubios_'
      and not has_function_privilege('service_role', p.oid, 'EXECUTE');
-  perform kubios_test.record('B8', 'B', 'service_role con EXECUTE sobre las 12 RPC Kubios',
+  perform kubios_test.record('B8', 'B', 'service_role con EXECUTE sobre las 14 RPC Kubios',
     jsonb_array_length(v) = 0, v::text);
 
   select coalesce(jsonb_agg(c.relname || ' rls=' || c.relrowsecurity), '[]'::jsonb) into v
@@ -2271,6 +2272,319 @@ begin
     raise;
   end;
   perform dblink_disconnect('k44_lock');
+end;
+$$;
+
+-- ===================== K. AK-01 listados administrativos =====================
+-- Fixtures sinteticos de usuarios (identidad integer), vinculos y snapshots:
+--   3001, 3002, 3004: vinculo + snapshot;
+--   3003: vinculo pendiente, sin snapshot;
+--   3005: snapshot con vinculo revocado;
+--   3999: snapshot sin vinculo.
+do $$
+declare
+  v jsonb;
+  v_ids jsonb;
+  v_count integer;
+  v_team constant uuid := 'a0000000-0000-4000-8000-000000000001';
+begin
+  insert into public.users ("UserID", "Username") values
+    (3001, 'synthetic-admin-3001'),
+    (3002, 'synthetic-admin-3002'),
+    (3003, 'synthetic-admin-3003'),
+    (3004, 'synthetic-admin-3004'),
+    (3005, 'synthetic-admin-3005'),
+    (3999, 'synthetic-admin-3999');
+
+  insert into kubios_private.user_member_links(user_id, team_id, kubios_member_id) values
+    (3001, v_team, 'b0000001-0000-4000-8000-000000000001'::uuid),
+    (3002, v_team, 'b0000002-0000-4000-8000-000000000002'::uuid),
+    (3003, v_team, 'b0000003-0000-4000-8000-000000000003'::uuid),
+    (3004, v_team, 'b0000004-0000-4000-8000-000000000004'::uuid),
+    (3005, v_team, 'b0000005-0000-4000-8000-000000000005'::uuid);
+  delete from kubios_private.user_member_links where user_id = 3005;
+
+  insert into kubios_private.encrypted_snapshots
+    (team_id, member_id, ciphertext, nonce, tag, key_version, updated_at)
+  values
+    (v_team, 'b0000001-0000-4000-8000-000000000001'::uuid,
+     decode('aa01', 'hex'), decode('bb01', 'hex'), decode('cc01', 'hex'), 2,
+     '2026-11-01 01:00:00+00'::timestamptz),
+    (v_team, 'b0000002-0000-4000-8000-000000000002'::uuid,
+     decode('aa02', 'hex'), decode('bb02', 'hex'), decode('cc02', 'hex'), 3,
+     '2026-11-02 02:00:00+00'::timestamptz),
+    (v_team, 'b0000004-0000-4000-8000-000000000004'::uuid,
+     decode('aa04', 'hex'), decode('bb04', 'hex'), decode('cc04', 'hex'), 4,
+     '2026-11-04 04:00:00+00'::timestamptz),
+    (v_team, 'b0000005-0000-4000-8000-000000000005'::uuid,
+     decode('aa05', 'hex'), decode('bb05', 'hex'), decode('cc05', 'hex'), 5,
+     '2026-11-05 05:00:00+00'::timestamptz),
+    (v_team, 'b0003999-0000-4000-8000-000000000399'::uuid,
+     decode('aa99', 'hex'), decode('bb99', 'hex'), decode('cc99', 'hex'), 9,
+     '2026-11-09 09:00:00+00'::timestamptz);
+
+  -- K1: activos = vinculo existente; orden ascendente y username de users.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_participants(null, null)$q$);
+  select jsonb_agg(item.row_data->>'user_id') into v_ids
+    from jsonb_array_elements(v->'rows') as item(row_data);
+  perform kubios_test.record('K1', 'K', 'participants: activos ordenados y username de users',
+    (v->>'ok')::boolean
+      and v_ids = '["3001","3002","3003","3004"]'::jsonb
+      and (v->'rows'->0->>'username') = 'synthetic-admin-3001',
+    v::text);
+
+  -- K2: after exclusivo.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_participants(3002, 10)$q$);
+  select jsonb_agg(item.row_data->>'user_id') into v_ids
+    from jsonb_array_elements(v->'rows') as item(row_data);
+  perform kubios_test.record('K2', 'K', 'participants: p_after_user_id es exclusivo',
+    v_ids = '["3003","3004"]'::jsonb, v::text);
+
+  -- K3: p_after_user_id nulo y limite pequeno.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_participants(null, 2)$q$);
+  select jsonb_agg(item.row_data->>'user_id') into v_ids
+    from jsonb_array_elements(v->'rows') as item(row_data);
+  perform kubios_test.record('K3', 'K', 'participants: start nulo empieza por el primero y respeta el limite',
+    v_ids = '["3001","3002"]'::jsonb, v::text);
+
+  -- K4: revocados y no vinculados no aparecen.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_participants(null, 100)$q$);
+  select jsonb_agg(item.row_data->>'user_id') into v_ids
+    from jsonb_array_elements(v->'rows') as item(row_data);
+  perform kubios_test.record('K4', 'K', 'participants: sin revocados (3005) ni no vinculados (3999)',
+    not (v_ids ? '3005') and not (v_ids ? '3999'),
+    coalesce(v_ids::text, 'null'));
+
+  -- K5: limite 1 y cursor mas alla del ultimo.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_participants(null, 1)$q$);
+  perform kubios_test.record('K5a', 'K', 'participants: limite 1 devuelve solo el primero',
+    jsonb_array_length(v->'rows') = 1 and (v->'rows'->0->>'user_id') = '3001', v::text);
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_participants(3004, 10)$q$);
+  perform kubios_test.record('K5b', 'K', 'participants: cursor tras el ultimo devuelve cero filas',
+    (v->>'ok')::boolean and jsonb_array_length(v->'rows') = 0, v::text);
+
+  -- K6: limite maximo 100 con 105 vinculos adicionales.
+  insert into public.users ("UserID", "Username")
+  select g, 'synthetic-admin-' || g from generate_series(3101, 3205) as g;
+  insert into kubios_private.user_member_links(user_id, team_id, kubios_member_id)
+  select g, v_team,
+         ('c' || lpad(to_hex(g), 7, '0') || '-0000-4000-8000-000000000000')::uuid
+    from generate_series(3101, 3205) as g;
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_participants(3004, 1000)$q$);
+  select count(*) into v_count from jsonb_array_elements(v->'rows');
+  perform kubios_test.record('K6a', 'K', 'participants: limite capado a 100',
+    v_count = 100
+      and (v->'rows'->0->>'user_id') = '3101'
+      and (v->'rows'->99->>'user_id') = '3200',
+    format('filas=%s primero=%s ultimo=%s', v_count,
+      v->'rows'->0->>'user_id', v->'rows'->99->>'user_id'));
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_participants(3004, null)$q$);
+  select count(*) into v_count from jsonb_array_elements(v->'rows');
+  perform kubios_test.record('K6b', 'K', 'participants: limite nulo usa el maximo de 100',
+    v_count = 100, format('filas=%s', v_count));
+
+  -- K7: permisos: solo service_role, sin PUBLIC/anon/authenticated/authenticator.
+  perform kubios_test.record('K7', 'K', 'participants: solo service_role tiene EXECUTE',
+    has_function_privilege('service_role',
+      'public.kubios_admin_list_participants(integer, integer)', 'EXECUTE')
+      and not has_function_privilege('anon',
+        'public.kubios_admin_list_participants(integer, integer)', 'EXECUTE')
+      and not has_function_privilege('authenticated',
+        'public.kubios_admin_list_participants(integer, integer)', 'EXECUTE')
+      and not has_function_privilege('authenticator',
+        'public.kubios_admin_list_participants(integer, integer)', 'EXECUTE')
+      and not exists (
+        select 1 from pg_proc p
+          join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and p.proname = 'kubios_admin_list_participants'
+           and (p.proacl is null
+                or exists (select 1 from aclexplode(p.proacl) a
+                            where a.grantee = 0 and a.privilege_type = 'EXECUTE'))),
+    'service_role=si; anon/authenticated/authenticator/PUBLIC=no');
+
+  perform kubios_test.expect_error('K7a', 'K', 'participants: anon recibe 42501', 'anon',
+    $q$select * from public.kubios_admin_list_participants(null, 10)$q$, '42501');
+  perform kubios_test.expect_error('K7b', 'K', 'participants: authenticated recibe 42501', 'authenticated',
+    $q$select * from public.kubios_admin_list_participants(null, 10)$q$, '42501');
+  perform kubios_test.expect_error('K7c', 'K', 'participants: authenticator sin SET ROLE recibe 42501', 'authenticator',
+    $q$select * from public.kubios_admin_list_participants(null, 10)$q$, '42501');
+
+  -- K8: contrato de seguridad de ambas funciones.
+  select count(*) into v_count
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('kubios_admin_list_participants', 'kubios_admin_list_snapshots')
+     and (p.prosecdef
+          or p.provolatile <> 's'
+          or p.proconfig is null
+          or not exists (
+               select 1 from unnest(p.proconfig) cfg
+                where cfg in ('search_path=""', 'search_path=pg_catalog, pg_temp')));
+  perform kubios_test.record('K8', 'K', 'ambas RPC: SECURITY INVOKER, STABLE y search_path fijo',
+    v_count = 0, format('violaciones=%s', v_count));
+
+  perform kubios_test.record('K9', 'K', 'firmas y columnas devueltas exactas',
+    to_regprocedure('public.kubios_admin_list_participants(integer, integer)') is not null
+      and to_regprocedure('public.kubios_admin_list_snapshots(integer, integer, integer)') is not null
+      and pg_get_function_result('public.kubios_admin_list_participants(integer, integer)'::regprocedure)
+          = 'TABLE(user_id integer, username text)'
+      and pg_get_function_result('public.kubios_admin_list_snapshots(integer, integer, integer)'::regprocedure)
+          = 'TABLE(user_id integer, username text, team_id uuid, member_id uuid, ciphertext bytea, nonce bytea, tag bytea, key_version integer, updated_at timestamp with time zone)',
+    format('participants=%s snapshots=%s',
+      pg_get_function_result('public.kubios_admin_list_participants(integer, integer)'::regprocedure),
+      pg_get_function_result('public.kubios_admin_list_snapshots(integer, integer, integer)'::regprocedure)));
+
+  -- K10: vision global: solo vinculos con snapshot, orden ascendente.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(null, null, null)$q$);
+  select jsonb_agg(item.row_data->>'user_id') into v_ids
+    from jsonb_array_elements(v->'rows') as item(row_data);
+  perform kubios_test.record('K10', 'K', 'snapshots global: solo vinculados con snapshot, orden ascendente',
+    (v->>'ok')::boolean and v_ids = '["3001","3002","3004"]'::jsonb,
+    v::text);
+
+  -- K11: usuario concreto con snapshot: una fila y campos exactos.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(3001, null, null)$q$);
+  perform kubios_test.record('K11', 'K', 'snapshots de usuario: vinculo con snapshot devuelve una fila exacta',
+    jsonb_array_length(v->'rows') = 1
+      and (v->'rows'->0->>'user_id') = '3001'
+      and (v->'rows'->0->>'username') = 'synthetic-admin-3001'
+      and (v->'rows'->0->>'team_id') = v_team::text
+      and (v->'rows'->0->>'member_id') = 'b0000001-0000-4000-8000-000000000001'
+      and kubios_test.hexof(v->'rows'->0->>'ciphertext') = 'aa01'
+      and kubios_test.hexof(v->'rows'->0->>'nonce') = 'bb01'
+      and kubios_test.hexof(v->'rows'->0->>'tag') = 'cc01'
+      and (v->'rows'->0->>'key_version')::integer = 2
+      and (v->'rows'->0->>'updated_at')::timestamptz = '2026-11-01 01:00:00+00'::timestamptz,
+    v::text);
+
+  -- K12: vinculo pendiente: LEFT JOIN con columnas de snapshot nulas.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(3003, null, null)$q$);
+  perform kubios_test.record('K12', 'K', 'snapshots de usuario: vinculo pendiente devuelve fila con snapshot nulo',
+    jsonb_array_length(v->'rows') = 1
+      and (v->'rows'->0->>'user_id') = '3003'
+      and (v->'rows'->0->>'username') = 'synthetic-admin-3003'
+      and (v->'rows'->0->>'team_id') is null
+      and (v->'rows'->0->>'member_id') is null
+      and (v->'rows'->0->>'ciphertext') is null
+      and (v->'rows'->0->>'nonce') is null
+      and (v->'rows'->0->>'tag') is null
+      and (v->'rows'->0->>'key_version') is null
+      and (v->'rows'->0->>'updated_at') is null,
+    v::text);
+
+  -- K13: revocado, nunca vinculado e inexistente no devuelven filas.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(3005, null, null)$q$);
+  perform kubios_test.record('K13a', 'K', 'snapshots: vinculo revocado no devuelve filas',
+    (v->>'ok')::boolean and jsonb_array_length(v->'rows') = 0, v::text);
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(3999, null, null)$q$);
+  perform kubios_test.record('K13b', 'K', 'snapshots: usuario nunca vinculado no devuelve filas',
+    (v->>'ok')::boolean and jsonb_array_length(v->'rows') = 0, v::text);
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(9999, null, null)$q$);
+  perform kubios_test.record('K13c', 'K', 'snapshots: usuario inexistente no devuelve filas',
+    (v->>'ok')::boolean and jsonb_array_length(v->'rows') = 0, v::text);
+
+  -- K14: p_start_user_id inclusivo en la vision global.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(null, 3002, 10)$q$);
+  select jsonb_agg(item.row_data->>'user_id') into v_ids
+    from jsonb_array_elements(v->'rows') as item(row_data);
+  perform kubios_test.record('K14a', 'K', 'snapshots global: start inclusivo incluye el user_id indicado',
+    v_ids = '["3002","3004"]'::jsonb, v::text);
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(null, 3005, 10)$q$);
+  perform kubios_test.record('K14b', 'K', 'snapshots global: start posterior a los snapshots devuelve cero filas',
+    (v->>'ok')::boolean and jsonb_array_length(v->'rows') = 0, v::text);
+
+  -- K15: limite de snapshots.
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(null, null, 1)$q$);
+  perform kubios_test.record('K15a', 'K', 'snapshots global: limite 1 devuelve solo el primero',
+    jsonb_array_length(v->'rows') = 1 and (v->'rows'->0->>'user_id') = '3001', v::text);
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(null, null, 2)$q$);
+  select jsonb_agg(item.row_data->>'user_id') into v_ids
+    from jsonb_array_elements(v->'rows') as item(row_data);
+  perform kubios_test.record('K15b', 'K', 'snapshots global: limite 2 devuelve los dos primeros ordenados',
+    v_ids = '["3001","3002"]'::jsonb, v::text);
+
+  -- K16: limite maximo 16 con 20 vinculos con snapshot adicionales.
+  insert into public.users ("UserID", "Username")
+  select g, 'synthetic-admin-' || g from generate_series(3401, 3420) as g;
+  insert into kubios_private.user_member_links(user_id, team_id, kubios_member_id)
+  select g, v_team,
+         ('d' || lpad(to_hex(g), 7, '0') || '-0000-4000-8000-000000000000')::uuid
+    from generate_series(3401, 3420) as g;
+  insert into kubios_private.encrypted_snapshots
+    (team_id, member_id, ciphertext, nonce, tag, key_version, updated_at)
+  select v_team,
+         ('d' || lpad(to_hex(g), 7, '0') || '-0000-4000-8000-000000000000')::uuid,
+         decode('ee01', 'hex'), decode('ee02', 'hex'), decode('ee03', 'hex'), 7,
+         '2026-11-09 10:00:00+00'::timestamptz
+    from generate_series(3401, 3420) as g;
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(null, 3005, 1000)$q$);
+  select count(*) into v_count from jsonb_array_elements(v->'rows');
+  perform kubios_test.record('K16a', 'K', 'snapshots: limite capado a 16',
+    v_count = 16
+      and (v->'rows'->0->>'user_id') = '3401'
+      and (v->'rows'->15->>'user_id') = '3416',
+    format('filas=%s primero=%s ultimo=%s', v_count,
+      v->'rows'->0->>'user_id', v->'rows'->15->>'user_id'));
+  v := kubios_test.query_as('service_role',
+    $q$select * from public.kubios_admin_list_snapshots(null, 3005, null)$q$);
+  select count(*) into v_count from jsonb_array_elements(v->'rows');
+  perform kubios_test.record('K16b', 'K', 'snapshots: limite nulo usa el maximo de 16',
+    v_count = 16, format('filas=%s', v_count));
+
+  -- K17: permisos de la RPC de snapshots.
+  perform kubios_test.record('K17', 'K', 'snapshots: solo service_role tiene EXECUTE',
+    has_function_privilege('service_role',
+      'public.kubios_admin_list_snapshots(integer, integer, integer)', 'EXECUTE')
+      and not has_function_privilege('anon',
+        'public.kubios_admin_list_snapshots(integer, integer, integer)', 'EXECUTE')
+      and not has_function_privilege('authenticated',
+        'public.kubios_admin_list_snapshots(integer, integer, integer)', 'EXECUTE')
+      and not has_function_privilege('authenticator',
+        'public.kubios_admin_list_snapshots(integer, integer, integer)', 'EXECUTE')
+      and not exists (
+        select 1 from pg_proc p
+          join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and p.proname = 'kubios_admin_list_snapshots'
+           and (p.proacl is null
+                or exists (select 1 from aclexplode(p.proacl) a
+                            where a.grantee = 0 and a.privilege_type = 'EXECUTE'))),
+    'service_role=si; anon/authenticated/authenticator/PUBLIC=no');
+
+  perform kubios_test.expect_error('K17a', 'K', 'snapshots: anon recibe 42501', 'anon',
+    $q$select * from public.kubios_admin_list_snapshots(null, null, 10)$q$, '42501');
+  perform kubios_test.expect_error('K17b', 'K', 'snapshots: authenticated recibe 42501', 'authenticated',
+    $q$select * from public.kubios_admin_list_snapshots(null, null, 10)$q$, '42501');
+  perform kubios_test.expect_error('K17c', 'K', 'snapshots: authenticator sin SET ROLE recibe 42501', 'authenticator',
+    $q$select * from public.kubios_admin_list_snapshots(null, null, 10)$q$, '42501');
+
+  -- Limpieza de los fixtures de esta seccion.
+  delete from kubios_private.encrypted_snapshots where team_id = v_team;
+  delete from public.users
+   where "UserID" in (3001, 3002, 3003, 3004, 3005, 3999)
+      or "UserID" between 3101 and 3205
+      or "UserID" between 3401 and 3420;
 end;
 $$;
 

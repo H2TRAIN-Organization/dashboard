@@ -1,15 +1,16 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 
-import { useState, useEffect, useCallback, useRef, type ReactNode, type RefObject } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
+import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, type LucideIcon } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
+import CalendarDatePicker from '@/components/calendar/CalendarDatePicker'
+import { formatDateValue } from '@/components/calendar/calendar-utils'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import UserAutocomplete from './user-autocomplete'
@@ -20,247 +21,6 @@ import {
   type HealthDataCategory,
 } from '@/lib/health-csv'
 import { isUserGroupExpanded, usersForRecordGroups, visibleMetricCards } from '@/lib/dashboard-data'
-
-function formatDateForInput(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function getDaysInMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
-}
-
-function getFirstDayOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
-}
-
-function navigateMonth(date: Date, direction: 'prev' | 'next') {
-  const newDate = new Date(date)
-  if (direction === 'prev') {
-    newDate.setMonth(newDate.getMonth() - 1)
-  } else {
-    newDate.setMonth(newDate.getMonth() + 1)
-  }
-  return newDate
-}
-
-function isToday(date: Date, today: Date) {
-  return date.toDateString() === today.toDateString()
-}
-
-// Portal simple para renderizar en document.body (evita clipping y stacking contexts)
-function Portal({ children }: { children: ReactNode }) {
-  if (typeof window === 'undefined') return null
-  return createPortal(children, document.body)
-}
-
-interface CalendarPosition {
-  top: number
-  left: number
-  width: number
-  maxHeight: number
-}
-
-interface CustomCalendarProps {
-  isOpen: boolean
-  onClose: () => void
-  selectedDate: Date
-  selectedDateFilter: string
-  today: Date
-  onDateChange: (date: Date) => void
-  onSelectDate: (date: Date) => void
-  containerRef?: RefObject<HTMLDivElement | null>
-  popupRef?: RefObject<HTMLDivElement | null>
-  position?: CalendarPosition
-}
-
-// Componente de calendario personalizado
-function CustomCalendar({
-  isOpen,
-  onClose,
-  selectedDate,
-  selectedDateFilter,
-  today,
-  onDateChange,
-  onSelectDate,
-  containerRef,
-  popupRef,
-  position,
-}: CustomCalendarProps) {
-  const { language, t } = useLanguage()
-  if (!isOpen) return null
-
-  const daysInMonth = getDaysInMonth(selectedDate)
-  const firstDay = getFirstDayOfMonth(selectedDate)
-  const locale = language === 'en' ? 'en-US' : 'es-ES'
-  const monthFormatter = new Intl.DateTimeFormat(locale, { month: 'long' })
-  const weekdayFormatter = new Intl.DateTimeFormat(locale, { weekday: 'short' })
-  const capitalize = (value: string) =>
-    value.charAt(0).toLocaleUpperCase(locale) + value.slice(1)
-  // 7 January 2024 is a Sunday, so the array starts on the same weekday as
-  // the calendar grid.
-  const dayNames = Array.from({ length: 7 }, (_, index) =>
-    capitalize(weekdayFormatter.format(new Date(2024, 0, 7 + index))),
-  )
-  const monthLabel = capitalize(monthFormatter.format(selectedDate))
-
-  const renderCalendarDays = () => {
-    const days = []
-
-    // Días del mes anterior
-    const prevMonth = navigateMonth(selectedDate, 'prev')
-    const daysInPrevMonth = getDaysInMonth(prevMonth)
-    for (let i = firstDay - 1; i >= 0; i--) {
-      const day = daysInPrevMonth - i
-      const date = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), day)
-      days.push(
-        <button
-          key={`prev-${day}`}
-          className="w-10 h-10 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-          onClick={() => onDateChange(date)}
-        >
-          {day}
-        </button>
-      )
-    }
-
-    // Días del mes actual
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day)
-      const isSelectedDay = formatDateForInput(date) === selectedDateFilter
-      const isTodayDay = isToday(date, today)
-
-      days.push(
-        <button
-          key={day}
-          className={`w-10 h-10 rounded-lg transition-all duration-200 font-medium ${
-            isSelectedDay
-              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg transform scale-105'
-              : isTodayDay
-              ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-              : 'text-slate-700 hover:bg-slate-100 hover:scale-105'
-          }`}
-          onClick={() => onSelectDate(date)}
-        >
-          {day}
-        </button>
-      )
-    }
-
-    // Días del mes siguiente
-    const totalCells = 42 // 6 semanas x 7 días
-    const remainingCells = totalCells - days.length
-    const nextMonth = navigateMonth(selectedDate, 'next')
-    for (let day = 1; day <= remainingCells; day++) {
-      const date = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), day)
-      days.push(
-        <button
-          key={`next-${day}`}
-          className="w-10 h-10 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-          onClick={() => onDateChange(date)}
-        >
-          {day}
-        </button>
-      )
-    }
-
-    return days
-  }
-
-  return (
-    <div
-      ref={containerRef}
-      className="fixed top-0 left-0 right-0 bottom-0"
-      style={{ zIndex: 9999999 }}
-    >
-      <div
-        ref={popupRef}
-        className="bg-white border-2 border-slate-200/60 rounded-2xl shadow-2xl overflow-hidden w-80 relative"
-        style={position ? {
-          position: 'fixed',
-          top: position.top,
-          left: position.left,
-          width: position.width,
-          maxHeight: position.maxHeight,
-          overflowY: 'auto',
-          zIndex: 9999999
-        } : {
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '320px',
-          maxHeight: 'calc(100vh - 16px)',
-          overflowY: 'auto',
-          zIndex: 9999999
-        }}
-      >
-      <div className="p-6">
-        {/* Header del calendario */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            type="button"
-            onClick={() => onDateChange(navigateMonth(selectedDate, 'prev'))}
-            aria-label={t.common.previous}
-            title={t.common.previous}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-          >
-            <ChevronLeft className="h-5 w-5 text-slate-600" />
-          </button>
-
-          <h3 className="text-lg font-bold text-slate-800">
-            {monthLabel} {selectedDate.getFullYear()}
-          </h3>
-
-          <button
-            type="button"
-            onClick={() => onDateChange(navigateMonth(selectedDate, 'next'))}
-            aria-label={t.common.next}
-            title={t.common.next}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-          >
-            <ChevronRight className="h-5 w-5 text-slate-600" />
-          </button>
-        </div>
-
-        {/* Días de la semana */}
-        <div className="grid grid-cols-7 gap-2 mb-4">
-          {dayNames.map((day) => (
-            <div key={day} className="text-center text-sm font-medium text-slate-500 py-2">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Días del calendario */}
-        <div className="grid grid-cols-7 gap-2">
-          {renderCalendarDays()}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
-          <button
-            type="button"
-            onClick={() => onSelectDate(new Date())}
-            className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
-          >
-            {t.datepicker.today}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors duration-200"
-          >
-            {t.datepicker.close}
-          </button>
-        </div>
-      </div>
-      </div>
-    </div>
-  )
-}
 
 // Errors raised locally use a translation key so the visible text follows the
 // language selector; backend errors are shown unchanged.
@@ -308,14 +68,9 @@ export default function DataPage() {
       : error.message
     : null
   
-  // Estados para el timepicker personalizado
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
-  const [datePicker, setDatePicker] = useState(() => new Date())
+  // Date shown by the shared calendar as "today". Freezing it at mount keeps
+  // the highlight stable for the lifetime of the page.
   const [today] = useState(() => new Date())
-  const datePickerRef = useRef<HTMLButtonElement>(null)
-  const datePickerPortalRef = useRef<HTMLDivElement | null>(null)
-  const datePickerPopupRef = useRef<HTMLDivElement | null>(null)
-  const [datePickerPosition, setDatePickerPosition] = useState<CalendarPosition | null>(null)
 
   const cancelDataRequest = useCallback(() => {
     dataRequestRef.current += 1
@@ -461,81 +216,6 @@ export default function DataPage() {
     }
   }, [session, fetchData, cancelDataRequest])
 
-  // Cerrar calendario al hacer click fuera y recalcular posición al hacer scroll/resize
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node
-      // Calendario (portal)
-      if (isDatePickerOpen && datePickerPortalRef.current?.contains(target)) return
-      if (isDatePickerOpen) {
-        setIsDatePickerOpen(false)
-        setDatePickerPosition(null)
-      }
-    }
-
-    const updateDatePickerPosition = () => {
-      if (!datePickerRef.current || !isDatePickerOpen) return
-
-      const trigger = datePickerRef.current.getBoundingClientRect()
-      const popup = datePickerPopupRef.current
-      if (!popup) return
-      const viewportWidth = window.innerWidth
-      const viewportHeight = window.innerHeight
-      const padding = 8
-      const gap = 8
-      const maxHeight = Math.max(0, viewportHeight - padding * 2)
-      const width = Math.min(
-        Math.max(trigger.width, 320),
-        Math.max(0, viewportWidth - padding * 2),
-      )
-
-      // scrollHeight is the natural content height even when the previous
-      // maxHeight capped the popup. Apply the new width first so wrapping is
-      // measured at the width that will be used, then add the borders because
-      // scrollHeight includes padding but not borders.
-      popup.style.width = `${width}px`
-      const popupStyle = window.getComputedStyle(popup)
-      const borders =
-        (Number.parseFloat(popupStyle.borderTopWidth) || 0) +
-        (Number.parseFloat(popupStyle.borderBottomWidth) || 0)
-      const naturalHeight = popup.scrollHeight + borders
-      const height = Math.min(naturalHeight, maxHeight)
-      const left = Math.max(
-        padding,
-        Math.min(trigger.left, viewportWidth - padding - width),
-      )
-
-      const spaceBelow = viewportHeight - trigger.bottom - gap - padding
-      const spaceAbove = trigger.top - gap - padding
-      const fitsBelow = height === 0 || height <= spaceBelow
-      const fitsAbove = height > 0 && height <= spaceAbove
-
-      let top = fitsBelow || !fitsAbove
-        ? trigger.bottom + gap
-        : trigger.top - gap - height
-      top = Math.max(
-        padding,
-        Math.min(top, viewportHeight - padding - height),
-      )
-
-      setDatePickerPosition({ top, left, width, maxHeight })
-    }
-
-    // Solo agregar listeners si el calendario está abierto
-    if (isDatePickerOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      document.addEventListener('scroll', updateDatePickerPosition, true)
-      window.addEventListener('resize', updateDatePickerPosition)
-      updateDatePickerPosition()
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('scroll', updateDatePickerPosition, true)
-      window.removeEventListener('resize', updateDatePickerPosition)
-    }
-  }, [isDatePickerOpen])
-
   const toggleUserExpansion = (userId: string) => {
     const newExpanded = new Set(expandedUsers)
     if (newExpanded.has(userId)) {
@@ -563,26 +243,14 @@ export default function DataPage() {
     setSelectedDataType('all')
   }
 
-  const formatDisplayDate = (date: Date) => {
-    return date.toLocaleDateString(locale, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    })
+  const handleCalendarMonthChange = (month: Date) => {
+    // Preserve the previous Health Data behaviour: moving to another month
+    // updates the date filter immediately, not only when a day is selected.
+    setDateFilter(formatDateValue(month))
   }
 
-  const handleDateChange = (date: Date) => {
-    // Crear una nueva fecha en zona horaria local para evitar problemas de UTC
-    const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-    setDatePicker(localDate)
-    setDateFilter(formatDateForInput(localDate))
-  }
-
-  const selectDate = (date: Date) => {
-    const dateString = formatDateForInput(date)
-    setDateFilter(dateString)
-    setIsDatePickerOpen(false)
-    setDatePickerPosition(null)
+  const selectDate = (value: string) => {
+    setDateFilter(value)
   }
 
   const exportData = () => {
@@ -610,7 +278,7 @@ export default function DataPage() {
     window.URL.revokeObjectURL(url)
   }
 
-  // Estadísticas de los datos
+  // Estad├¡sticas de los datos
   const stats = {
     totalInsulin: insulinData.length,
     totalFood: foodData.length,
@@ -716,7 +384,7 @@ export default function DataPage() {
       lastActivity: null as Date | null
     }
 
-    // Encontrar la actividad más reciente
+    // Encontrar la actividad m├ís reciente
     const allDates = [
       ...userInsulin.map(d => new Date(d.date_time)),
       ...userFood.map(d => new Date(d.date_time)),
@@ -868,9 +536,9 @@ export default function DataPage() {
             </Link>
           </div>
         )}
-        
+
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8 xl:py-12 relative z-10">
-          {/* Header con estadísticas */}
+          {/* Header con estad├¡sticas */}
           <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-10 mb-6 sm:mb-12 overflow-hidden shadow-2xl">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 sm:mb-8 space-y-4 lg:space-y-0">
@@ -918,7 +586,7 @@ export default function DataPage() {
             </div>
           )}
 
-          {/* Estadísticas generales: solo roles privilegiados y solo categorías
+          {/* Estad├¡sticas generales: solo roles privilegiados y solo categor├¡as
               con datos tras terminar la carga (DR09/DR12). */}
           {!isIndividualUser && !loading && !error && metricCards.length > 0 && (
             <div className="mb-8 sm:mb-12">
@@ -958,7 +626,7 @@ export default function DataPage() {
                   onClick={clearFilters}
                   className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105 flex items-center"
                 >
-                  <span className="mr-1 sm:mr-2">🗑️</span>
+                  <span className="mr-1 sm:mr-2">­ƒùæ´©Å</span>
                   {t.dashboard.clearFilters}
                 </button>
               </div>
@@ -1025,41 +693,21 @@ export default function DataPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-xs sm:text-sm font-bold text-blue-900 mb-2 sm:mb-3 flex items-center">
+                  <label
+                    htmlFor="health-data-date-trigger"
+                    className="block text-xs sm:text-sm font-bold text-blue-900 mb-2 sm:mb-3 flex items-center"
+                  >
                     <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     {t.dashboard.specificDate}
                   </label>
-                  <button
-                    ref={datePickerRef}
-                    onClick={() => {
-                      setIsDatePickerOpen(!isDatePickerOpen)
-                      setDatePickerPosition(null)
-                    }}
-                    className="w-full bg-white border border-blue-200 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-blue-900 text-left hover:bg-blue-50 transition-all duration-300 flex items-center justify-between text-sm sm:text-base"
-                  >
-                    <span className={dateFilter ? 'text-blue-900' : 'text-gray-500'}>
-                      {dateFilter ? formatDisplayDate(new Date(dateFilter)) : t.dashboard.selectDate}
-                    </span>
-                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                  </button>
-                  
-                  <Portal>
-                    <CustomCalendar
-                      isOpen={isDatePickerOpen}
-                      onClose={() => {
-                        setIsDatePickerOpen(false)
-                        setDatePickerPosition(null)
-                      }}
-                      selectedDate={datePicker}
-                      selectedDateFilter={dateFilter}
-                      today={today}
-                      onDateChange={handleDateChange}
-                      onSelectDate={selectDate}
-                      containerRef={datePickerPortalRef}
-                      popupRef={datePickerPopupRef}
-                      position={datePickerPosition || undefined}
-                    />
-                  </Portal>
+                  <CalendarDatePicker
+                    id="health-data-date-trigger"
+                    value={dateFilter}
+                    onChange={selectDate}
+                    onMonthChange={handleCalendarMonthChange}
+                    placeholder={t.dashboard.selectDate}
+                    today={today}
+                  />
                 </div>
               </div>
             </div>
@@ -1146,8 +794,8 @@ export default function DataPage() {
                     {isExpanded && (
                       <div className="relative z-10 p-4 sm:p-6 lg:p-8">
                         {/* Resumen por tipo de dato: el usuario normal ve sus
-                            categorías directamente y sin resumen redundante
-                            (DR09); las tarjetas vacías no se muestran (DR12). */}
+                            categor├¡as directamente y sin resumen redundante
+                            (DR09); las tarjetas vac├¡as no se muestran (DR12). */}
                         {!isIndividualUser && group.stats.totalRecords > 0 && (
                           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
                             {group.stats.insulinCount > 0 && (
@@ -1239,7 +887,7 @@ export default function DataPage() {
                             </div>
                           )}
 
-                          {/* Períodos */}
+                          {/* Per├¡odos */}
                           {group.periods.length > 0 && (
                             <div>
                               <h4 className="text-base sm:text-lg font-bold text-purple-900 mb-3 sm:mb-4 flex items-center">
@@ -1252,7 +900,7 @@ export default function DataPage() {
                             </div>
                           )}
 
-                          {/* Estado de ánimo */}
+                          {/* Estado de ├ínimo */}
                           {group.mood.length > 0 && (
                             <div>
                               <h4 className="text-base sm:text-lg font-bold text-pink-900 mb-3 sm:mb-4 flex items-center">

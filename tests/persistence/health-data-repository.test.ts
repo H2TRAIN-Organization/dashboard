@@ -183,6 +183,35 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
     }
   });
 
+  it("keeps legacy plaintext rows in global reads when IV columns are null", async () => {
+    const gateway = new FakePersistenceGateway({
+      insulindata: [
+        {
+          id: 1,
+          username: "alice",
+          insulinType: "Bolus",
+          insulintype_iv: null,
+          dose: "4",
+          dose_iv: null,
+          date_time: "2026-01-15T10:00:00",
+        },
+      ],
+    });
+    const repo = new SupabaseHealthDataRepository(gateway, decryptor());
+
+    const data = await repo.getDecryptedData({
+      selectedUser: null,
+      timeRange: "30d",
+      selectedDataType: "all",
+      dateFilter: null,
+      from: null,
+      to: "2026-01-31T23:59:59.999Z",
+    });
+
+    expect(data.insulinData).toHaveLength(1);
+    expect(data.insulinData[0]).toMatchObject({ insulinType: "Bolus", dose: "4" });
+  });
+
   it("uses an exclusive upper bound for decrypted windows and an inclusive one for legacy", async () => {
     const { repo } = repository();
     const decrypted = await repo.getDecryptedData({

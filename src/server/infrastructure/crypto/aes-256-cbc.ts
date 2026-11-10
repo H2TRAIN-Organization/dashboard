@@ -128,6 +128,12 @@ export class Aes256CbcDecryptor implements TextDecryptor {
     }
 
     if (typeof iv !== "string" || iv.length === 0) {
+      // Pre-encryption rows in the legacy schema store plaintext and leave
+      // their IV columns null. Preserve that format while still refusing
+      // ciphertext-shaped values that have lost their IV.
+      if (!looksLikeCiphertext(value)) {
+        return value;
+      }
       throw new CryptoError(
         "MISSING_IV",
         `El campo "${field}" no tiene IV y no está marcado con ${PLAIN_PREFIX}.`,

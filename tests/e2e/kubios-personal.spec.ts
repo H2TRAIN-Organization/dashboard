@@ -143,7 +143,7 @@ test.describe('Kubios personal UI', () => {
 
     await page.goto('/kubios')
 
-    await expect(page.getByText('Solo se muestran tus propios datos de Kubios.')).toBeVisible()
+    await expect(page.getByText('Solo se muestran los datos propios de Kubios.')).toBeVisible()
     await expect(page.getByText('2 mediciones')).toBeVisible()
     await expect(page.getByText('72.0%', { exact: false }).first()).toBeVisible()
 
@@ -282,21 +282,105 @@ test.describe('Kubios personal UI', () => {
       page.getByText(/No hay mediciones HRV en el rango de fechas seleccionado/i),
     ).toBeVisible()
     await expect(page.locator('article')).toHaveCount(0)
-    await expect(page.getByText('0 mediciones')).toBeVisible()
 
-    const totalCard = page.getByText('mediciones', { exact: true }).locator('..')
-    await expect(totalCard.getByText('0', { exact: true })).toBeVisible()
-
-    const latestCard = page.getByText('Última medición', { exact: true }).locator('..')
-    await expect(latestCard).toContainText('N/D')
-    await expect(latestCard).not.toContainText(/1 nov 2026/)
-
+    // Sin mediciones en el rango, la cabecera no anuncia un contador 0 y no
+    // reutiliza el resumen global.
+    await expect(page.getByText('0 mediciones')).toHaveCount(0)
+    await expect(page.getByText('mediciones', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/72\.0%/)).toHaveCount(0)
     await expect(page.getByText(/1 nov 2026/)).toHaveCount(0)
+  })
 
-    // synced_at sigue siendo la fecha del snapshot global.
-    const syncedCard = page.getByText('Última sincronización', { exact: true }).locator('..')
-    await expect(syncedCard).toContainText(/3 nov 2026/)
+  test('selects and clears a date with the shared calendar field', async ({
+    page,
+  }) => {
+    await mockSession(page)
+    await mockMe(page, readySummary)
+    await mockResultsByRange(page, ({ from, to }) =>
+      from === null && to === null ? readyResults : filteredResults,
+    )
+
+    await page.goto('/kubios')
+    await expect(page.getByText('2 mediciones')).toBeVisible()
+
+    const fromInput = page.locator('#kubios-date-from')
+    const trigger = page.getByRole('button', {
+      name: 'Fecha desde: Seleccionar fecha',
+    })
+    await trigger.click()
+
+    const dialog = page.getByRole('dialog', { name: 'Fecha Específica' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator('[data-date][tabindex="0"]')).toBeFocused()
+
+    // Las flechas mueven el foco del calendario y Enter selecciona el día.
+    await page.keyboard.press('ArrowRight')
+    const target = dialog.locator('[data-date][tabindex="0"]')
+    await expect(target).toBeFocused()
+    const targetValue = await target.getAttribute('data-date')
+    expect(targetValue).not.toBeNull()
+
+    const selectedRequest = page.waitForRequest((request) => {
+      if (!request.url().includes('/api/kubios/hrv-results')) return false
+      const url = new URL(request.url())
+      return (
+        url.searchParams.get('from') === targetValue &&
+        url.searchParams.get('to') === null
+      )
+    })
+    await page.keyboard.press('Enter')
+    await selectedRequest
+
+    await expect(dialog).toHaveCount(0)
+    await expect(fromInput).toHaveValue(targetValue ?? '')
+    await expect(trigger).toBeFocused()
+
+    const clearedRequest = page.waitForRequest((request) => {
+      if (!request.url().includes('/api/kubios/hrv-results')) return false
+      return !new URL(request.url()).searchParams.has('from')
+    })
+    await page.getByRole('button', { name: 'Limpiar', exact: true }).click()
+    await clearedRequest
+
+    await expect(fromInput).toHaveValue('')
+    await expect(fromInput).toBeFocused()
+  })
+
+  test('disables Hoy outside the active range without changing the filter', async ({
+    page,
+  }) => {
+    await mockSession(page)
+    await mockMe(page, readySummary)
+    await mockResultsByRange(page, ({ from, to }) =>
+      from === null && to === null ? readyResults : filteredResults,
+    )
+
+    await page.goto('/kubios')
+    await expect(page.getByText('2 mediciones')).toBeVisible()
+
+    const fromInput = page.locator('#kubios-date-from')
+    const toInput = page.locator('#kubios-date-to')
+    const dialog = page.getByRole('dialog', { name: 'Fecha Específica' })
+
+    // Un máximo pasado deja hoy fuera del rango del campo «desde».
+    await toInput.fill('2020-01-31')
+    await page.getByRole('button', { name: 'Fecha desde: Seleccionar fecha' }).click()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Hoy' })).toBeDisabled()
+    await dialog.getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await expect(fromInput).toHaveValue('')
+    await expect(toInput).toHaveValue('2020-01-31')
+
+    // Un mínimo futuro deja hoy fuera del rango del campo «hasta».
+    await page.getByRole('button', { name: 'Limpiar filtros', exact: true }).click()
+    await fromInput.fill('2030-01-01')
+    await expect(fromInput).toHaveValue('2030-01-01')
+    await page.getByRole('button', { name: 'Fecha hasta: Seleccionar fecha' }).click()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Hoy' })).toBeDisabled()
+    await dialog.getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await expect(fromInput).toHaveValue('2030-01-01')
+    await expect(toInput).toHaveValue('')
   })
 
   test('shows the compact personal summary on the main dashboard', async ({ page }) => {
@@ -326,7 +410,7 @@ test.describe('Kubios personal UI', () => {
 
     await page.goto('/')
 
-    await expect(page.getByText('Mi HRV (Kubios)')).toBeVisible()
+    await expect(page.getByText('HRV (Kubios)', { exact: true })).toBeVisible()
     await expect(page.locator('a[href="/kubios"]')).toHaveCount(1)
     await expect(page.getByText('mediciones', { exact: true })).toBeVisible()
     await expect(page.getByText('72.0%', { exact: true })).toBeVisible()
@@ -343,6 +427,7 @@ test.describe('Kubios personal UI', () => {
       synced_at: null,
       latest_result: null,
     })
+    await mockResults(page, emptyResults)
     await page.route('**/api/users/count', async (route) => {
       await route.fulfill({
         status: 200,
@@ -366,7 +451,7 @@ test.describe('Kubios personal UI', () => {
 
     await page.goto('/')
 
-    await expect(page.getByText('Mi HRV (Kubios)')).toHaveCount(0)
+    await expect(page.getByText('HRV (Kubios)', { exact: true })).toHaveCount(0)
     await page.locator('button:has(svg.lucide-menu)').click()
     await expect(page.locator('a[href="/kubios"]')).toHaveCount(0)
   })

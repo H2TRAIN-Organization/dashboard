@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { BadRequestError } from "@/server/domain/errors";
 import {
+  extractRequestId,
+  runWithRequestErrorContext,
+} from "../error-diagnostics";
+import {
   SESSION_COOKIE_NAME,
   type HttpCookie,
 } from "../cookies";
@@ -97,16 +101,30 @@ export function toNextResponse(result: HttpResult): NextResponse {
 
 /**
  * Shared Next.js adapter: CSRF validation, error mapping, cookies and JSON.
- * Route files supply the runtime-backed operation.
+ * Route files supply the runtime-backed operation and an optional static route
+ * label used only for sanitized diagnostics.
  */
 export async function runApiRoute(
   request: NextRequest,
   operation: () => Promise<HttpResult>,
+  options: { readonly route?: string } = {},
 ): Promise<NextResponse> {
-  try {
-    assertRequestCsrf(request);
-    return toNextResponse(await operation());
-  } catch (error) {
-    return toNextResponse(toProblem(error));
-  }
+  const context = {
+    requestId: extractRequestId([
+      request.headers.get("x-vercel-id"),
+      request.headers.get("x-request-id"),
+      request.headers.get("x-correlation-id"),
+    ]),
+    method: request.method,
+    route: options.route ?? null,
+  };
+
+  return runWithRequestErrorContext(context, async () => {
+    try {
+      assertRequestCsrf(request);
+      return toNextResponse(await operation());
+    } catch (error) {
+      return toNextResponse(toProblem(error, "route"));
+    }
+  });
 }

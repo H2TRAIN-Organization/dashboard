@@ -1,4 +1,4 @@
-# K49 - Pruebas reproducibles de la capa de datos Kubios
+# K49 + AK-01 - Pruebas reproducibles de la capa de datos Kubios
 
 Runner: `run-kubios-db-tests.ps1`.
 
@@ -6,9 +6,10 @@ Levanta un PostgreSQL 16 efimero en Docker local, aprovisiona un bootstrap
 sintetico minimo de la base de produccion (roles de la Data API,
 `public.users("UserID") integer` con secuencia y columnas sensibles, y las seis
 tablas de salud), aplica las migraciones reales de privacidad T025/T053 y
-despues la migracion consolidada Kubios, y ejecuta 161 comprobaciones de
-privilegios, restricciones, aislamiento, privacidad y contrato de las RPC.
-Imprime PASS/FAIL por comprobacion y sale con codigo distinto de 0 si algo falla.
+despues las migraciones Kubios en orden (nucleo K49 y listados administrativos
+AK-01), y ejecuta 191 comprobaciones de privilegios, restricciones,
+aislamiento, privacidad y contrato de las RPC. Imprime PASS/FAIL por
+comprobacion y sale con codigo distinto de 0 si algo falla.
 
 No lee `.env`, YAML ni credenciales; no usa datos reales; no accede a red remota;
 no modifica migraciones ni ningun otro archivo del repositorio.
@@ -38,8 +39,9 @@ Codigos de salida:
 
 ## Que hace el runner
 
-1. Verifica Docker, la imagen local, que exista exactamente la migracion
-   `20261103100413_kubios_production_core.sql` y que existan las dos
+1. Verifica Docker, la imagen local, que existan exactamente las migraciones
+   Kubios `20261103100413_kubios_production_core.sql` y
+   `20261109120000_kubios_admin_list_rpcs.sql`, y que existan las dos
    migraciones reales de privacidad `20261021130000_t025_health_tables_private.sql`
    y `20261021150000_t053_users_private.sql`.
 2. Crea un contenedor efimero con nombre aleatorio `cerbero-kubios-db-<12 hex>`
@@ -49,7 +51,8 @@ Codigos de salida:
 3. Aplica el bootstrap sintetico como superusuario `postgres`: roles, fixture
    de users/salud y registro del estado de privilegios/politicas previo.
 4. Aplica los SQL reales de T025 y T053, sin modificarlos, antes de Kubios.
-5. Aplica la migracion Kubios consolidada.
+5. Aplica las migraciones Kubios en orden por nombre/timestamp (nucleo
+   consolidado y listados administrativos AK-01).
 6. Ejecuta las comprobaciones y muestra la tabla PASS/FAIL con la evidencia.
 7. Elimina el contenedor, incluso si las comprobaciones fallan.
 
@@ -68,7 +71,7 @@ Solo existe lo que la migracion referencia. No es un Supabase completo.
 | Privilegios/politicas heredados | Grants de tabla y columna a `PUBLIC`/`anon`/`authenticated`, grants de secuencia y policies abiertas | Estado previo que T025/T053 deben revocar/eliminar; `kubios_precheck.before` registra el resultado efectivo de 70 hechos antes de aplicar los SQL |
 | `USAGE` en `public` | Para `anon`, `authenticated`, `service_role` | Baseline de Supabase para resolver las RPC por nombre; las migraciones revocan EXECUTE y solo conceden a `service_role` |
 
-No se crea el esquema `auth` ni `auth.users`: la migracion consolidada no debe
+No se crea el esquema `auth` ni `auth.users`: las migraciones Kubios no deben
 depender de ellos ni la FK de vinculos. Tampoco se crean extensiones para el
 esquema; la unica excepcion es `dblink` (contrib de la imagen oficial), que se
 instala solo en la base efimera para abrir una segunda sesion local y verificar
@@ -76,7 +79,7 @@ el lock del cursor.
 
 ## Comprobaciones y resultado real
 
-Ultima ejecucion (2026-11-03): **161/161 PASS**, exit 0, contenedor eliminado.
+Ultima ejecucion (2026-11-09): **191/191 PASS**, exit 0, contenedor eliminado.
 
 | Criterio | Checks | Resultado | Evidencia principal |
 |----------|--------|-----------|---------------------|
@@ -91,12 +94,13 @@ Ultima ejecucion (2026-11-03): **161/161 PASS**, exit 0, contenedor eliminado.
 | H. Backoff 429, pausa indefinida y validacion | H1-H27 | PASS | `retry_after=30` fija `next_allowed_at` a +30 s y el intento inmediato da `false`; `86401` y `2147483647` se aceptan sin recorte; un valor > int4 se rechaza sin persistir; `kubios_finish_sync_indefinite` fija `infinity`, limpia el lease con lease vigente o expirado del mismo owner, no toca nada con otro owner y bloquea `try_acquire`; un `finish_sync` finito posterior no acorta `infinity`; argumentos invalidos dan **22023**; CHECK de formato y de pareja del lease dan **23514** |
 | I. Token cifrado | I1-I12 | PASS | Round-trip exacto del token, expiracion pasada conservada (sin filtro), escritura con owner distinto rechazada con `kubios_token_write_denied` y token intacto, `anon`/`authenticated` sin acceso |
 | J. Cursor durable | J1-J34 | PASS | Lectura/escritura por `service_role`; owner distinto, lease caducado y equipo sin lease devuelven `false` y no cambian el estado; argumentos invalidos dan **22023**; CHECK `failed subset` da **23514**; `FOR UPDATE` real con `dblink`: avance concurrente bloqueado con **55P03** sin escribir y aplicado tras liberar el lock; solo `service_role` tiene EXECUTE; helpers `SECURITY DEFINER` en `kubios_private`, wrappers `SECURITY INVOKER`, tabla sin privilegios directos y RLS sin politicas |
+| K. Listados administrativos AK-01 | K1-K17c | PASS | `participants`: activos = fila en `user_member_links`, orden ascendente, `after` exclusivo, start nulo, cap 100 y ausencia de revocados/no vinculados; `snapshots`: global solo vinculos con snapshot, usuario concreto con LEFT JOIN para pendiente sin snapshot, revocados/inexistentes sin filas, `start` inclusivo, orden ascendente, cap 16; solo `service_role` ejecuta, `SECURITY INVOKER`/`STABLE`/`search_path` fijo y firmas exactas |
 
 Salida resumida observada:
 
 ```text
-TOTAL=161 PASS=161 FAIL=0
-KUBIOS_DB_TESTS_RESULT: PASS (161 comprobaciones, 0 fallidas)
+TOTAL=191 PASS=191 FAIL=0
+KUBIOS_DB_TESTS_RESULT: PASS (191 comprobaciones, 0 fallidas)
 ==> RESULTADO: PASS
 ==> cleanup: contenedor cerbero-kubios-db-... eliminado
 ```
@@ -135,7 +139,7 @@ SQLSTATE reales documentados por las comprobaciones:
 
 Probado de verdad:
 
-- Aplicacion de la migracion consolidada sobre PostgreSQL 16 limpio, sin
+- Aplicacion de las migraciones Kubios sobre PostgreSQL 16 limpio, sin
   `auth.users`.
 - Aislamiento a nivel SQL: schema privado, revokes de tabla y de funcion,
   privilegios efectivos por rol y `SECURITY INVOKER` con `search_path` fijo.

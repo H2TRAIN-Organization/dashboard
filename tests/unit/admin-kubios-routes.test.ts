@@ -27,16 +27,16 @@ describe('Admin Kubios HTTP boundaries',()=>{
     }
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
-  it('lists participants searched by username and exports only safe cache data for any admin',async()=>{
+  it('lists participants by cursor and exports only safe cache data for any admin',async()=>{
     mocks.rpc.mockImplementation(async(name:string)=> {
       const link={user_id:2,username:'Alice',team_id:'11111111-1111-4111-8111-111111111111',kubios_member_id:'22222222-2222-4222-8222-222222222222'}
-      if(name==='kubios_admin_page_links') return {data:{total:1,links:[link]}}
+      if(name==='kubios_admin_list_participants') return {data:[{user_id:2,username:'Alice'}]}
       if(name==='kubios_admin_get_link' || name==='kubios_admin_list_links') return {data:[link]}
       return {data:[{key_version:1,nonce:'\\x'+'00'.repeat(12),tag:'\\x'+'00'.repeat(16),ciphertext:'\\x01',updated_at:'2026-01-02T12:00:00Z'}]}
     })
-    const response=await list(req('/api/admin/kubios/participants?search=alice'))
+    const response=await list(req('/api/admin/kubios/participants'))
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({total:1,participants:[{userId:2,username:'Alice',measurementCount:1}]})
+    expect(await response.json()).toEqual({participants:[{userId:2,username:'Alice'}],nextCursor:null})
     const detailResponse=await detail(req(),context)
     expect(detailResponse.status).toBe(200)
     expect(await detailResponse.text()).not.toMatch(/hidden|token|team_id/)
