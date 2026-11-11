@@ -121,11 +121,15 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
   }
 
   /** Reintenta una decisión fallida: aceptar no es destructivo y se repite
-   * directamente; el rechazo fallido vuelve a ofrecerse con el mismo botón. */
+   * directamente; el rechazo nunca se repite solo, se restaura el estado
+   * previo al fallo (la tarjeta con sus botones) para que el usuario vuelva
+   * a elegir. */
   function retryFailure() {
     if (decisionFailure === null || busy) return
+    const { decision } = decisionFailure
     setDecisionFailure(null)
-    void decide(decisionFailure.decision)
+    if (decision === 'reject') return
+    void decide(decision)
   }
 
   if (path === '/privacy') return children

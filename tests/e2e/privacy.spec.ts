@@ -48,6 +48,13 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       const dialog = page.getByRole('dialog', { name: 'Aviso de privacidad', exact: true })
       await expect(dialog).toBeVisible()
       expect(mock.reads()).toBe(0)
+      // The card receives a programmatic focus on sign-in; the browser focus
+      // outline (the black rectangle around the card) must not be painted.
+      const outline = await page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null
+        return active ? getComputedStyle(active).outlineStyle : ''
+      })
+      expect(outline).toBe('none')
       await page.keyboard.press('Escape')
       await expect(dialog).toBeVisible()
       await page.keyboard.press('Shift+Tab')
