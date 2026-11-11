@@ -14,6 +14,9 @@ test.skip(
 );
 
 const SMALL_TYPES = ['detemir', 'degludec', 'lispro', 'aspart', 'regular', 'glargina', 'mezcla'];
+// With INSULIN_TOP_TYPES = 5 the first five types render individually and the
+// remaining tail (stable order, equal values) is aggregated into «Otros».
+const OTHERS_BREAKDOWN = SMALL_TYPES.slice(3);
 const INSULIN = [
   ...Array.from({ length: 200 }, (_, index) => insulinRow('Rápida', index)),
   ...Array.from({ length: 90 }, (_, index) => insulinRow('Lenta', index)),
@@ -86,11 +89,10 @@ test('the insulin pie labels big slices and hides tiny overlapping ones', async 
   await expect(page.getByText('Mezcla 0%')).toHaveCount(0);
 
   // The «Otros» dropdown keeps the full breakdown of the aggregated types.
-  const dropdown = page.getByRole('button', { name: /Tipos incluidos en «Otros» \(7\)/ });
-  await expect(dropdown).toBeVisible();
+  const dropdown = page.getByRole('button', { name: /Tipos incluidos en «Otros» \(\d+\)/ });
+  await expect(dropdown).toHaveText(new RegExp(`Tipos incluidos en «Otros» \\(${OTHERS_BREAKDOWN.length}\\)`));
   await dropdown.click();
-  await expect(page.getByText('Tipos incluidos en «Otros» (7)')).toBeVisible();
-  for (const type of SMALL_TYPES) {
+  for (const type of OTHERS_BREAKDOWN) {
     await expect(page.locator('li', { hasText: type })).toBeVisible();
   }
 });
