@@ -178,9 +178,8 @@ describe('estructura del shell', () => {
   })
 
   it('retira la parte de estudio del front sin borrar su código fuente', () => {
-    const studyPage = readSource('src/app/study/page.tsx')
-    expect(studyPage).toContain('notFound()')
-    expect(studyPage).toContain('StudyPageView')
+    expect(readSource('src/app/study/page.tsx')).toContain('notFound()')
+    expect(readSource('src/app/study/study-page-view.tsx')).toContain('StudyPageView')
     expect(readSource('src/components/Navigation.tsx')).not.toContain("'/study'")
     expect(readSource('src/app/page.tsx')).not.toContain("href: '/study'")
   })

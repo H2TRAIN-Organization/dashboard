@@ -42,8 +42,9 @@ El código fuente original se mantiene intacto y no se borra porque **no se
 sabe con certeza cuál es el objetivo de esa parte**. La API
 `src/app/api/study` sigue desplegada (protegida por sesión y permisos);
 solo la superficie del front queda desactivada. Para reactivarla, elimina el
-guard `STUDY_ROUTE_DISABLED` de `src/app/study/page.tsx`, vuelve a exportar
-`StudyPageView` como página y reintroduce las entradas de navegación.
+guard de `src/app/study/page.tsx`, vuelve a montar `StudyPageView`
+(`src/app/study/study-page-view.tsx`) como página y reintroduce las
+entradas de navegación.
 
 ## Requisitos y puesta en marcha
 
