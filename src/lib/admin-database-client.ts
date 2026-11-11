@@ -1,4 +1,5 @@
 import { apiRequest, buildQuery } from "./api-client";
+import { deriveBackupKey } from "./derive-backup-key";
 
 export interface DatabaseStats {
   readonly tables: readonly { readonly name: string; readonly recordCount: number; readonly accessible: boolean }[];
@@ -23,7 +24,12 @@ export const databaseApi = {
   stats: () => apiRequest<DatabaseStats>("/api/admin/database/tables"),
   page: (table: string, limit: number, offset: number) => apiRequest<DatabasePage>(`/api/admin/database/table-data${buildQuery({ table, limit, offset })}`),
   exportTable: (table: string, format: "csv" | "json") => apiRequest<DatabaseDownload>(`/api/admin/database/export${buildQuery({ table, format })}`),
-  logicalCopy: (password: string) => apiRequest<DatabaseDownload>("/api/admin/database/logical-backup", { method: "POST", body: JSON.stringify({ password }) }),
+  /** The browser derives the encryption key locally: the passphrase never
+   * travels in the request, so it cannot appear in any inspectable payload. */
+  logicalCopy: async (password: string) => {
+    const derived = await deriveBackupKey(password);
+    return apiRequest<DatabaseDownload>("/api/admin/database/logical-backup", { method: "POST", body: JSON.stringify({ salt: derived.salt, key: derived.key }) });
+  },
 };
 export function saveDatabaseDownload(download: DatabaseDownload): void {
   const url = URL.createObjectURL(new Blob([download.content], { type: download.contentType }));

@@ -6,7 +6,7 @@ import { buildClearedSessionCookie } from '../cookies'
 import { jsonResult, parseInput } from '../problem'
 
 const decisionSchema = z.object({
-  policyVersion: z.string().min(1).max(100), surface: z.enum(['login', 'banner']),
+  policyVersion: z.string().min(1).max(100), surface: z.enum(['login']),
   decision: z.enum(['accept', 'reject']), language: z.enum(['es', 'en']),
   requestId: z.uuid(),
 }).strict()

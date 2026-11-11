@@ -10,30 +10,30 @@ async function signIn(page, accept = true) {
   expect(login.status()).toBe(200)
   if (accept) {
     const policyVersion = (await login.json()).privacy.policyVersion
-    for (const surface of ['login', 'banner']) {
-      const response = await page.request.post('/api/privacy/decision', { headers: { Origin: 'http://localhost:4630' }, data: { policyVersion, surface, decision: 'accept', language: 'es', requestId: crypto.randomUUID() } })
-      expect(response.status()).toBe(200)
-    }
+    const response = await page.request.post('/api/privacy/decision', { headers: { Origin: 'http://localhost:4630' }, data: { policyVersion, surface: 'login', decision: 'accept', language: 'es', requestId: crypto.randomUUID() } })
+    expect(response.status()).toBe(200)
   }
 }
 
-test('real session persists the modal and lower banner choices', async ({ page }) => {
+test('real session persists the one-time notice acceptance', async ({ page }) => {
   await signIn(page, false)
   await page.goto('/')
   const modal = page.getByRole('dialog', { name: 'Aviso de privacidad', exact: true })
   await expect(modal).toBeVisible()
   expect((await page.request.get('/api/decrypted-data')).status()).toBe(403)
   await modal.getByRole('button', { name: 'He leído y acepto continuar' }).click()
-  const banner = page.getByRole('complementary', { name: 'Aviso de privacidad', exact: true })
-  await expect(banner).toBeVisible()
+  await expect(modal).not.toBeVisible()
   expect((await page.request.get('/api/decrypted-data')).status()).toBe(200)
-  await page.reload()
-  await expect(banner).toBeVisible()
-  await banner.getByRole('button', { name: 'He leído y acepto continuar' }).click()
-  await expect(banner).not.toBeVisible()
   await page.reload()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   expect((await (await page.request.get('/api/auth/session')).json()).privacy.state).toBe('complete')
+})
+
+test('a second sign-in of the same account is never asked again', async ({ page }) => {
+  await signIn(page)
+  const second = await page.request.post('/api/auth/login', { data: admin, headers: { Origin: 'http://localhost:4630' } })
+  expect(second.status()).toBe(200)
+  expect((await second.json()).privacy.state).toBe('complete')
 })
 
 test('admin navigates to participant Kubios, exports its cache and opens Study', async ({ page }) => {
@@ -84,6 +84,9 @@ test('mobile database controls browse, page, export, encrypt and refresh', async
   await page.getByRole('button', { name: 'Descargar copia cifrada', exact: true }).click()
   const encrypted = JSON.parse(await readFile(await (await encryptedEvent).path(), 'utf8'))
   expect(encrypted.cipher).toBe('aes-256-gcm')
+  expect(encrypted.version).toBe(2)
+  expect(encrypted.kdf).toMatchObject({ name: 'pbkdf2', hash: 'SHA-256' })
+  expect(JSON.stringify(encrypted)).not.toContain('Disposable-Download-1!')
   expect(JSON.stringify(encrypted)).not.toContain('acceptance.bcrypt')
   const refresh = page.waitForResponse(r => r.url().endsWith('/api/admin/database/tables'))
   await page.getByRole('button', { name: 'Actualizar estadísticas', exact: true }).click()

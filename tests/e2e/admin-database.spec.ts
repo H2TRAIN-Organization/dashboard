@@ -85,7 +85,11 @@ test('the four admin database buttons run their real function', async ({ page })
     }
     if (path === '/api/admin/database/logical-backup') {
       const body = route.request().postDataJSON() as Record<string, unknown>
-      expect(body.password).toBe('synthetic-passphrase')
+      // The passphrase never travels: only the browser-derived key material.
+      expect(body.password).toBeUndefined()
+      expect(typeof body.salt).toBe('string')
+      expect(typeof body.key).toBe('string')
+      expect(JSON.stringify(body)).not.toContain('synthetic-passphrase')
       return route.fulfill({ json: {
         filename: 'logical-copy.bin', contentType: 'application/octet-stream', content: 'synthetic-cipher',
       } })

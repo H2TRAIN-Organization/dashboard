@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { pbkdf2Sync, randomBytes } from 'node:crypto'
 import { before, describe, test } from 'node:test'
-import { enabled, request, loginEmail, loginUsername } from './support/http.mjs'
+import { enabled, request, loginEmail, loginUsername, logout } from './support/http.mjs'
 import { admin, bcryptUser } from './support/fixtures.mjs'
 
 const suite = enabled && process.env.ACCEPTANCE_RESET_URL ? describe : describe.skip
@@ -31,31 +32,37 @@ suite('Administration, Study and Privacy: real backend / synthetic dependency', 
     assert.equal((await decide(login, 'login', 'accept', { policyVersion: 'obsolete' })).status, 409)
     const first = await decide(login, 'login')
     assert.equal(first.status, 200)
-    assert.equal(first.body.state, 'banner')
+    assert.equal(first.body.state, 'complete')
     assert.equal((await request('/api/users', { cookie: login.cookie })).status, 200)
     const requestId = crypto.randomUUID()
-    const second = await decide(login, 'banner', 'accept', { requestId })
-    assert.equal(second.body.state, 'complete')
-    assert.equal((await decide(login, 'banner', 'accept', { requestId })).status, 200)
+    assert.equal((await decide(login, 'login', 'accept', { requestId })).status, 200)
+    assert.equal((await decide(login, 'login', 'accept', { requestId })).status, 200)
     const restored = await request('/api/auth/session', { cookie: login.cookie })
     assert.equal(restored.body.privacy.state, 'complete')
     assert.equal(restored.body.user.gdprConsent, login.body.user.gdprConsent)
   })
 
-  test('rejection revokes the session without changing external consent; next login starts again', async () => {
+  test('the acceptance persists per user: the next login is never asked again', async () => {
+    const next = await rawAdmin()
+    assert.equal(next.status, 200)
+    assert.equal(next.body.privacy.state, 'complete')
+    assert.equal((await request('/api/users', { cookie: next.cookie })).status, 200)
+    assert.equal(next.body.user.gdprConsent, (await request('/api/auth/session', { cookie: next.cookie })).body.user.gdprConsent)
+  })
+
+  test('rejection revokes the session without changing external consent or the user ack', async () => {
     const login = await rawAdmin()
-    await decide(login, 'login')
-    const rejection = await decide(login, 'banner', 'reject')
+    assert.equal(login.body.privacy.state, 'complete')
+    const rejection = await decide(login, 'login', 'reject')
     assert.equal(rejection.status, 200)
     assert.equal(rejection.body.rejected, true)
     assert.match(rejection.headers.get('set-cookie'), /Max-Age=0/i)
     assert.equal((await request('/api/auth/session', { cookie: login.cookie })).status, 401)
     assert.equal((await request('/api/decrypted-data', { cookie: login.cookie })).status, 401)
     const next = await rawAdmin()
-    assert.equal(next.body.privacy.state, 'initial')
-    assert.equal(next.body.user.gdprConsent, login.body.user.gdprConsent)
-    assert.equal((await decide(next, 'login', 'reject')).status, 200)
-    assert.equal((await request('/api/auth/session', { cookie: next.cookie })).status, 401)
+    assert.equal(next.body.privacy.state, 'complete')
+    assert.equal((await request('/api/auth/session', { cookie: next.cookie })).status, 200)
+    await logout(next.cookie)
   })
 
   test('admin without a personal link reads participant Kubios and Study; regular actor is denied', async () => {
@@ -95,7 +102,15 @@ suite('Administration, Study and Privacy: real backend / synthetic dependency', 
     assert.doesNotMatch(download.body.content, /PasswordHash|_iv|ciphertext/)
     const rows = JSON.parse(download.body.content)
     assert.equal((Array.isArray(rows) ? rows : rows.records ?? rows.data).length, page.body.totalRecords)
-    const backup = await request('/api/admin/database/logical-backup', { method: 'POST', cookie, body: { password: 'Synthetic-Download-Password-1!' } })
+    const backup = await request('/api/admin/database/logical-backup', {
+      method: 'POST', cookie,
+      // The browser derives the key; here Node simulates the same PBKDF2 profile.
+      body: (() => {
+        const salt = randomBytes(32)
+        const key = pbkdf2Sync('Synthetic-Download-Password-1!', salt, 600000, 32, 'sha256')
+        return { salt: salt.toString('base64'), key: key.toString('base64') }
+      })(),
+    })
     assert.equal(backup.status, 200)
     assert.doesNotMatch(backup.text, /Synthetic-Download-Password|__PLAIN__|acceptance\.bcrypt|PasswordHash|internal_secret/)
   })

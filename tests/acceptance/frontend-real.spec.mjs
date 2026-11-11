@@ -42,9 +42,9 @@ async function waitForHydration(page) {
 async function acceptAccessNotices(page) {
   const initial = page.getByRole('dialog', { name: /^(Aviso de privacidad|Privacy notice)$/ })
   await initial.getByRole('button', { name: /He leído y acepto continuar|I have read and accept to continue|I have read and agree to continue/ }).click()
-  const banner = page.getByRole('complementary', { name: /^(Aviso de privacidad|Privacy notice)$/ })
-  await banner.getByRole('button', { name: /He leído y acepto continuar|I have read and accept to continue|I have read and agree to continue/ }).click()
-  await expect(banner).not.toBeVisible()
+  // Single-stage flow: one acceptance dismisses the gate; no banner exists.
+  await expect(initial).not.toBeVisible()
+  await expect(page.getByRole('complementary', { name: /^(Aviso de privacidad|Privacy notice)$/ })).toHaveCount(0)
 }
 
 test('admin email login, cookie reload, Users CRUD and logout', async ({ page }) => {

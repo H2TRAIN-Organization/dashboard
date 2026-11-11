@@ -5,11 +5,11 @@ export { PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION }
 export interface PrivacyStatus {
   readonly policyVersion: string
   readonly policyHash: string
-  readonly state: 'initial' | 'banner' | 'complete'
+  readonly state: 'initial' | 'complete'
 }
 export interface PrivacyDecision {
   readonly policyVersion: string
-  readonly surface: 'login' | 'banner'
+  readonly surface: 'login'
   readonly decision: 'accept' | 'reject'
   readonly language: 'es' | 'en'
   readonly requestId: string
@@ -21,7 +21,7 @@ export function initialPrivacyStatus(): PrivacyStatus {
 export function assertPrivacyAcknowledged(session: { readonly privacy?: PrivacyStatus }): void {
   if (session.privacy?.policyVersion !== PRIVACY_POLICY_VERSION ||
       session.privacy.policyHash !== PRIVACY_POLICY_HASH ||
-      !['banner', 'complete'].includes(session.privacy.state)) {
+      session.privacy.state !== 'complete') {
     throw new AppError(403, 'PRIVACY_ACTION_REQUIRED', 'Debe leer el aviso de privacidad antes de acceder a los datos')
   }
 }

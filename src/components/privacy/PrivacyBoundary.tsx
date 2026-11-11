@@ -71,11 +71,7 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
   const [forced, setForced] = useState(false)
   const [busy, setBusy] = useState(false)
   const [decisionFailure, setDecisionFailure] = useState<DecisionFailure | null>(null)
-  const [confirmReject, setConfirmReject] = useState(false)
   const initialDialogRef = useRef<HTMLDivElement>(null)
-  const rejectDialogRef = useRef<HTMLDialogElement>(null)
-  const bannerRef = useRef<HTMLElement>(null)
-  const [bannerHeight, setBannerHeight] = useState(288)
   const requestRef = useRef<{ key: string; id: string } | null>(null)
   const privacy = session?.privacy
   const stage = privacy?.policyVersion === PRIVACY_POLICY_VERSION && privacy.policyHash === PRIVACY_POLICY_HASH ? privacy.state : 'initial'
@@ -87,37 +83,22 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
     return () => window.removeEventListener('privacy:required', required)
   }, [refresh])
   useEffect(() => { if (initial && session && path !== '/privacy') initialDialogRef.current?.focus({ preventScroll: true }) }, [initial, session, path])
-  useEffect(() => {
-    if (confirmReject) rejectDialogRef.current?.showModal()
-    else rejectDialogRef.current?.close()
-  }, [confirmReject])
-  useEffect(() => {
-    const banner = bannerRef.current
-    if (!banner) return
-    const update = () => setBannerHeight(banner.getBoundingClientRect().height)
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(banner)
-    return () => observer.disconnect()
-  }, [stage, loading, decisionFailure, session, path])
 
   async function decide(decision: 'accept' | 'reject') {
-    if (busy || (decision === 'reject' && !initial && !confirmReject)) return
+    if (busy) return
     setBusy(true)
     setDecisionFailure(null)
-    const surface = initial ? 'login' : 'banner'
-    const key = `${surface}:${decision}:${language}`
+    const key = `${decision}:${language}`
     if (requestRef.current?.key !== key) requestRef.current = { key, id: crypto.randomUUID() }
     try {
       const response = await fetch('/api/privacy/decision', {
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policyVersion: PRIVACY_POLICY_VERSION, surface, decision, language, requestId: requestRef.current.id }),
+        body: JSON.stringify({ policyVersion: PRIVACY_POLICY_VERSION, surface: 'login', decision, language, requestId: requestRef.current.id }),
       })
       if (!response.ok) {
         // Re-sync the authoritative stage: a conflict may mean the server
         // already recorded another outcome for this session or request.
-        setConfirmReject(false)
         await refresh().catch(() => undefined)
         setDecisionFailure({ kind: classifyPrivacyDecisionFailure(response.status), decision })
         return
@@ -134,24 +115,21 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
       setForced(false)
       await refresh()
     } catch {
-      setConfirmReject(false)
       await refresh().catch(() => undefined)
       setDecisionFailure({ kind: 'transient', decision })
     } finally { setBusy(false) }
   }
 
-  /** Reintenta una decisión fallida. El rechazo nunca se repite solo: se
-   * restaura el estado previo al fallo (diálogo o barra con sus botones y,
-   * en la barra, la confirmación) para que el usuario vuelva a elegir;
-   * aceptar no es destructivo y se repite directamente. */
+  /** Reintenta una decisión fallida: aceptar no es destructivo y se repite
+   * directamente; el rechazo nunca se repite solo, se restaura el estado
+   * previo al fallo (la tarjeta con sus botones) para que el usuario vuelva
+   * a elegir. */
   function retryFailure() {
     if (decisionFailure === null || busy) return
+    const { decision } = decisionFailure
     setDecisionFailure(null)
-    if (decisionFailure.decision === 'reject') {
-      if (!initial) setConfirmReject(false)
-      return
-    }
-    void decide(decisionFailure.decision)
+    if (decision === 'reject') return
+    void decide(decision)
   }
 
   if (path === '/privacy') return children
@@ -184,6 +162,10 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
         aria-modal="true"
         aria-labelledby="privacy-title"
         aria-busy={busy}
+        /* focus:outline-none evita el recuadro de foco del navegador alrededor
+         * de la tarjeta tras el foco programático inicial; desaparecía al hacer
+         * clic en cualquier parte de la pantalla y no aportaba nada. */
+        className="focus:outline-none"
         onKeyDown={(event) => {
           if (event.key !== 'Tab') return
           const elements = event.currentTarget.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled])')
@@ -202,21 +184,5 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
       </div>
     </PrivacyPanel>
   )
-  return <div style={{ paddingBottom: stage === 'banner' ? bannerHeight : 0 }}>{stage === 'banner' ? <aside ref={bannerRef} aria-label={text.title} className="fixed inset-x-0 bottom-0 z-50 max-h-[65vh] overflow-y-auto border-t border-amber-300 bg-amber-50 p-4 text-slate-900">
-    <p>{text.banner} <Link className="underline" href="/privacy">{text.policy}</Link></p>
-    {decisionFailure && <DecisionFailureAlert failure={decisionFailure} language={language} onRetry={retryFailure} />}
-    <div className="mt-2 flex flex-wrap items-center gap-3">
-      <button disabled={busy} className="rounded bg-blue-700 px-3 py-2 text-white" onClick={() => void decide('accept')}>{text.accept}</button>
-      <button disabled={busy} className="rounded border px-3 py-2 disabled:opacity-50" onClick={() => setConfirmReject(true)}>{text.reject}</button>
-    </div>
-  </aside> : null}{children}
-    <dialog ref={rejectDialogRef} aria-labelledby="privacy-reject-title" onCancel={() => setConfirmReject(false)} className="m-auto max-w-lg rounded-xl bg-white p-6 text-slate-900 shadow-xl backdrop:bg-black/50">
-      <h2 id="privacy-reject-title" className="text-lg font-semibold">{text.reject}</h2>
-      <p className="my-4">{text.confirm}</p>
-      <div className="flex flex-wrap gap-3">
-        <button disabled={busy} className="rounded border px-4 py-2" onClick={() => setConfirmReject(false)}>{language === 'es' ? 'Cancelar' : 'Cancel'}</button>
-        <button disabled={busy} className="rounded bg-red-700 px-4 py-2 text-white" onClick={() => void decide('reject')}>{language === 'es' ? 'Confirmar rechazo' : 'Confirm rejection'}</button>
-      </div>
-    </dialog>
-  </div>
+  return children
 }

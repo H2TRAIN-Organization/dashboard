@@ -11,8 +11,8 @@ export default function PrivacyPage() {
   const privacy = session?.privacy
   const currentPrivacy = privacy?.policyVersion === PRIVACY_POLICY_VERSION && privacy.policyHash === PRIVACY_POLICY_HASH ? privacy : undefined
   const states = language === 'es'
-    ? { initial: 'lectura inicial pendiente', banner: 'lectura de la barra pendiente', complete: 'lectura completada' }
-    : { initial: 'first acknowledgement pending', banner: 'banner acknowledgement pending', complete: 'acknowledgement complete' }
+    ? { initial: 'lectura inicial pendiente', complete: 'lectura completada' }
+    : { initial: 'first acknowledgement pending', complete: 'acknowledgement complete' }
   return (
     <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {/* Elementos decorativos de fondo, iguales que en el resto del dashboard */}

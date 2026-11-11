@@ -150,7 +150,18 @@ export function createAuthGateway(
       failInfrastructure(error);
     }
 
-    return { user, token, method, expiresAt, privacy: initialPrivacyStatus() };
+    // The fresh session row starts at stage 0; readPrivacy seeds it from the
+    // per-user acceptance so an account that already accepted this policy
+    // version is never asked again on a new sign-in.
+    let privacy = initialPrivacyStatus();
+    if (dependencies.privacy) {
+      try {
+        privacy = await dependencies.privacy.readPrivacy(sidHash, user.id);
+      } catch (error) {
+        failInfrastructure(error);
+      }
+    }
+    return { user, token, method, expiresAt, privacy };
   }
 
   async function consumeLimit(keyHash: string): Promise<boolean> {

@@ -1160,7 +1160,7 @@ test.describe("Admin Kubios overview", () => {
 
     await page.getByTestId("admin-kubios-sync").click();
     const message = page.getByTestId("admin-kubios-sync-message");
-    await expect(message).toContainText("No se pudo sincronizar la copia");
+    await expect(message).toContainText("Fallo interno del refresco en este despliegue");
     await expect(message).not.toContainText("Fallo sintético interno");
     await page.getByTestId("admin-kubios-sync-retry").click();
     await expect(page.getByTestId("admin-kubios-sync-message")).toContainText(

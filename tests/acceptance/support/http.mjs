@@ -93,17 +93,15 @@ export async function loginUsername(username, password) {
   return result;
 }
 
-/** Existing feature regressions run after the actor explicitly accepts both notices.
+/** Existing feature regressions run after the actor explicitly accepts the notice.
  * Privacy tests use request('/api/auth/login', ...) directly to inspect the gate.
  */
 export async function acknowledgePrivacy(cookie, privacy) {
-  for (const surface of ['login', 'banner']) {
-    const result = await request('/api/privacy/decision', {
-      method: 'POST', cookie,
-      body: { policyVersion: privacy.policyVersion, surface, decision: 'accept', language: 'es', requestId: crypto.randomUUID() },
-    });
-    if (result.status !== 200) throw new Error(`Privacy ${surface} acknowledgment failed: ${result.status}`);
-  }
+  const result = await request('/api/privacy/decision', {
+    method: 'POST', cookie,
+    body: { policyVersion: privacy.policyVersion, surface: 'login', decision: 'accept', language: 'es', requestId: crypto.randomUUID() },
+  });
+  if (result.status !== 200) throw new Error(`Privacy acknowledgment failed: ${result.status}`);
 }
 
 export function session(cookie) {
