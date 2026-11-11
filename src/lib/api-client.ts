@@ -149,7 +149,7 @@ function mapClientSession(raw: unknown, fallbackMethod: 'email' | 'username'): C
     ...(isRecord(raw.privacy) &&
       typeof raw.privacy.policyVersion === 'string' &&
       typeof raw.privacy.policyHash === 'string' &&
-      (raw.privacy.state === 'initial' || raw.privacy.state === 'banner' || raw.privacy.state === 'complete')
+      (raw.privacy.state === 'initial' || raw.privacy.state === 'complete')
       ? { privacy: {
           policyVersion: raw.privacy.policyVersion,
           policyHash: raw.privacy.policyHash,

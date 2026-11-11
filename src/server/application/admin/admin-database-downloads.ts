@@ -20,23 +20,18 @@ function incomplete(): never {
   throw new ConflictError("CONFLICT", "La lectura no está completa o los datos cambiaron. Repite la operación.");
 }
 
-function comparePrimaryKey(previous: string, current: string): number {
-  if (/^\d+$/.test(previous) && /^\d+$/.test(current)) {
-    const a = BigInt(previous), b = BigInt(current);
-    return a < b ? -1 : a > b ? 1 : 0;
-  }
-  return previous < current ? -1 : previous > current ? 1 : 0;
-}
-
-/** Ordered pages, exact counts and unique increasing PKs. Never silently returns a short export. */
+/** Ordered pages, exact counts and unique PKs. Never silently returns a short
+ * export. Uniqueness is checked per key instead of assuming the JavaScript
+ * string ordering matches the database collation: PostgreSQL may order text
+ * keys differently, and that difference is not a data inconsistency. */
 export async function readCompleteAdminTable(
   database: AdminDatabaseUseCases,
   actor: ActiveActor,
   table: string,
 ): Promise<readonly HealthRecord[]> {
   const records: HealthRecord[] = [];
+  const seenKeys = new Set<string>();
   let expected: number | undefined;
-  let previousKey: string | undefined;
   for (;;) {
     const page = await database.getTableData(actor, table, PAGE_SIZE, records.length);
     expected ??= page.totalRecords;
@@ -45,8 +40,8 @@ export async function readCompleteAdminTable(
       const key = row[table === "users" ? "UserID" : "id"];
       if ((typeof key !== "string" && typeof key !== "number") || String(key).length === 0) incomplete();
       const currentKey = String(key);
-      if (previousKey !== undefined && comparePrimaryKey(previousKey, currentKey) >= 0) incomplete();
-      previousKey = currentKey;
+      if (seenKeys.has(currentKey)) incomplete();
+      seenKeys.add(currentKey);
       records.push(withoutSecrets(row) as HealthRecord);
     }
     if (records.length === expected) return records;

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-export const databaseTableQuerySchema = z.strictObject({
-  table: z
+export const databaseTableQuerySchema = z.strictObject({  table: z
     .string()
     .trim()
     .regex(/^[a-z][a-z0-9_]{0,62}$/, "Nombre de tabla no válido"),
@@ -15,5 +14,8 @@ export const databaseExportQuerySchema = z.strictObject({
 });
 
 export const logicalBackupBodySchema = z.strictObject({
-  password: z.string().min(12).max(1024),
+  salt: z.base64(),
+  /** 32-byte PBKDF2-SHA256 key derived by the browser. The raw passphrase
+   * never travels to the server and cannot appear in any payload. */
+  key: z.base64(),
 });
