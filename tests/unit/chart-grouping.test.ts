@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregatePieTail, pieLabelText, shouldLabelPieSlice, type NamedValue } from '@/lib/chart-grouping'
+import { aggregatePieTail, pieLabelText, shouldLabelPieSlice, summarizeDosesByDate, type NamedValue } from '@/lib/chart-grouping'
 
 const TOP = 5
 const OTHERS_NAME = 'Otros'
@@ -128,5 +128,44 @@ describe('pie slice labels: umbral y texto para evitar el solape', () => {
     expect(pieLabelText('Rápida', 0.66)).toBe('Rápida 66%')
     expect(pieLabelText('Lenta', 0.3)).toBe('Lenta 30%')
     expect(pieLabelText('Otros', 0.0333)).toBe('Otros 3%')
+  })
+})
+
+describe('summarizeDosesByDate: inyecciones y promedio de dosis por día', () => {
+  interface DoseRow { readonly day: string; readonly dose: string }
+
+  const row = (day: string, dose: string): DoseRow => ({ day, dose })
+  const dateOf = (r: DoseRow) => r.day
+  const doseOf = (r: DoseRow) => parseFloat(r.dose || '0')
+
+  it('cuenta inyecciones y calcula el promedio redondeado a 1 decimal por día', () => {
+    const rows = [row('1 nov', '2'), row('1 nov', '4'), row('1 nov', '3.5'), row('2 nov', '1')]
+
+    expect(summarizeDosesByDate(rows, dateOf, doseOf)).toEqual([
+      { date: '1 nov', injections: 3, averageDose: 3.2 },
+      { date: '2 nov', injections: 1, averageDose: 1 },
+    ])
+  })
+  it('trata la dosis ausente o no numérica como 0', () => {
+    const rows = [row('1 nov', ''), row('1 nov', '3'), row('1 nov', 'abc')]
+
+    expect(summarizeDosesByDate(rows, dateOf, doseOf)).toEqual([
+      { date: '1 nov', injections: 3, averageDose: 1 },
+    ])
+  })
+  it('ordena cronológicamente aunque la entrada venga desordenada', () => {
+    const rows = [row('10 nov', '1'), row('1 nov', '1'), row('5 nov', '1')]
+
+    expect(summarizeDosesByDate(rows, dateOf, doseOf).map(s => s.date)).toEqual(['1 nov', '5 nov', '10 nov'])
+  })
+  it('no muta la colección original', () => {
+    const rows = [row('2 nov', '1'), row('1 nov', '1')]
+
+    summarizeDosesByDate(rows, dateOf, doseOf)
+
+    expect(rows.map(r => r.day)).toEqual(['2 nov', '1 nov'])
+  })
+  it('devuelve una colección vacía sin datos', () => {
+    expect(summarizeDosesByDate([], dateOf, doseOf)).toEqual([])
   })
 })

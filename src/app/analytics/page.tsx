@@ -11,7 +11,7 @@ import Navigation from '@/components/Navigation'
 import StatCard from '@/components/analytics/StatCard'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
-import { aggregatePieTail } from '@/lib/chart-grouping'
+import { aggregatePieTail, summarizeDosesByDate } from '@/lib/chart-grouping'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -98,13 +98,14 @@ export default function AnalyticsPage() {
   }, [session, fetchData, fetchUsers])
 
   // Función para agrupar datos por fecha
+  const dayKey = (value: unknown): string =>
+    new Date(String(value)).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
   const groupDataByDate = <T extends object>(
     data: T[],
     dateField: string = 'date_time',
   ): Array<{ date: string; count: number }> => {
     const grouped = data.reduce<Record<string, { date: string; count: number }>>((acc, item) => {
-      const rawDate = (item as Record<string, unknown>)[dateField]
-      const date = new Date(String(rawDate)).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+      const date = dayKey((item as Record<string, unknown>)[dateField])
       if (!acc[date]) {
         acc[date] = { date, count: 0 }
       }
@@ -187,6 +188,14 @@ export default function AnalyticsPage() {
   const insulinByType = groupDataByType(insulinData, 'insulinType')
   const foodByType = groupDataByType(foodData, 'food_type')
   const moodByValue = groupDataByType(moodData, 'mood_value')
+
+  // Inyecciones y promedio de dosis reales por día; dos gráficos separados
+  // para que cada título represente exactamente lo que dibuja.
+  const insulinDosesByDate = summarizeDosesByDate(
+    insulinData,
+    (row) => dayKey(row.date_time),
+    (row) => parseFloat(row.dose || '0'),
+  )
 
   // Pie chart de insulina: los tipos menos representativos se agrupan en
   // "Otros" con el porcentaje sumado, con desglose disponible en desplegable.
@@ -625,7 +634,7 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
-                {/* Promedio de dosis de insulina por día */}
+                {/* Inyecciones de insulina por día */}
                 {insulinByDate.length > 0 && (
                   <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
@@ -635,10 +644,10 @@ export default function AnalyticsPage() {
                         <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg mr-3">
                           <Pill className="h-5 w-5 text-white" />
                         </div>
-                        {t.analytics.averageInsulinDose}
+                        {t.analytics.injectionsPerDay}
                       </h3>
                       <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsAverageInsulin} 
+                        {t.analytics.showsInsulinInjections} 
                         <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </p>
@@ -673,6 +682,60 @@ export default function AnalyticsPage() {
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
                           <Bar dataKey="count" fill="#3B82F6" name={t.analytics.insulinInjections} />
+                        </BarChart>
+                      </ScrollableChart>
+                    </div>
+                  </div>
+                )}
+
+                {/* Promedio de dosis de insulina por día */}
+                {insulinDosesByDate.length > 0 && (
+                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
+                    
+                    <div className="relative z-10">
+                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
+                        <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg mr-3">
+                          <Pill className="h-5 w-5 text-white" />
+                        </div>
+                        {t.analytics.averageInsulinDose}
+                      </h3>
+                      <p className="text-sm text-slate-600 mb-6">
+                        {t.analytics.showsAverageInsulin} 
+                        <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
+                        <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.averageDoseUnits}
+                      </p>
+                      <ScrollableChart height={300} minInnerWidth={insulinDosesByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
+                        <BarChart data={insulinDosesByDate}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="#9CA3AF" 
+                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                          />
+                          <YAxis 
+                            stroke="#9CA3AF" 
+                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
+                            label={{ value: t.analytics.averageDoseUnits, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                          />
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              borderRadius: '12px',
+                              color: '#1e293b',
+                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                            }}
+                            itemStyle={{ color: '#1e293b' }}
+                            labelStyle={{ color: '#1e293b' }}
+                            formatter={(value) => [
+                              `${value} ${t.analytics.units}`,
+                              t.analytics.averageDose
+                            ]}
+                            labelFormatter={(label) => `${t.analytics.date}: ${label}`}
+                          />
+                          <Bar dataKey="averageDose" fill="#6366F1" name={t.analytics.averageDose} />
                         </BarChart>
                       </ScrollableChart>
                     </div>

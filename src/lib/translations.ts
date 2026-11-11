@@ -384,6 +384,8 @@ export interface Translations {
     others: string
     othersDetail: string
     averageInsulinDose: string
+    averageDoseUnits: string
+    averageDose: string
     moodDistribution: string
     temporalEvolution: string
     insulinEvolution: string
@@ -1195,6 +1197,8 @@ export const translations: Record<Language, Translations> = {
       yAxis: 'Eje Y',
       numberOfRecords: 'Número de Registros',
       showsAverageInsulin: 'Muestra la cantidad promedio de insulina administrada cada día.',
+      averageDoseUnits: 'Dosis promedio (unidades)',
+      averageDose: 'Dosis promedio',
       numberOfInjections: 'Número de inyecciones',
       showsMoodFrequency: 'Muestra qué tan frecuente es cada nivel de estado de ánimo (0=Muy triste, 10=Muy feliz).',
       verySad: 'Muy triste',
@@ -1939,6 +1943,8 @@ export const translations: Record<Language, Translations> = {
       yAxis: 'Y Axis',
       numberOfRecords: 'Number of Records',
       showsAverageInsulin: 'Shows the average amount of insulin administered each day.',
+      averageDoseUnits: 'Average dose (units)',
+      averageDose: 'Average dose',
       numberOfInjections: 'Number of injections',
       showsMoodFrequency: 'Shows how frequent each mood level is (0=Very sad, 10=Very happy).',
       verySad: 'Very sad',
