@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, type LucideIcon } from 'lucide-react'
+import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, Trash2, type LucideIcon } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import CalendarDatePicker from '@/components/calendar/CalendarDatePicker'
@@ -551,7 +551,7 @@ export default function DataPage() {
                     <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900">
                       {t.dashboard.healthData}
                     </h2>
-                    <p className="text-gray-600 text-sm sm:text-base lg:text-xl font-light">{t.dashboard.healthDataDescription}</p>
+                    <p className="text-gray-600 text-sm sm:text-base lg:text-xl font-light max-w-xl lg:pr-6">{t.dashboard.healthDataDescription}</p>
                   </div>
                 </div>
               </div>
@@ -626,7 +626,7 @@ export default function DataPage() {
                   onClick={clearFilters}
                   className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105 flex items-center"
                 >
-                  <span className="mr-1 sm:mr-2">­ƒùæ´©Å</span>
+                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
                   {t.dashboard.clearFilters}
                 </button>
               </div>
