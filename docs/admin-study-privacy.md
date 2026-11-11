@@ -30,7 +30,7 @@ Se conserva `progress.txt` preexistente y no se añaden dependencias.
   Recargas conservan la etapa; una sesión nueva vuelve a empezar.
 - `/privacy` es pública y enlazada desde la navegación. La política ES/EN
   permanece marcada como borrador. Responsable y contacto facilitados:
-  ULPGC y `htrain@proton.me`; finalidad de consulta/tratamiento de datos médicos,
+  ULPGC y `h2train@proton.me`; finalidad de consulta/tratamiento de datos médicos,
   consentimiento explícito externo y conservación prevista de un año desde
   la recogida. Los avisos son reconocimientos para acceder, no sustituyen ni
   modifican el consentimiento externo o `GDPRConsent`.

@@ -42,7 +42,7 @@ describe('privacy policy and access', () => {
   it('binds both full translations to the audited hash', () => {
     expect(createHash('sha256').update(JSON.stringify(privacyPolicy)).digest('hex')).toBe(PRIVACY_POLICY_HASH)
     for (const text of Object.values(privacyPolicy)) {
-      expect(text.paragraphs.join(' ')).toContain('htrain@proton.me')
+      expect(text.paragraphs.join(' ')).toContain('h2train@proton.me')
       expect(text.paragraphs.join(' ')).toContain('Supabase')
     }
   })

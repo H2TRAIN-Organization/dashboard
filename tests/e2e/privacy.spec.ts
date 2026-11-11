@@ -105,7 +105,7 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       await page.getByRole('link', { name: /Política de privacidad/ }).click()
       await expect(page).toHaveURL(/\/privacy$/)
       await expect(page.getByRole('heading', { name: 'Aviso de privacidad', exact: true })).toBeVisible()
-      await expect(page.getByRole('link', { name: 'htrain@proton.me', exact: true })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'h2train@proton.me', exact: true })).toBeVisible()
     })
     test('banner rejection needs a cancellable confirmation before signing out', async ({ page }) => {
       const mock = await mockPrivacy(page, 'banner')
@@ -170,7 +170,7 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       await page.getByRole('link', { name: 'Consultar aviso y contacto' }).click()
       await expect(page).toHaveURL(/\/privacy$/)
       await expect(page.getByRole('heading', { name: 'Aviso de privacidad', exact: true })).toBeVisible()
-      await expect(page.getByRole('link', { name: 'htrain@proton.me', exact: true })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'h2train@proton.me', exact: true })).toBeVisible()
     })
   })
 }

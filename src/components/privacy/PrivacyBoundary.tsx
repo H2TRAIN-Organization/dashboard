@@ -2,10 +2,34 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useSession } from '@/contexts/SessionContext'
 import { privacyPolicy, PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
 import PrivacyNotice from './PrivacyNotice'
+
+/** Fondo decorativo compartido por las vistas de privacidad, igual al del dashboard. */
+function PrivacyBackdrop() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-blue-400 opacity-10 mix-blend-multiply blur-xl animate-pulse"></div>
+      <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-indigo-400 opacity-10 mix-blend-multiply blur-xl animate-pulse delay-1000"></div>
+      <div className="absolute left-1/2 top-40 h-80 w-80 rounded-full bg-purple-400 opacity-10 mix-blend-multiply blur-xl animate-pulse delay-500"></div>
+    </div>
+  )
+}
+
+/** Tarjeta flotante centrada con el estilo translúcido del dashboard. */
+function PrivacyPanel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 p-4 sm:p-8">
+      <PrivacyBackdrop />
+      <section className={`relative z-10 my-auto w-full rounded-2xl sm:rounded-3xl border border-gray-200/50 bg-white/90 p-5 shadow-2xl backdrop-blur-xl sm:p-8 ${className}`}>
+        {children}
+      </section>
+    </main>
+  )
+}
 
 export default function PrivacyBoundary({ children }: { children: React.ReactNode }) {
   const { session, loading, error, refresh } = useSession()
@@ -16,7 +40,7 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const [confirmReject, setConfirmReject] = useState(false)
-  const initialDialogRef = useRef<HTMLElement>(null)
+  const initialDialogRef = useRef<HTMLDivElement>(null)
   const rejectDialogRef = useRef<HTMLDialogElement>(null)
   const bannerRef = useRef<HTMLElement>(null)
   const [bannerHeight, setBannerHeight] = useState(288)
@@ -73,27 +97,63 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
   }
 
   if (path === '/privacy') return children
-  if (loading) return <main className="p-8" role="status">{text.loading}</main>
-  if (failed) return <main className="p-8" role="alert">{text.unavailable} <button onClick={() => { setFailed(false); void refresh() }}>{text.retry}</button> <Link href="/privacy">{text.policy}</Link></main>
-  if (error) return <main className="p-8" role="alert">{text.unavailable} <button onClick={() => void refresh()}>{text.retry}</button> <Link href="/privacy">{text.policy}</Link></main>
-  if (!session) return children
-  if (initial) return <main className="min-h-screen bg-slate-50 p-4 sm:p-8">
-    <section ref={initialDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="privacy-title" aria-busy={busy} className="mx-auto max-w-3xl rounded-xl bg-white p-5 shadow sm:p-8"
-      onKeyDown={(event) => {
-        if (event.key !== 'Tab') return
-        const elements = event.currentTarget.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled])')
-        const first = elements[0]
-        const last = elements[elements.length - 1]
-        if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last?.focus() }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
-      }}>
-      <PrivacyNotice />
-      <div className="mt-6 flex flex-wrap gap-3">
-        <button disabled={busy} className="rounded bg-blue-700 px-4 py-3 text-white disabled:opacity-50" onClick={() => void decide('accept')}>{text.accept}</button>
-        <button disabled={busy} className="rounded border px-4 py-3" onClick={() => void decide('reject')}>{text.reject}</button>
+  if (loading) return (
+    <PrivacyPanel className="max-w-sm">
+      <div className="flex flex-col items-center space-y-4 text-center" role="status">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-600" aria-hidden="true" />
+        <p className="text-base font-medium text-gray-700">{text.loading}</p>
       </div>
-    </section>
-  </main>
+    </PrivacyPanel>
+  )
+  if (failed) return (
+    <PrivacyPanel className="max-w-lg">
+      <div className="space-y-4 text-center" role="alert">
+        <p className="text-base font-medium text-gray-700">{text.unavailable}</p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button onClick={() => { setFailed(false); void refresh() }} className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-2 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700">{text.retry}</button>
+          <Link href="/privacy" className="rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50">{text.policy}</Link>
+        </div>
+      </div>
+    </PrivacyPanel>
+  )
+  if (error) return (
+    <PrivacyPanel className="max-w-lg">
+      <div className="space-y-4 text-center" role="alert">
+        <p className="text-base font-medium text-gray-700">{text.unavailable}</p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button onClick={() => void refresh()} className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-2 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700">{text.retry}</button>
+          <Link href="/privacy" className="rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50">{text.policy}</Link>
+        </div>
+      </div>
+    </PrivacyPanel>
+  )
+  if (!session) return children
+  if (initial) return (
+    <PrivacyPanel className="max-w-3xl">
+      <div
+        ref={initialDialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="privacy-title"
+        aria-busy={busy}
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab') return
+          const elements = event.currentTarget.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled])')
+          const first = elements[0]
+          const last = elements[elements.length - 1]
+          if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last?.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        }}
+      >
+        <PrivacyNotice />
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button disabled={busy} className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-3 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50" onClick={() => void decide('accept')}>{text.accept}</button>
+          <button disabled={busy} className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50" onClick={() => void decide('reject')}>{text.reject}</button>
+        </div>
+      </div>
+    </PrivacyPanel>
+  )
   return <div style={{ paddingBottom: stage === 'banner' ? bannerHeight : 0 }}>{stage === 'banner' ? <aside ref={bannerRef} aria-label={text.title} className="fixed inset-x-0 bottom-0 z-50 max-h-[65vh] overflow-y-auto border-t border-amber-300 bg-amber-50 p-4 text-slate-900">
     <p>{text.banner} <Link className="underline" href="/privacy">{text.policy}</Link></p>
     <div className="mt-2 flex flex-wrap items-center gap-3">

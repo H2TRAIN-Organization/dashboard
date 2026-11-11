@@ -59,7 +59,7 @@ trabajar en paralelo sin tocar los tres archivos compartidos.
 ## Política confirmada
 
 Borrador ES/EN. Responsable Universidad de Las Palmas de Gran Canaria;
-contacto htrain@proton.me (no afirmar DPD); finalidad dashboard de tratamiento
+contacto h2train@proton.me (no afirmar DPD); finalidad dashboard de tratamiento
 y consulta de datos médicos/Kubios; consentimiento explícito externo como base
 indicada por usuario; conservación un año desde recogida. Texto debe explicar
 derechos/contacto y separación entre lectura/acceso y consentimiento externo.

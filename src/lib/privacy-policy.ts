@@ -1,10 +1,10 @@
 /** Draft notice: update version and hash together whenever either translation changes. */
-export const PRIVACY_POLICY_VERSION = '2026-11-04-draft-1'
+export const PRIVACY_POLICY_VERSION = '2026-11-11-draft-1'
 export const privacyPolicy = {
   es: {
     title: 'Aviso de privacidad',
     paragraphs: [
-      'Responsable: Universidad de Las Palmas de Gran Canaria. Contacto: htrain@proton.me.',
+      'Responsable: Universidad de Las Palmas de Gran Canaria. Contacto: h2train@proton.me.',
       'Finalidad: tratamiento y consulta de datos médicos y de Kubios mediante este dashboard. Categorías: identificativos, medicación, alimentación, ejercicio, ánimo, ciclo y variabilidad de la frecuencia cardíaca (HRV). La base indicada, según declaración del responsable, es el consentimiento explícito obtenido externamente; reconocer este aviso de lectura y acceso no lo sustituye ni lo modifica.',
       'Acceso: los participantes consultan sus propios datos y el personal autorizado los consulta según su rol. El rol médico no concede acceso global a Kubios.',
       'Conservación prevista: un año desde la recogida. Este texto es un borrador; la aplicación operativa del plazo y del borrado está pendiente de verificar.',
@@ -21,7 +21,7 @@ export const privacyPolicy = {
   en: {
     title: 'Privacy notice',
     paragraphs: [
-      'Controller: Universidad de Las Palmas de Gran Canaria. Contact: htrain@proton.me.',
+      'Controller: Universidad de Las Palmas de Gran Canaria. Contact: h2train@proton.me.',
       'Purpose: processing and consulting medical and Kubios data through this dashboard. Categories: identifiers, medication, food, exercise, mood, cycle and heart rate variability (HRV). According to the controller’s declaration, the stated basis is explicit consent obtained externally; acknowledging this access notice does not replace or modify it.',
       'Access: participants consult their own data and authorized staff consult data according to their role. The doctor role does not grant global Kubios access.',
       'Planned retention: one year from collection. This text is a draft; operational retention and deletion arrangements remain to be verified.',
@@ -38,4 +38,4 @@ export const privacyPolicy = {
 } as const
 
 // SHA-256 of JSON.stringify(privacyPolicy), checked by the policy contract test.
-export const PRIVACY_POLICY_HASH = '279bdc6c40df59a0224017a4e3ad012b2fe042bf0ef562da3206f296f26ae64c'
+export const PRIVACY_POLICY_HASH = '19b903fbfdbfe575db05a367e7d61957f3186ea78e034d6b2b61e84ef4a4663f'
