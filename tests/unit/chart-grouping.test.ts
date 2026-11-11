@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregatePieTail, type NamedValue } from '@/lib/chart-grouping'
+import { aggregatePieTail, pieLabelText, shouldLabelPieSlice, type NamedValue } from '@/lib/chart-grouping'
 
 const TOP = 5
 const OTHERS_NAME = 'Otros'
@@ -109,5 +109,24 @@ describe('aggregatePieTail: pie chart con entrada "Otros"', () => {
     expect(result.slices).toHaveLength(0)
     expect(result.others).toBeNull()
     expect(result.othersBreakdown).toHaveLength(0)
+  })
+})
+
+describe('pie slice labels: umbral y texto para evitar el solape', () => {
+  it('oculta los sectores diminotos y conserva los representativos', () => {
+    expect(shouldLabelPieSlice(0)).toBe(false)          // sector de 0%
+    expect(shouldLabelPieSlice(0.03)).toBe(false)       // Otros 3%
+    expect(shouldLabelPieSlice(0.049)).toBe(false)
+    expect(shouldLabelPieSlice(0.05)).toBe(true)        // borde del umbral
+    expect(shouldLabelPieSlice(0.3)).toBe(true)         // Lenta 30%
+    expect(shouldLabelPieSlice(0.66)).toBe(true)        // Rápida 66%
+  })
+  it('oculta cuando recharts no puede calcular el porcentaje', () => {
+    expect(shouldLabelPieSlice(Number.NaN)).toBe(false)
+  })
+  it('redondea el porcentaje sin decimales y usa el nombre del sector', () => {
+    expect(pieLabelText('Rápida', 0.66)).toBe('Rápida 66%')
+    expect(pieLabelText('Lenta', 0.3)).toBe('Lenta 30%')
+    expect(pieLabelText('Otros', 0.0333)).toBe('Otros 3%')
   })
 })

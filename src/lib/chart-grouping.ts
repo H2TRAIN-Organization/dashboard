@@ -39,3 +39,21 @@ export function aggregatePieTail(
     othersBreakdown: tail,
   }
 }
+
+/** Porcentaje mínimo (sobre el total, 0-100) para dibujar la etiqueta
+ * exterior de un sector: las etiquetas de sectores diminotos se solapan
+ * entre sí y no aportan nada. */
+export const PIE_LABEL_MIN_PERCENT = 5
+
+/** Decide si un sector del pie chart lleva etiqueta. `percent` es la fracción
+ * del total (0-1), igual que en recharts. Los sectores bajo el umbral siguen
+ * accesibles por tooltip (y, en el pie de insulina, por el desplegable de
+ * "Otros"). */
+export function shouldLabelPieSlice(percent: number): boolean {
+  return Number.isFinite(percent) && percent * 100 >= PIE_LABEL_MIN_PERCENT
+}
+
+/** Texto estándar de la etiqueta de un sector: "Rápida 66%". */
+export function pieLabelText(name: string, percent: number): string {
+  return `${name} ${(percent * 100).toFixed(0)}%`
+}
