@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { readdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { privacyPolicy, PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
@@ -45,6 +47,17 @@ describe('privacy policy and access', () => {
       expect(text.paragraphs.join(' ')).toContain('h2train@proton.me')
       expect(text.paragraphs.join(' ')).toContain('Supabase')
     }
+  })
+  it('pins the audited policy inside the latest SQL decision RPC', () => {
+    const migrationsDir = path.join(process.cwd(), 'supabase', 'migrations')
+    const definitions = readdirSync(migrationsDir).sort()
+      .filter((file) => file.endsWith('.sql'))
+      .map((file) => ({ file, sql: readFileSync(path.join(migrationsDir, file), 'utf8') }))
+      .filter(({ sql }) => sql.includes('create or replace function public.auth_privacy_decide'))
+    expect(definitions.length).toBeGreaterThan(0)
+    const latest = definitions[definitions.length - 1]!
+    expect(latest.sql).toContain(PRIVACY_POLICY_VERSION)
+    expect(latest.sql).toContain(PRIVACY_POLICY_HASH)
   })
   it('fails closed for missing, initial, obsolete and malformed state; permits banner and complete', () => {
     for (const privacy of [undefined, initial, { ...banner, policyVersion: 'obsolete' }, { ...banner, policyHash: 'wrong' }]) {

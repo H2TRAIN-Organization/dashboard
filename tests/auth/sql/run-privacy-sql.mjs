@@ -1,13 +1,22 @@
 // Real PostgreSQL 16, isolated synthetic container; no ports, volumes or network.
 import { spawnSync, spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
 import assert from 'node:assert/strict'
 
 const container = `dashboard-privacy-validation-${process.pid}`
 const root = new URL('../../../', import.meta.url)
-const migration = readFileSync(new URL('supabase/migrations/20261104121000_session_privacy.sql', root), 'utf8')
-const version = '2026-11-04-draft-1'
-const hash = '279bdc6c40df59a0224017a4e3ad012b2fe042bf0ef562da3206f296f26ae64c'
+// Single source of truth: the audited policy lives in src/lib/privacy-policy.ts.
+const policySource = readFileSync(new URL('src/lib/privacy-policy.ts', root), 'utf8')
+const version = /PRIVACY_POLICY_VERSION = '([^']+)'/.exec(policySource)[1]
+const policyStart = policySource.indexOf('export const privacyPolicy = {')
+const policyEnd = policySource.indexOf('} as const', policyStart)
+const privacyPolicy = eval('(' + policySource.slice(policyStart + 'export const privacyPolicy ='.length, policyEnd + 1) + ')')
+const hash = createHash('sha256').update(JSON.stringify(privacyPolicy)).digest('hex')
+// Every migration that (re)defines the decision RPC, applied in order.
+const migrations = readdirSync(new URL('supabase/migrations', root)).sort()
+  .filter((file) => file.endsWith('.sql') && readFileSync(new URL(`supabase/migrations/${file}`, root), 'utf8').includes('create or replace function public.auth_privacy_decide'))
+  .map((file) => readFileSync(new URL(`supabase/migrations/${file}`, root), 'utf8'))
 const sid = 'synthetic-privacy-sid'
 function command(args, input) {
   const result = spawnSync('docker', args, { encoding: 'utf8', ...(input ? { input } : {}) })
@@ -50,8 +59,8 @@ try {
     insert into public.users values(42,true);
     create table public.auth_sessions(sid_hash text primary key,user_id integer,expires_at timestamptz,revoked_at timestamptz);
     insert into public.auth_sessions values('${sid}',42,now()+interval '1 day',null),('other-session',42,now()+interval '1 day',null);`)
-  sql(migration)
-  sql(migration) // migration is idempotent
+  for (const migration of migrations) sql(migration)
+  for (const migration of migrations) sql(migration) // migrations are idempotent
   expectSqlError(rpc('banner', 'accept', ids[0]), 'out of order')
   assert.equal(sql(rpc('login', 'accept', ids[0])), '1|f')
   assert.equal(sql(rpc('login', 'accept', ids[0])), '1|f')

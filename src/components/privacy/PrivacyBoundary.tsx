@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useSession } from '@/contexts/SessionContext'
 import { privacyPolicy, PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
+import { classifyPrivacyDecisionFailure, privacyGateText, type PrivacyDecisionFailureKind } from '@/lib/privacy-gate'
 import PrivacyNotice from './PrivacyNotice'
 
 /** Fondo decorativo compartido por las vistas de privacidad, igual al del dashboard. */
@@ -31,6 +32,37 @@ function PrivacyPanel({ children, className = '' }: { children: React.ReactNode;
   )
 }
 
+interface DecisionFailure {
+  readonly kind: PrivacyDecisionFailureKind
+  readonly decision: 'accept' | 'reject'
+}
+
+/** Aviso inline cuando una decisión no se registró: el aviso legal sigue visible. */
+function DecisionFailureAlert({ failure, language, onRetry }: {
+  failure: DecisionFailure
+  language: 'es' | 'en'
+  onRetry: () => void
+}) {
+  const text = privacyPolicy[language]
+  const message = failure.kind === 'transient' ? text.unavailable : privacyGateText[language].decisionConflict
+  return (
+    <div role="alert" className="mt-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <p className="font-medium">{message}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          onClick={onRetry}
+          className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-2 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700"
+        >
+          {text.retry}
+        </button>
+        <Link href="/privacy" className="rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50">
+          {text.policy}
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 export default function PrivacyBoundary({ children }: { children: React.ReactNode }) {
   const { session, loading, error, refresh } = useSession()
   const { language } = useLanguage()
@@ -38,7 +70,7 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
   const router = useRouter()
   const [forced, setForced] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [decisionFailure, setDecisionFailure] = useState<DecisionFailure | null>(null)
   const [confirmReject, setConfirmReject] = useState(false)
   const initialDialogRef = useRef<HTMLDivElement>(null)
   const rejectDialogRef = useRef<HTMLDialogElement>(null)
@@ -67,12 +99,12 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
     const observer = new ResizeObserver(update)
     observer.observe(banner)
     return () => observer.disconnect()
-  }, [stage, loading, failed, session, path])
+  }, [stage, loading, decisionFailure, session, path])
 
   async function decide(decision: 'accept' | 'reject') {
     if (busy || (decision === 'reject' && !initial && !confirmReject)) return
     setBusy(true)
-    setFailed(false)
+    setDecisionFailure(null)
     const surface = initial ? 'login' : 'banner'
     const key = `${surface}:${decision}:${language}`
     if (requestRef.current?.key !== key) requestRef.current = { key, id: crypto.randomUUID() }
@@ -82,10 +114,18 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ policyVersion: PRIVACY_POLICY_VERSION, surface, decision, language, requestId: requestRef.current.id }),
       })
-      if (!response.ok) throw new Error('privacy')
+      if (!response.ok) {
+        // Re-sync the authoritative stage: a conflict may mean the server
+        // already recorded another outcome for this session or request.
+        setConfirmReject(false)
+        await refresh().catch(() => undefined)
+        setDecisionFailure({ kind: classifyPrivacyDecisionFailure(response.status), decision })
+        return
+      }
       if (decision === 'reject') {
         // The atomic decision already revoked this app session and cleared its
         // cookie. Clear the UI without invoking external-provider logout.
+        requestRef.current = null
         window.dispatchEvent(new Event('auth:unauthorized'))
         router.replace('/login')
         return
@@ -93,7 +133,25 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
       requestRef.current = null
       setForced(false)
       await refresh()
-    } catch { setFailed(true); setConfirmReject(false) } finally { setBusy(false) }
+    } catch {
+      setConfirmReject(false)
+      await refresh().catch(() => undefined)
+      setDecisionFailure({ kind: 'transient', decision })
+    } finally { setBusy(false) }
+  }
+
+  /** Reintenta una decisión fallida. El rechazo nunca se repite solo: se
+   * restaura el estado previo al fallo (diálogo o barra con sus botones y,
+   * en la barra, la confirmación) para que el usuario vuelva a elegir;
+   * aceptar no es destructivo y se repite directamente. */
+  function retryFailure() {
+    if (decisionFailure === null || busy) return
+    setDecisionFailure(null)
+    if (decisionFailure.decision === 'reject') {
+      if (!initial) setConfirmReject(false)
+      return
+    }
+    void decide(decisionFailure.decision)
   }
 
   if (path === '/privacy') return children
@@ -102,17 +160,6 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
       <div className="flex flex-col items-center space-y-4 text-center" role="status">
         <Loader2 className="h-10 w-10 animate-spin text-blue-600" aria-hidden="true" />
         <p className="text-base font-medium text-gray-700">{text.loading}</p>
-      </div>
-    </PrivacyPanel>
-  )
-  if (failed) return (
-    <PrivacyPanel className="max-w-lg">
-      <div className="space-y-4 text-center" role="alert">
-        <p className="text-base font-medium text-gray-700">{text.unavailable}</p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <button onClick={() => { setFailed(false); void refresh() }} className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-2 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700">{text.retry}</button>
-          <Link href="/privacy" className="rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50">{text.policy}</Link>
-        </div>
       </div>
     </PrivacyPanel>
   )
@@ -147,6 +194,7 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
         }}
       >
         <PrivacyNotice />
+        {decisionFailure && <DecisionFailureAlert failure={decisionFailure} language={language} onRetry={retryFailure} />}
         <div className="mt-6 flex flex-wrap gap-3">
           <button disabled={busy} className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-3 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50" onClick={() => void decide('accept')}>{text.accept}</button>
           <button disabled={busy} className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50" onClick={() => void decide('reject')}>{text.reject}</button>
@@ -156,6 +204,7 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
   )
   return <div style={{ paddingBottom: stage === 'banner' ? bannerHeight : 0 }}>{stage === 'banner' ? <aside ref={bannerRef} aria-label={text.title} className="fixed inset-x-0 bottom-0 z-50 max-h-[65vh] overflow-y-auto border-t border-amber-300 bg-amber-50 p-4 text-slate-900">
     <p>{text.banner} <Link className="underline" href="/privacy">{text.policy}</Link></p>
+    {decisionFailure && <DecisionFailureAlert failure={decisionFailure} language={language} onRetry={retryFailure} />}
     <div className="mt-2 flex flex-wrap items-center gap-3">
       <button disabled={busy} className="rounded bg-blue-700 px-3 py-2 text-white" onClick={() => void decide('accept')}>{text.accept}</button>
       <button disabled={busy} className="rounded border px-3 py-2 disabled:opacity-50" onClick={() => setConfirmReject(true)}>{text.reject}</button>

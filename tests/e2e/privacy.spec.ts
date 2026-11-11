@@ -9,6 +9,7 @@ async function mockPrivacy(
   let stage = initialStage
   let signedIn = true
   let fail = false
+  let failureStatus = 503
   let privateReads = 0
   let logoutCalls = 0
   const decisions: Array<Record<string, unknown>> = []
@@ -24,7 +25,7 @@ async function mockPrivacy(
     if (path === '/api/privacy/decision') {
       const body = route.request().postDataJSON() as Record<string, unknown>
       decisions.push(body)
-      if (fail) return route.fulfill({ status: 503, json: { error: { code: 'SERVICE_UNAVAILABLE', message: 'Synthetic offline' } } })
+      if (fail) return route.fulfill({ status: failureStatus, json: { error: { code: failureStatus === 409 ? 'CONFLICT' : 'SERVICE_UNAVAILABLE', message: 'Synthetic decision failure' } } })
       if (body.decision === 'reject') signedIn = false
       else stage = body.surface === 'login' ? 'banner' : 'complete'
       return route.fulfill({ json: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: stage, rejected: body.decision === 'reject' } })
@@ -35,7 +36,7 @@ async function mockPrivacy(
     if (path.includes('count')) return route.fulfill({ json: { count: 0 } })
     return route.fulfill({ json: { users: [], total: 0, insulinData: [], foodData: [], exerciseData: [], periodData: [], moodData: [] } })
   })
-  return { decisions, reads: () => privateReads, logoutCalls: () => logoutCalls, succeed: () => { fail = false }, fail: () => { fail = true } }
+  return { decisions, reads: () => privateReads, logoutCalls: () => logoutCalls, succeed: () => { fail = false }, fail: (status = 503) => { fail = true; failureStatus = status } }
 }
 
 for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }]] as const) {
@@ -98,6 +99,24 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       await expect(page).toHaveURL(/\/login$/)
       expect(mock.decisions).toHaveLength(2)
       expect(mock.reads()).toBe(0)
+    })
+    test('a conflicting decision keeps the gate with an inline conflict alert and recovers', async ({ page }) => {
+      const mock = await mockPrivacy(page)
+      mock.fail(409)
+      await page.goto('/')
+      const dialog = page.getByRole('dialog', { name: 'Aviso de privacidad', exact: true })
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'He leído y acepto continuar' }).click()
+      const alert = page.getByRole('alert').filter({ hasText: 'conflicto del servidor' })
+      await expect(alert).toBeVisible()
+      await expect(dialog).toBeVisible()
+      expect(mock.decisions).toHaveLength(1)
+      mock.succeed()
+      await alert.getByRole('button', { name: 'Reintentar', exact: true }).click()
+      const banner = page.getByRole('complementary', { name: 'Aviso de privacidad', exact: true })
+      await expect(banner).toBeVisible()
+      await expect(alert).toHaveCount(0)
+      expect(mock.decisions[0]).toMatchObject({ surface: 'login', decision: 'accept' })
     })
     test('the user panel links its privacy policy section', async ({ page }) => {
       await mockPrivacy(page, 'complete')
