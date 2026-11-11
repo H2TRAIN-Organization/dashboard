@@ -381,6 +381,8 @@ export interface Translations {
     dataTypeCharts: string
     insulinByType: string
     insulinTypesUsed: string
+    others: string
+    othersDetail: string
     averageInsulinDose: string
     moodDistribution: string
     temporalEvolution: string
@@ -1139,6 +1141,8 @@ export const translations: Record<Language, Translations> = {
       dataTypeCharts: 'Gráficos por Tipo de Dato',
       insulinByType: 'Insulina por Tipo',
       insulinTypesUsed: 'Tipos de Insulina Utilizados',
+      others: 'Otros',
+      othersDetail: 'Tipos incluidos en «Otros»',
       averageInsulinDose: 'Promedio de Dosis de Insulina por Día',
       moodDistribution: 'Distribución de Estado de Ánimo',
       temporalEvolution: 'Evolución Temporal',
@@ -1881,6 +1885,8 @@ export const translations: Record<Language, Translations> = {
       dataTypeCharts: 'Charts by Data Type',
       insulinByType: 'Insulin by Type',
       insulinTypesUsed: 'Insulin Types Used',
+      others: 'Others',
+      othersDetail: 'Types included in "Others"',
       averageInsulinDose: 'Average Insulin Dose per Day',
       moodDistribution: 'Mood Distribution',
       temporalEvolution: 'Temporal Evolution',

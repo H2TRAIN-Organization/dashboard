@@ -4,12 +4,22 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { TrendingUp, Activity, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, LineChart as LineChartIcon } from 'lucide-react'
+import { TrendingUp, Activity, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, LineChart as LineChartIcon, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
+import StatCard from '@/components/analytics/StatCard'
+import ScrollableChart from '@/components/analytics/ScrollableChart'
+import { aggregatePieTail } from '@/lib/chart-grouping'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
+
+/** Tipos de insulina que se muestran individualmente antes de agrupar en "Otros". */
+const INSULIN_TOP_TYPES = 5
+/** Color del sector "Otros" del pie chart de insulina. */
+const OTHERS_COLOR = '#94A3B8'
+/** Ancho interior por categoría en los gráficos de barras deslizables. */
+const BAR_INNER_WIDTH_PER_ITEM = 80
 
 export default function AnalyticsPage() {
   const { t, language } = useLanguage()
@@ -26,6 +36,7 @@ export default function AnalyticsPage() {
   const [selectedUser, setSelectedUser] = useState<string>('all')
   const [timeRange, setTimeRange] = useState<string>('30d')
   const [selectedDataType, setSelectedDataType] = useState<string>('all')
+  const [insulinOthersOpen, setInsulinOthersOpen] = useState(false)
 
   const currentRole = session?.user.role ?? null
   const currentUsername = session?.user.username ?? null
@@ -175,6 +186,14 @@ export default function AnalyticsPage() {
   const insulinByType = groupDataByType(insulinData, 'insulinType')
   const foodByType = groupDataByType(foodData, 'food_type')
   const moodByValue = groupDataByType(moodData, 'mood_value')
+
+  // Pie chart de insulina: los tipos menos representativos se agrupan en
+  // "Otros" con el porcentaje sumado, con desglose disponible en desplegable.
+  const insulinPie = aggregatePieTail(insulinByType, INSULIN_TOP_TYPES, t.analytics.others)
+  const insulinPieData = insulinPie.others !== null
+    ? [...insulinPie.slices, insulinPie.others]
+    : insulinPie.slices
+  const insulinTotal = insulinByType.reduce((total, entry) => total + entry.value, 0)
 
   // Datos combinados para gráfico de actividad general
   const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce<Array<{ date: string; count: number }>>((acc, item) => {
@@ -332,131 +351,83 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* Estadísticas generales */}
+          {/* Estadísticas: una sola estructura de tarjeta, centrada en
+              filas de 3 arriba / 2 abajo en escritorio (MT06). */}
           {showData && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-12">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mb-6 sm:mb-12">
             {insulinData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 sm:p-3 lg:p-4 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl sm:rounded-2xl shadow-lg">
-                    <Pill className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white" />
-                  </div>
-                </div>
-                <div className="ml-3 sm:ml-4 lg:ml-6">
-                  <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{t.dashboard.insulin}</h3>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600">{stats.totalInsulin}</p>
-                  <p className="text-xs sm:text-sm text-slate-600">{t.analytics.average}: {stats.avgInsulinDose} {t.analytics.units}</p>
-                </div>
-              </div>
-            </div>
+              <StatCard
+                icon={Pill}
+                iconGradient="from-blue-600 to-blue-700"
+                accent="text-blue-600"
+                title={t.dashboard.insulin}
+                value={String(stats.totalInsulin)}
+                description={`${t.analytics.average}: ${stats.avgInsulinDose} ${t.analytics.units}`}
+              />
             )}
 
             {foodData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-green-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg">
-                    <Utensils className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-3 sm:ml-4">
-                  <h3 className="text-sm sm:text-base lg:text-lg font-medium text-slate-800">{t.dashboard.meals}</h3>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600">{stats.totalFood}</p>
-                  <p className="text-xs sm:text-sm text-slate-600">{t.analytics.average}: {stats.avgCarbs} {t.analytics.carbohydrates}</p>
-                </div>
-              </div>
-            </div>
+              <StatCard
+                icon={Utensils}
+                iconGradient="from-green-500 to-green-600"
+                accent="text-green-600"
+                title={t.dashboard.meals}
+                value={String(stats.totalFood)}
+                description={`${t.analytics.average}: ${stats.avgCarbs} ${t.analytics.carbohydrates}`}
+              />
             )}
 
             {exerciseData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-orange-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg">
-                    <Dumbbell className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-3 sm:ml-4">
-                  <h3 className="text-sm sm:text-base lg:text-lg font-medium text-slate-800">{t.dashboard.exercise}</h3>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-600">{stats.totalExercise}</p>
-                  <p className="text-xs sm:text-sm text-slate-600">{t.analytics.registeredSessions}</p>
-                </div>
-              </div>
-            </div>
+              <StatCard
+                icon={Dumbbell}
+                iconGradient="from-orange-500 to-orange-600"
+                accent="text-orange-600"
+                title={t.dashboard.exercise}
+                value={String(stats.totalExercise)}
+                description={t.analytics.registeredSessions}
+              />
+            )}
+
+            <StatCard
+              icon={Activity}
+              iconGradient="from-indigo-500 to-indigo-600"
+              accent="text-indigo-600"
+              title={t.dashboard.total}
+              value={String(stats.totalRecords)}
+              description={t.analytics.allTypes}
+            />
+
+            {stats.lastActivity && (
+              <StatCard
+                icon={Calendar}
+                iconGradient="from-red-500 to-red-600"
+                accent="text-red-600"
+                title={t.dashboard.lastActivity}
+                value={new Date(stats.lastActivity).toLocaleDateString(locale)}
+                description={t.analytics.mostRecentDate}
+              />
+            )}
+
+            {periodData.length > 0 && (
+              <StatCard
+                icon={CalendarDays}
+                iconGradient="from-purple-500 to-purple-600"
+                accent="text-purple-600"
+                title={t.dashboard.periods}
+                value={String(stats.totalPeriods)}
+                description={t.analytics.cycleRecords}
+              />
             )}
 
             {moodData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-pink-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg">
-                    <Smile className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-3 sm:ml-4">
-                  <h3 className="text-sm sm:text-base lg:text-lg font-medium text-slate-800">{t.dashboard.mood}</h3>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-pink-600">{stats.totalMood}</p>
-                  <p className="text-xs sm:text-sm text-slate-600">{t.analytics.average}: {stats.avgMood}/10</p>
-                </div>
-              </div>
-            </div>
-            )}
-          </div>
-          )}
-
-          {/* Estadísticas adicionales */}
-          {showData && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            {periodData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg">
-                    <CalendarDays className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-lg font-medium text-slate-800">{t.dashboard.periods}</h3>
-                  <p className="text-3xl font-bold text-purple-600">{stats.totalPeriods}</p>
-                  <p className="text-sm text-slate-600">{t.analytics.cycleRecords}</p>
-                </div>
-              </div>
-            </div>
-            )}
-
-            <div className="relative bg-white/90 backdrop-blur-sm border border-indigo-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg">
-                    <Activity className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-lg font-medium text-slate-800">{t.dashboard.total}</h3>
-                  <p className="text-3xl font-bold text-indigo-600">{stats.totalRecords}</p>
-                  <p className="text-sm text-slate-600">{t.analytics.allTypes}</p>
-                </div>
-              </div>
-            </div>
-
-            {stats.lastActivity && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-red-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-red-500 to-red-600 rounded-lg">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-lg font-medium text-slate-800">{t.dashboard.lastActivity}</h3>
-                  <p className="text-xl font-bold text-red-600">
-                    {new Date(stats.lastActivity).toLocaleDateString(locale)}
-                  </p>
-                  <p className="text-sm text-slate-600">{t.analytics.mostRecentDate}</p>
-                </div>
-              </div>
-            </div>
+              <StatCard
+                icon={Smile}
+                iconGradient="from-pink-500 to-pink-600"
+                accent="text-pink-600"
+                title={t.dashboard.mood}
+                value={String(stats.totalMood)}
+                description={`${t.analytics.average}: ${stats.avgMood}/10`}
+              />
             )}
           </div>
           )}
@@ -533,7 +504,7 @@ export default function AnalyticsPage() {
                       <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                           <Pie
-                            data={insulinByType}
+                            data={insulinPieData}
                             cx="50%"
                             cy="50%"
                             labelLine={false}
@@ -542,11 +513,14 @@ export default function AnalyticsPage() {
                             fill="#8884d8"
                             dataKey="value"
                           >
-                            {insulinByType.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            {insulinPieData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={index === insulinPieData.length - 1 && insulinPie.others !== null ? OTHERS_COLOR : colors[index % colors.length]}
+                              />
                             ))}
                           </Pie>
-                          <Tooltip 
+                          <Tooltip
                             contentStyle={{
                               backgroundColor: 'rgba(255, 255, 255, 0.95)',
                               border: '1px solid rgba(59, 130, 246, 0.3)',
@@ -557,13 +531,41 @@ export default function AnalyticsPage() {
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
                             formatter={(value) => [
-                              `${value} ${t.analytics.injections}`, 
+                              `${value} ${t.analytics.injections}`,
                               t.analytics.insulinType
                             ]}
                             labelFormatter={(label) => `${t.analytics.type}: ${label}`}
                           />
                         </PieChart>
                       </ResponsiveContainer>
+                      {insulinPie.others !== null && (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            aria-expanded={insulinOthersOpen}
+                            onClick={() => setInsulinOthersOpen((open) => !open)}
+                            className="inline-flex items-center rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors"
+                          >
+                            <ChevronDown className={`h-4 w-4 mr-2 transition-transform ${insulinOthersOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                            {t.analytics.othersDetail} ({insulinPie.othersBreakdown.length})
+                          </button>
+                          {insulinOthersOpen && (
+                            <ul className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-white/80 p-3 sm:p-4">
+                              {insulinPie.othersBreakdown.map((entry) => (
+                                <li key={entry.name} className="flex items-center justify-between gap-3 text-sm text-slate-700">
+                                  <span className="flex items-center gap-2 min-w-0">
+                                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: OTHERS_COLOR }} aria-hidden="true"></span>
+                                    <span className="truncate">{entry.name}</span>
+                                  </span>
+                                  <span className="font-semibold shrink-0">
+                                    {insulinTotal > 0 ? `${((entry.value / insulinTotal) * 100).toFixed(1)}%` : '0%'}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -585,7 +587,7 @@ export default function AnalyticsPage() {
                         <strong className="text-green-600"> {t.analytics.xAxis}:</strong> {t.analytics.mealTypes} | 
                         <strong className="text-green-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={foodByType.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={foodByType}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -617,7 +619,7 @@ export default function AnalyticsPage() {
                           />
                           <Bar dataKey="value" fill="#10B981" name={t.analytics.registeredMeals} />
                         </BarChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -639,7 +641,7 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={insulinByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={insulinByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -671,7 +673,7 @@ export default function AnalyticsPage() {
                           />
                           <Bar dataKey="count" fill="#3B82F6" name={t.analytics.insulinInjections} />
                         </BarChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
