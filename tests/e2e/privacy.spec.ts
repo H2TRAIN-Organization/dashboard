@@ -3,7 +3,7 @@ import { PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '../../src/lib/priva
 
 async function mockPrivacy(
   page: Page,
-  initialStage: 'initial' | 'banner' | 'complete' = 'initial',
+  initialStage: 'initial' | 'complete' = 'initial',
   policy: { readonly version: string; readonly hash: string } = { version: PRIVACY_POLICY_VERSION, hash: PRIVACY_POLICY_HASH },
 ) {
   let stage = initialStage
@@ -27,7 +27,7 @@ async function mockPrivacy(
       decisions.push(body)
       if (fail) return route.fulfill({ status: failureStatus, json: { error: { code: failureStatus === 409 ? 'CONFLICT' : 'SERVICE_UNAVAILABLE', message: 'Synthetic decision failure' } } })
       if (body.decision === 'reject') signedIn = false
-      else stage = body.surface === 'login' ? 'banner' : 'complete'
+      else stage = 'complete'
       return route.fulfill({ json: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: stage, rejected: body.decision === 'reject' } })
     }
     if (path === '/api/auth/logout') { logoutCalls++; signedIn = false; return route.fulfill({ status: 204 }) }
@@ -42,7 +42,7 @@ async function mockPrivacy(
 for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }]] as const) {
   test.describe(`privacy ${device}`, () => {
     test.use({ viewport })
-    test('initial gate, keyboard, language and two durable acknowledgements', async ({ page }) => {
+    test('initial gate, keyboard, language and one durable acknowledgement', async ({ page }) => {
       const mock = await mockPrivacy(page)
       await page.goto('/')
       const dialog = page.getByRole('dialog', { name: 'Aviso de privacidad', exact: true })
@@ -57,20 +57,13 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       await page.screenshot({ path: `test-results/privacy-${device}-initial.png`, fullPage: true })
       await dialog.getByRole('button', { name: 'English', exact: true }).click()
       await page.getByRole('button', { name: 'I have read and accept to continue' }).click()
-      const banner = page.getByRole('complementary', { name: 'Privacy notice', exact: true })
-      await expect(banner).toBeVisible()
       expect(mock.decisions[0]).toMatchObject({ surface: 'login', decision: 'accept', language: 'en' })
-      const bounds = await banner.boundingBox()
-      expect(bounds).not.toBeNull()
-      expect(Math.abs(bounds!.y + bounds!.height - viewport.height)).toBeLessThan(2)
-      await page.screenshot({ path: `test-results/privacy-${device}-banner.png`, fullPage: true })
-      await banner.getByRole('button', { name: 'I have read and accept to continue' }).click()
-      await expect(banner).toHaveCount(0)
+      // Single-stage: the gate disappears immediately, no bottom banner exists.
+      await expect(page.getByRole('dialog', { name: 'Privacy notice', exact: true })).toHaveCount(0)
+      await expect(page.getByRole('complementary', { name: /Privacy notice|Aviso de privacidad/ })).toHaveCount(0)
       await page.reload()
       await expect(page.getByRole('dialog', { name: 'Privacy notice', exact: true })).toHaveCount(0)
-      await expect(page.getByRole('complementary', { name: 'Privacy notice', exact: true })).toHaveCount(0)
-      expect(mock.decisions[1]).toMatchObject({ surface: 'banner', decision: 'accept', language: 'en' })
-      expect(mock.decisions[1]!.requestId).not.toBe(mock.decisions[0]!.requestId)
+      expect(mock.decisions).toHaveLength(1)
     })
     test('initial popup rejection signs the user out without private reads', async ({ page }) => {
       const mock = await mockPrivacy(page)
@@ -113,8 +106,7 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       expect(mock.decisions).toHaveLength(1)
       mock.succeed()
       await alert.getByRole('button', { name: 'Reintentar', exact: true }).click()
-      const banner = page.getByRole('complementary', { name: 'Aviso de privacidad', exact: true })
-      await expect(banner).toBeVisible()
+      await expect(page.getByRole('dialog', { name: 'Privacy notice', exact: true })).toHaveCount(0)
       await expect(alert).toHaveCount(0)
       expect(mock.decisions[0]).toMatchObject({ surface: 'login', decision: 'accept' })
     })
@@ -126,46 +118,11 @@ for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['
       await expect(page.getByRole('heading', { name: 'Aviso de privacidad', exact: true })).toBeVisible()
       await expect(page.getByRole('link', { name: 'h2train@proton.me', exact: true })).toBeVisible()
     })
-    test('banner rejection needs a cancellable confirmation before signing out', async ({ page }) => {
-      const mock = await mockPrivacy(page, 'banner')
+    test('an already acknowledged account signs in straight to the data', async ({ page }) => {
+      await mockPrivacy(page, 'complete')
       await page.goto('/')
-      const banner = page.getByRole('complementary', { name: 'Aviso de privacidad', exact: true })
-      await banner.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
-      const dialog = page.getByRole('dialog', { name: 'Rechazar y cerrar sesión', exact: true })
-      await expect(dialog).toBeVisible()
-      await page.screenshot({ path: `test-results/privacy-${device}-confirm-rejection.png`, fullPage: true })
-      expect(mock.decisions).toHaveLength(0)
-      await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click()
-      await expect(dialog).not.toBeVisible()
-      await expect(banner).toBeVisible()
-      await banner.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
-      await dialog.getByRole('button', { name: 'Confirmar rechazo', exact: true }).click()
-      await expect(page).toHaveURL(/\/login$/)
-      expect(mock.decisions).toHaveLength(1)
-      expect(mock.logoutCalls()).toBe(0)
-      expect(mock.decisions[0]).toMatchObject({ surface: 'banner', decision: 'reject' })
-    })
-    test('banner rejection recovers its confirmation after a failed decision', async ({ page }) => {
-      const mock = await mockPrivacy(page, 'banner')
-      mock.fail()
-      await page.goto('/')
-      const banner = page.getByRole('complementary', { name: 'Aviso de privacidad', exact: true })
-      await expect(banner).toBeVisible()
-      await banner.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
-      const dialog = page.getByRole('dialog', { name: 'Rechazar y cerrar sesión', exact: true })
-      await expect(dialog).toBeVisible()
-      await dialog.getByRole('button', { name: 'Confirmar rechazo', exact: true }).click()
-      await expect(page.getByRole('alert').filter({ hasText: 'acceso a datos permanece bloqueado' })).toBeVisible()
-      expect(mock.decisions).toHaveLength(1)
-      expect(mock.decisions[0]).toMatchObject({ surface: 'banner', decision: 'reject' })
-      await page.getByRole('button', { name: 'Reintentar', exact: true }).click()
-      await expect(banner).toBeVisible()
-      await banner.getByRole('button', { name: 'Rechazar y cerrar sesión' }).click()
-      await expect(dialog).toBeVisible()
-      expect(mock.decisions).toHaveLength(1)
-      await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click()
-      await expect(dialog).not.toBeVisible()
-      await expect(banner).toBeVisible()
+      await expect(page.getByRole('dialog', { name: /Aviso de privacidad|Privacy notice/ })).toHaveCount(0)
+      await expect(page.getByRole('complementary', { name: /Aviso de privacidad|Privacy notice/ })).toHaveCount(0)
     })
     for (const stale of [
       { name: 'version', version: '2026-01-01-obsolete', hash: PRIVACY_POLICY_HASH },
