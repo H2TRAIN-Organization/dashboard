@@ -31,7 +31,7 @@ function insulinRow(type: string, index: number) {
   return {
     username: 'synthetic-participant',
     insulinType: type,
-    dose: '1',
+    dose: type === 'Rápida' ? '2' : type === 'Lenta' ? '4' : '1',
     carbs: '10',
     date_time: '2026-11-01T08:00:00.000Z',
     rowKey: `insulin-${index}`,
@@ -95,6 +95,21 @@ test('the insulin pie labels big slices and hides tiny overlapping ones', async 
   for (const type of OTHERS_BREAKDOWN) {
     await expect(page.locator('li', { hasText: type })).toBeVisible();
   }
+});
+
+test('daily injections and the real average dose are two separate honest charts', async ({ page }) => {
+  await mockAnalytics(page);
+  await page.goto('/analytics');
+
+  // Chart 1: injections per day (total records), axis in injections.
+  const injectionsCard = page.locator('div', { has: page.getByRole('heading', { name: 'Inyecciones por Día' }) }).last();
+  await expect(injectionsCard.getByText('Número de inyecciones').first()).toBeVisible();
+
+  // Chart 2: the actual average dose per day (774 units / 304 records = 2.5),
+  // with its own axis in insulin units.
+  const doseCard = page.locator('div', { has: page.getByRole('heading', { name: 'Promedio de Dosis de Insulina por Día' }) }).last();
+  await expect(doseCard.getByText('Dosis promedio (unidades)').first()).toBeVisible();
+  await expect(doseCard.getByText('Muestra la cantidad promedio de insulina administrada cada día.')).toBeVisible();
 });
 
 test('the mood pie follows the same label threshold', async ({ page }) => {

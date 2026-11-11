@@ -6,6 +6,7 @@ import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
 import { Users, Activity, TrendingUp, AlertTriangle, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Database, Target } from 'lucide-react'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
+import PieSliceLabel from '@/components/analytics/PieSliceLabel'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridNavigation from '@/components/HybridNavigation'
 import { useSession } from '@/contexts/SessionContext'
@@ -536,7 +537,7 @@ export default function OverviewPage() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                        label={<PieSliceLabel />}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"

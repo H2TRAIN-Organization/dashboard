@@ -57,3 +57,40 @@ export function shouldLabelPieSlice(percent: number): boolean {
 export function pieLabelText(name: string, percent: number): string {
   return `${name} ${(percent * 100).toFixed(0)}%`
 }
+
+export interface DailyDoseSummary {
+  readonly date: string
+  /** Registros (inyecciones) de ese día. */
+  readonly injections: number
+  /** Promedio de dosis del día, redondeado a 1 decimal; 0 sin registros válidos. */
+  readonly averageDose: number
+}
+
+/**
+ * Resume dosis por día: nº de registros (inyecciones) y promedio de la dosis
+ * administrada (suma de dosis / nº de registros, redondeada a 1 decimal como
+ * el resto de promedios del dashboard). Las filas con dosis ausente o no
+ * numérica cuentan como dosis 0. El resultado queda ordenado por fecha.
+ */
+export function summarizeDosesByDate<T>(
+  data: readonly T[],
+  dateOf: (row: T) => string,
+  doseOf: (row: T) => number,
+): DailyDoseSummary[] {
+  const grouped = new Map<string, { injections: number; total: number }>()
+  for (const row of data) {
+    const date = dateOf(row)
+    const dose = doseOf(row)
+    const summary = grouped.get(date) ?? { injections: 0, total: 0 }
+    summary.injections += 1
+    summary.total += Number.isFinite(dose) ? dose : 0
+    grouped.set(date, summary)
+  }
+  return [...grouped.entries()]
+    .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+    .map(([date, summary]) => ({
+      date,
+      injections: summary.injections,
+      averageDose: Math.round((summary.total / summary.injections) * 10) / 10,
+    }))
+}
