@@ -5,7 +5,6 @@ import Link from 'next/link'
 import {
   Activity,
   BarChart3,
-  BookOpen,
   Home,
   Settings,
   ShieldCheck,
@@ -65,7 +64,6 @@ export default function DashboardPage() {
   const canViewUsers = role !== null && hasPermission(role, 'view_users')
   const canViewData = role !== null && hasPermission(role, 'view_data')
   const canViewAnalytics = role !== null && hasPermission(role, 'view_analytics')
-  const canViewStudy = role !== null && hasPermission(role, 'view_study')
   const canViewAdmin = role !== null && hasPermission(role, 'view_admin')
   const canViewOverview = role === 'admin' || role === 'doctor'
 
@@ -198,19 +196,6 @@ export default function DashboardPage() {
             icon: Home,
             iconClass: 'from-blue-500 to-blue-600',
             accentClass: 'hover:border-blue-300/70',
-          },
-        ]
-      : []),
-    ...(canViewStudy
-      ? [
-          {
-            href: '/study',
-            title: t.navigation.study,
-            description: t.study.pageSubtitle,
-            action: t.dashboard.access,
-            icon: BookOpen,
-            iconClass: 'from-indigo-600 to-indigo-700',
-            accentClass: 'hover:border-indigo-300/70',
           },
         ]
       : []),

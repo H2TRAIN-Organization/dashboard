@@ -1,4 +1,5 @@
 'use client'
+import { notFound } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Navigation from '@/components/Navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -7,7 +8,24 @@ import { useLanguage } from '@/contexts/LanguageContext'
 import { studyAdminApi } from '@/lib/study-admin-client'
 import { studyAdminDictionary } from '@/lib/study-admin-dictionary'
 import { STUDY_PERIODS, type StudyPeriod, type StudyResponse } from '@/lib/study-contract'
+
+/**
+ * La parte de Estudio se retira del front para que no sea accesible por
+ * nadie: la ruta /study responde 404. El código fuente original se mantiene
+ * intacto (página, gráficos y API) porque no se sabe con certeza cuál es el
+ * objetivo de esa parte; ver README.md. Para reactivarla, elimina el
+ * guard inferior y vuelve a exportar `StudyPageView` como página.
+ */
+const STUDY_ROUTE_DISABLED = true
+
 export default function StudyPage() {
+  if (STUDY_ROUTE_DISABLED) {
+    notFound()
+  }
+  return <StudyPageView />
+}
+
+function StudyPageView() {
   const { language } = useLanguage()
   const text = studyAdminDictionary[language === 'en' ? 'en' : 'es']
   const [period, setPeriod] = useState<StudyPeriod>('90d')
