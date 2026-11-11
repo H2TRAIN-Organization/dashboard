@@ -10,6 +10,7 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import StatCard from '@/components/analytics/StatCard'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
+import PieSliceLabel from '@/components/analytics/PieSliceLabel'
 import { aggregatePieTail } from '@/lib/chart-grouping'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
@@ -508,7 +509,7 @@ export default function AnalyticsPage() {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                            label={<PieSliceLabel />}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"
@@ -701,7 +702,7 @@ export default function AnalyticsPage() {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}/10 ${((percent || 0) * 100).toFixed(0)}%`}
+                            label={<PieSliceLabel format={(name, percent) => `${name}/10 ${(percent * 100).toFixed(0)}%`} />}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"
