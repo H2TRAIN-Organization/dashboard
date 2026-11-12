@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Database, Trash2, type LucideIcon } from 'lucide-react'
+import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronFirst, ChevronLast, Database, Trash2, type LucideIcon } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import CalendarDatePicker from '@/components/calendar/CalendarDatePicker'
@@ -479,6 +479,16 @@ export default function DataPage() {
               </select>
               <button
                 type="button"
+                onClick={() => goToRecordPage(pageKey, 1)}
+                disabled={currentPage <= 1}
+                aria-label={t.common.firstPage}
+                title={t.common.firstPage}
+                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronFirst className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={() => goToRecordPage(pageKey, currentPage - 1)}
                 disabled={currentPage <= 1}
                 aria-label={t.common.previous}
@@ -499,6 +509,16 @@ export default function DataPage() {
                 className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
               >
                 <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => goToRecordPage(pageKey, totalPages)}
+                disabled={currentPage >= totalPages}
+                aria-label={t.common.lastPage}
+                title={t.common.lastPage}
+                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronLast className="h-4 w-4" />
               </button>
             </div>
           </div>

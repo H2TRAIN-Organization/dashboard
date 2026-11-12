@@ -749,6 +749,8 @@ export interface Translations {
     back: string
     next: string
     previous: string
+    firstPage: string
+    lastPage: string
     search: string
     filter: string
     clear: string
@@ -1506,6 +1508,8 @@ export const translations: Record<Language, Translations> = {
       back: 'Atrás',
       next: 'Siguiente',
       previous: 'Anterior',
+      firstPage: 'Primera página',
+      lastPage: 'Última página',
       search: 'Buscar',
       filter: 'Filtrar',
       clear: 'Limpiar',
@@ -2258,6 +2262,8 @@ export const translations: Record<Language, Translations> = {
       back: 'Back',
       next: 'Next',
       previous: 'Previous',
+      firstPage: 'First page',
+      lastPage: 'Last page',
       search: 'Search',
       filter: 'Filter',
       clear: 'Clear',
