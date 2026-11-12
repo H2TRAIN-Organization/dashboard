@@ -12,6 +12,8 @@ import StatCard from '@/components/analytics/StatCard'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
 import { aggregatePieTail, summarizeDosesByDate } from '@/lib/chart-grouping'
+import { splitFoodRecords } from '@/lib/meal-classification'
+import { finiteAverage, latestValidDate, parseFiniteNumber, parseFiniteNumberOrZero } from '@/lib/number-stats'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -42,6 +44,11 @@ export default function AnalyticsPage() {
   const currentRole = session?.user.role ?? null
   const currentUsername = session?.user.username ?? null
   const isIndividualUser = currentRole === 'user'
+
+  // MT38: la app móvil escribe eventos de glucemia (hipoglucemia/hiperglucemia)
+  // en la tabla de comidas. No son comidas: se excluyen de las métricas y de
+  // todos los gráficos de comidas y se avisa al usuario en el gráfico afectado.
+  const { meals: mealData, glucoseEvents } = splitFoodRecords(foodData)
 
   const fetchData = useCallback(async () => {
     try {
@@ -97,25 +104,28 @@ export default function AnalyticsPage() {
     }
   }, [session, fetchData, fetchUsers])
 
-  // Función para agrupar datos por fecha
-  const dayKey = (value: unknown): string =>
-    new Date(String(value)).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+  // Función para agrupar datos por fecha. El orden es cronológico real: se
+  // agrupa por milisegundo y la etiqueta localizada se genera al final, porque
+  // ordenar fechas ya localizadas ("12 nov") no parsea y degradaba el orden
+  // al de inserción (MT38). Los registros con fecha inválida se omiten.
+  const dayKey = (value: Date): string =>
+    value.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
   const groupDataByDate = <T extends object>(
     data: T[],
     dateField: string = 'date_time',
   ): Array<{ date: string; count: number }> => {
-    const grouped = data.reduce<Record<string, { date: string; count: number }>>((acc, item) => {
-      const date = dayKey((item as Record<string, unknown>)[dateField])
-      if (!acc[date]) {
-        acc[date] = { date, count: 0 }
-      }
-      acc[date].count++
-      return acc
-    }, {})
+    const grouped = new Map<number, { date: string; count: number }>()
+    for (const item of data) {
+      const ms = new Date(String((item as Record<string, unknown>)[dateField] ?? '')).getTime()
+      if (!Number.isFinite(ms)) continue
+      const entry = grouped.get(ms) ?? { date: dayKey(new Date(ms)), count: 0 }
+      entry.count++
+      grouped.set(ms, entry)
+    }
 
-    return Object.values(grouped).sort((a, b) =>
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    )
+    return [...grouped.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, entry]) => entry)
   }
 
   // Función para agrupar datos por tipo
@@ -135,66 +145,66 @@ export default function AnalyticsPage() {
     return Object.entries(grouped).map(([name, value]) => ({ name, value }))
   }
 
-  // Estadísticas generales
+  // Estadísticas generales. Los promedios usan parseo tolerante: los campos
+  // con texto vacío o no numérico no pueden convertir la media en NaN (MT41).
   const stats = {
     totalInsulin: insulinData.length,
-    totalFood: foodData.length,
+    totalFood: mealData.length,
     totalExercise: exerciseData.length,
     totalPeriods: periodData.length,
     totalMood: moodData.length,
-    totalRecords: insulinData.length + foodData.length + exerciseData.length + periodData.length + moodData.length,
+    totalRecords: insulinData.length + mealData.length + exerciseData.length + periodData.length + moodData.length,
     
     // Promedios de dosis de insulina
-    avgInsulinDose: insulinData.length > 0 
-      ? Math.round(insulinData.reduce((sum, item) => sum + parseFloat(item.dose || '0'), 0) / insulinData.length * 10) / 10 
-      : 0,
+    avgInsulinDose: finiteAverage(insulinData.map(item => item.dose)) ?? 0,
     
-    // Promedio de carbohidratos
-    avgCarbs: foodData.length > 0 
-      ? Math.round(foodData.reduce((sum, item) => sum + parseFloat(item.carbs || '0'), 0) / foodData.length * 10) / 10 
-      : 0,
+    // Promedio de carbohidratos (solo comidas reales)
+    avgCarbs: finiteAverage(mealData.map(item => item.carbs)) ?? 0,
     
     // Promedio de estado de ánimo
-    avgMood: moodData.length > 0 
-      ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(String(item.mood_value ?? 0)), 0) / moodData.length * 10) / 10
-      : 0,
+    avgMood: finiteAverage(moodData.map(item => item.mood_value)) ?? 0,
     
-    // Última actividad
+    // Última actividad: solo fechas válidas participan del máximo (MT41).
     lastActivity: null as Date | null
   }
 
   // Encontrar la actividad más reciente
   const allDates = [
     ...insulinData.map(d => new Date(d.date_time)),
-    ...foodData.map(d => new Date(d.date_time)),
+    ...mealData.map(d => new Date(d.date_time)),
     ...exerciseData.map(d => new Date(d.date_time)),
     ...periodData.map(d => new Date(d.startDate)),
     ...moodData.map(d => new Date(d.date_time))
   ]
 
-  if (allDates.length > 0) {
-    stats.lastActivity = new Date(Math.max(...allDates.map(d => d.getTime())))
-  }
+  stats.lastActivity = latestValidDate(allDates)
 
   const hasAnyData = stats.totalRecords > 0
   const showData = !loading && error === null && hasAnyData
 
-  // Datos para gráficos
+  // Datos para gráficos. Las comidas usan solo registros de comida reales
+  // (MT38); el ánimo solo incluye valores numéricos, porque "Sin datos/10"
+  // en el pie de niveles no es coherente.
   const insulinByDate = groupDataByDate(insulinData)
-  const foodByDate = groupDataByDate(foodData)
+  const foodByDate = groupDataByDate(mealData)
   const exerciseByDate = groupDataByDate(exerciseData)
   const moodByDate = groupDataByDate(moodData)
 
   const insulinByType = groupDataByType(insulinData, 'insulinType')
-  const foodByType = groupDataByType(foodData, 'food_type')
-  const moodByValue = groupDataByType(moodData, 'mood_value')
+  const foodByType = groupDataByType(mealData, 'food_type')
+  const moodByValue = groupDataByType(
+    moodData.filter(item => parseFiniteNumber(item.mood_value) !== null),
+    'mood_value',
+  )
 
   // Inyecciones y promedio de dosis reales por día; dos gráficos separados
-  // para que cada título represente exactamente lo que dibuja.
+  // para que cada título represente exactamente lo que dibuja. La clave de
+  // día se genera a partir de la fecha ya parseada (MT38) y la dosis usa
+  // parseo tolerante.
   const insulinDosesByDate = summarizeDosesByDate(
     insulinData,
-    (row) => dayKey(row.date_time),
-    (row) => parseFloat(row.dose || '0'),
+    (row) => dayKey(new Date(String(row.date_time))),
+    (row) => parseFiniteNumberOrZero(row.dose),
   )
 
   // Pie chart de insulina: los tipos menos representativos se agrupan en
@@ -206,8 +216,7 @@ export default function AnalyticsPage() {
   const insulinTotal = insulinByType.reduce((total, entry) => total + entry.value, 0)
 
   // Datos combinados para gráfico de actividad general
-  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce<Array<{ date: string; count: number }>>((acc, item) => {
-    const existing = acc.find(x => x.date === item.date)
+  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce<Array<{ date: string; count: number }>>((acc, item) => {    const existing = acc.find(x => x.date === item.date)
     if (existing) {
       existing.count += item.count
     } else {
@@ -597,6 +606,11 @@ export default function AnalyticsPage() {
                         <strong className="text-green-600"> {t.analytics.xAxis}:</strong> {t.analytics.mealTypes} | 
                         <strong className="text-green-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
                       </p>
+                      {glucoseEvents.length > 0 && (
+                        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                          {t.analytics.glucoseEventsExcluded.replace('{count}', String(glucoseEvents.length))}
+                        </p>
+                      )}
                       <ScrollableChart height={300} minInnerWidth={foodByType.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={foodByType}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -795,6 +809,23 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* MT39: separador entre las gráficas por tipo de dato y las
+                  gráficas de evolución temporal. */}
+              <div
+                className="flex items-center gap-4 pt-2"
+                role="separator"
+                aria-orientation="horizontal"
+              >
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-300/70 to-transparent" />
+                <h2 className="flex items-center gap-2 whitespace-nowrap text-base font-bold text-slate-800 sm:text-lg">
+                  <span className="inline-flex rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 p-1.5">
+                    <TrendingUp className="h-4 w-4 text-white" />
+                  </span>
+                  {t.analytics.timeEvolutionTitle}
+                </h2>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-300/70 to-transparent" />
               </div>
 
               {/* Gráficos de evolución temporal */}
