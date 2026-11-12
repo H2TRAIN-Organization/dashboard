@@ -68,6 +68,9 @@ export default function AnalyticsPage() {
   const [selectedUser, setSelectedUser] = useState<string>('all')
   const [timeRange, setTimeRange] = useState<string>('30d')
   const [selectedDataType, setSelectedDataType] = useState<string>('all')
+  // T13: filtro de fechas "desde - hasta"; vacío significa sin límite.
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
   const [insulinOthersOpen, setInsulinOthersOpen] = useState(false)
 
   const currentRole = session?.user.role ?? null
@@ -93,6 +96,8 @@ export default function AnalyticsPage() {
         selectedUser: selected,
         timeRange: timeRange as '7d' | '30d' | '90d' | 'all',
         selectedDataType: selectedDataType as 'all' | 'insulin' | 'food' | 'exercise' | 'period' | 'mood',
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
       })
 
       setInsulinData(data.insulinData)
@@ -106,7 +111,7 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedUser, timeRange, selectedDataType, isIndividualUser, currentUsername, t.auth.sessionMissingUsername])
+  }, [selectedUser, timeRange, selectedDataType, dateFrom, dateTo, isIndividualUser, currentUsername, t.auth.sessionMissingUsername])
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -366,6 +371,43 @@ export default function AnalyticsPage() {
                     <option value="90d" className="bg-white text-slate-700">{t.data.last90Days}</option>
                     <option value="all" className="bg-white text-slate-700">{t.dashboard.allTime}</option>
                   </select>
+                </div>
+
+                {/* T13: filtro de fechas "desde - hasta". Con rango explícito,
+                    la ventana consultada es el propio rango (contrato de la
+                    API); el servidor valida que desde <= hasta. */}
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center">
+                    <CalendarDays className="h-4 w-4 mr-2" />
+                    {t.analytics.dateRange}
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      max={dateTo || undefined}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      aria-label={`${t.analytics.dateRange} - ${t.analytics.dateFrom}`}
+                      className="w-full bg-white border-2 border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 shadow-lg hover:border-slate-400 transition-all duration-300 cursor-pointer"
+                    />
+                    <input
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom || undefined}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      aria-label={`${t.analytics.dateRange} - ${t.analytics.dateTo}`}
+                      className="w-full bg-white border-2 border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 shadow-lg hover:border-slate-400 transition-all duration-300 cursor-pointer"
+                    />
+                  </div>
+                  {(dateFrom || dateTo) && (
+                    <button
+                      type="button"
+                      onClick={() => { setDateFrom(''); setDateTo('') }}
+                      className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline"
+                    >
+                      {t.analytics.clearDates}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

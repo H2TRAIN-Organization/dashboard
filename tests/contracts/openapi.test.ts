@@ -175,7 +175,7 @@ describe("authoritative OpenAPI contract", () => {
     expect(userEmail.type).toEqual(["string", "null"]);
   });
 
-  it("accepts dateFilter and documents decrypted-data scoping", async () => {
+  it("accepts dateFilter, the from-to range (T13) and documents decrypted-data scoping", async () => {
     const spec = await loadSpec();
     const operation = recordAt(spec, "paths", "/api/decrypted-data", "get");
     const parameters = operation.parameters;
@@ -188,14 +188,26 @@ describe("authoritative OpenAPI contract", () => {
       "timeRange",
       "selectedDataType",
       "dateFilter",
+      "dateFrom",
+      "dateTo",
     ]);
     const dateFilter = (parameters as Array<Record<string, unknown>>).find(
       (parameter) => parameter.name === "dateFilter",
     );
     expect(recordAt(dateFilter, "schema")).toMatchObject({ format: "date" });
+    for (const name of ["dateFrom", "dateTo"]) {
+      const rangeParameter = (parameters as Array<Record<string, unknown>>).find(
+        (parameter) => parameter.name === name,
+      );
+      expect(recordAt(rangeParameter, "schema")).toMatchObject({ format: "date" });
+    }
     expect(String(operation.description)).toContain("normaliza siempre");
     expect(String(operation.description)).toContain("completo UTC");
     expect(String(operation.description)).toContain("YYYY-MM-DD");
+    // T13: the explicit window is authoritative; timeRange does not clip it,
+    // and an inverted range is a client error.
+    expect(String(operation.description)).toContain("no la recorta");
+    expect(String(operation.description)).toContain("anterior o igual a");
   });
 
   it("matches admin download failure statuses and Kubios paging bounds", async () => {

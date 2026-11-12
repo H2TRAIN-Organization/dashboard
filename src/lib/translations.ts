@@ -422,6 +422,11 @@ export interface Translations {
     correlations: string
     generalActivityByDate: string
     registeredMealTypes: string
+    // Filtro de fechas desde-hasta (T13)
+    dateRange: string
+    dateFrom: string
+    dateTo: string
+    clearDates: string
     timeEvolutionTitle: string
     glucoseEventsExcluded: string
     // Textos específicos de gráficos
@@ -1189,6 +1194,10 @@ export const translations: Record<Language, Translations> = {
       correlations: 'Correlaciones',
       generalActivityByDate: 'Actividad General por Fecha',
       registeredMealTypes: 'Tipos de Comida Registrados',
+      dateRange: 'Rango de fechas',
+      dateFrom: 'Desde',
+      dateTo: 'Hasta',
+      clearDates: 'Limpiar fechas',
       timeEvolutionTitle: 'Evolución temporal',
       glucoseEventsExcluded:
         '{count} registros de eventos de glucemia (hipoglucemia/hiperglucemia) no son comidas y no se muestran en este gráfico.',
@@ -1944,6 +1953,10 @@ export const translations: Record<Language, Translations> = {
       correlations: 'Correlations',
       generalActivityByDate: 'General Activity by Date',
       registeredMealTypes: 'Registered Meal Types',
+      dateRange: 'Date range',
+      dateFrom: 'From',
+      dateTo: 'To',
+      clearDates: 'Clear dates',
       timeEvolutionTitle: 'Time Evolution',
       glucoseEventsExcluded:
         '{count} glucose event records (hypoglycemia/hyperglycemia) are not meals and are not shown in this chart.',

@@ -454,6 +454,14 @@ paths:
         `dateFilter` es un día natural `YYYY-MM-DD`. El servidor consulta el día
         completo UTC `[00:00, siguiente 00:00)` y lo intersecta con `timeRange`.
         No significa "desde ese día hasta ahora".
+
+        `dateFrom`/`dateTo` (T13) definen una ventana explícita por día natural
+        UTC: `dateFrom` es inclusivo y `dateTo` incluye su día completo
+        `[00:00, siguiente 00:00)`. Cuando hay rango, la ventana es el propio
+        rango y `timeRange` no la recorta (así un rango anterior a `timeRange`
+        sigue alcanzable). Si solo se envía uno de los dos extremos, el otro
+        queda sin límite (hasta ahora o desde el origen). `dateFrom` debe ser
+        anterior o igual a `dateTo` (400 en caso contrario).
       operationId: getDecryptedData
       parameters:
         - name: selectedUser
@@ -486,6 +494,22 @@ paths:
             format: date
             pattern: "^\\d{4}-\\d{2}-\\d{2}$"
           description: Día UTC completo, intersectado con timeRange.
+        - name: dateFrom
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          description: Límite inferior del rango (día UTC inclusivo). Con rango, timeRange no recorta.
+        - name: dateTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          description: Límite superior del rango (su día completo UTC, incluido). Debe ser >= dateFrom.
       responses:
         "200":
           description: Las cinco colecciones, siempre presentes.

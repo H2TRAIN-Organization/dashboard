@@ -25,7 +25,7 @@ it.skipIf(process.env.DR_VERIFY_LIVE_SEED !== '1')('reads and decrypts the 24 co
   // NODE_ENV=test deliberately makes Next skip .env.local. Only this explicit
   // opt-in reads the local server environment; values are never logged.
   const repository = liveRepository()
-  const data = await repository.getDecryptedData({ selectedUser: TARGET, selectedDataType: 'all', timeRange: 'all', dateFilter: '2026-11-03', from: '2026-11-03T00:00:00.000Z', to: '2026-11-04T00:00:00.000Z' })
+  const data = await repository.getDecryptedData({ selectedUser: TARGET, selectedDataType: 'all', timeRange: 'all', dateFilter: '2026-11-03', dateFrom: null, dateTo: null, from: '2026-11-03T00:00:00.000Z', to: '2026-11-04T00:00:00.000Z' })
   const onlyBatch = Object.fromEntries(Object.entries(data).map(([key, rows]) => [key, rows.filter((row: Record<string, unknown>) => Number(row.id) <= -2026110301 && Number(row.id) >= -2026110324)])) as unknown as DecryptedDataResponse
   expect(onlyBatch.exerciseData).toHaveLength(8)
   expect(onlyBatch.foodData).toHaveLength(8)
@@ -44,7 +44,7 @@ it.skipIf(process.env.DR_VERIFY_LIVE_SEED !== '1')('reads and decrypts the 24 co
 }, 30_000)
 
 it.skipIf(process.env.DR_VERIFY_LIVE_SEED !== '1')('reads the complete real health dataset without exposing record values', async () => {
-  const data = await liveRepository().getDecryptedData({ selectedUser: null, selectedDataType: 'all', timeRange: 'all', dateFilter: null, from: null, to: new Date().toISOString() })
+  const data = await liveRepository().getDecryptedData({ selectedUser: null, selectedDataType: 'all', timeRange: 'all', dateFilter: null, dateFrom: null, dateTo: null, from: null, to: new Date().toISOString() })
   const collections = Object.entries(data) as [string, Record<string, unknown>[]][]
   const rows = collections.flatMap(([, records]) => records)
   expect(rows.length).toBeGreaterThanOrEqual(24)

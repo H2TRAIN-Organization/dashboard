@@ -365,6 +365,8 @@ export const dataApi = {
         timeRange: query.timeRange,
         selectedDataType: query.selectedDataType,
         dateFilter: query.dateFilter,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
       })}`,
       { signal: options.signal },
     )

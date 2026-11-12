@@ -311,6 +311,32 @@ describe("HTTP data and admin handlers", () => {
     expect(dataRepository.lastLegacyQuery?.selectedUser).toBe("all");
   });
 
+  it("accepts an explicit from-to range and rejects an inverted one (T13)", async () => {
+    const { api, dataRepository } = setup();
+
+    const ranged = await api.data.decrypted({
+      sessionToken: "admin-token",
+      query: { selectedUser: "all", dateFrom: "2025-11-01", dateTo: "2025-11-30" },
+    });
+    expect(ranged.status).toBe(200);
+    expect(dataRepository.lastDecryptedQuery).toMatchObject({
+      from: "2025-11-01T00:00:00.000Z",
+      to: "2025-12-01T00:00:00.000Z",
+    });
+
+    const inverted = await api.data.decrypted({
+      sessionToken: "admin-token",
+      query: { selectedUser: "all", dateFrom: "2025-11-30", dateTo: "2025-11-01" },
+    });
+    expect(inverted.status).toBe(400);
+
+    const malformed = await api.data.decrypted({
+      sessionToken: "admin-token",
+      query: { selectedUser: "all", dateFrom: "01-11-2025" },
+    });
+    expect(malformed.status).toBe(400);
+  });
+
   it("keeps legacy single-type responses as arrays and protects admin routes", async () => {
     const { api } = setup();
 

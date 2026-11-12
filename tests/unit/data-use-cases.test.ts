@@ -47,6 +47,8 @@ describe("health data use cases", () => {
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
     });
 
     expect(result.insulinData).toHaveLength(1);
@@ -63,9 +65,13 @@ describe("health data use cases", () => {
       timeRange: "90d",
       selectedDataType: "insulin",
       dateFilter: "2025-12-15",
+      dateFrom: null,
+      dateTo: null,
     });
     expect(repository.lastDecryptedQuery).toMatchObject({
       dateFilter: "2025-12-15",
+      dateFrom: null,
+      dateTo: null,
       from: "2025-12-15T00:00:00.000Z",
       to: "2025-12-16T00:00:00.000Z",
     });
@@ -75,6 +81,8 @@ describe("health data use cases", () => {
       timeRange: "all",
       selectedDataType: "all",
       dateFilter: "2026-01-15",
+      dateFrom: null,
+      dateTo: null,
     });
     expect(repository.lastDecryptedQuery).toMatchObject({
       from: "2026-01-15T00:00:00.000Z",
@@ -92,6 +100,8 @@ describe("health data use cases", () => {
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: "2026-01-01",
+      dateFrom: null,
+      dateTo: null,
     });
     expect(repository.lastDecryptedQuery).toMatchObject({
       from: "2026-01-01T12:00:00.000Z",
@@ -104,6 +114,8 @@ describe("health data use cases", () => {
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: "2026-01-31",
+      dateFrom: null,
+      dateTo: null,
     });
     expect(repository.lastDecryptedQuery).toMatchObject({
       from: "2026-01-31T00:00:00.000Z",
@@ -119,6 +131,8 @@ describe("health data use cases", () => {
       timeRange: "all",
       selectedDataType: "all",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
     });
     expect(repository.lastDecryptedQuery?.from).toBeNull();
     expect(repository.lastDecryptedQuery?.to).toBe(now.toISOString());
@@ -130,6 +144,8 @@ describe("health data use cases", () => {
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
     } as const;
 
     for (const selectedUser of ["all", "bob", "alice"]) {
@@ -149,6 +165,8 @@ describe("health data use cases", () => {
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
     } as const;
 
     await useCases.getDecryptedData(userNamedAllActor, query);
@@ -172,6 +190,69 @@ describe("health data use cases", () => {
         timeRange: "30d",
         selectedDataType: "all",
         dateFilter: "2026-02-30",
+        dateFrom: null,
+        dateTo: null,
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it("uses an explicit from-to range as the authoritative window (T13)", async () => {
+    const { repository, useCases } = setup();
+
+    // El rango completo define la ventana aunque sea anterior a timeRange:
+    // timeRange ya no la recorta.
+    await useCases.getDecryptedData(adminActor, {
+      selectedUser: "all",
+      timeRange: "30d",
+      selectedDataType: "all",
+      dateFilter: null,
+      dateFrom: "2025-11-01",
+      dateTo: "2025-11-30",
+    });
+    expect(repository.lastDecryptedQuery).toMatchObject({
+      from: "2025-11-01T00:00:00.000Z",
+      to: "2025-12-01T00:00:00.000Z",
+    });
+
+    // Solo desde: límite inferior explícito, superior = ahora.
+    await useCases.getDecryptedData(adminActor, {
+      selectedUser: "all",
+      timeRange: "all",
+      selectedDataType: "all",
+      dateFilter: null,
+      dateFrom: "2026-01-10",
+      dateTo: null,
+    });
+    expect(repository.lastDecryptedQuery).toMatchObject({
+      from: "2026-01-10T00:00:00.000Z",
+      to: now.toISOString(),
+    });
+
+    // Solo hasta: día completo incluido, sin límite inferior.
+    await useCases.getDecryptedData(adminActor, {
+      selectedUser: "all",
+      timeRange: "all",
+      selectedDataType: "all",
+      dateFilter: null,
+      dateFrom: null,
+      dateTo: "2026-01-05",
+    });
+    expect(repository.lastDecryptedQuery).toMatchObject({
+      from: null,
+      to: "2026-01-06T00:00:00.000Z",
+    });
+  });
+
+  it("rejects an inverted from-to range", async () => {
+    const { useCases } = setup();
+    await expect(
+      useCases.getDecryptedData(adminActor, {
+        selectedUser: "all",
+        timeRange: "all",
+        selectedDataType: "all",
+        dateFilter: null,
+        dateFrom: "2026-01-10",
+        dateTo: "2026-01-05",
       }),
     ).rejects.toMatchObject({ statusCode: 400 });
   });

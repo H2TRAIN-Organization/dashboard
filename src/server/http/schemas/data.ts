@@ -17,14 +17,24 @@ const dateFilterSchema = z
     return date.toISOString().slice(0, 10) === value;
   }, "Debe ser un día natural válido");
 
-export const decryptedDataQuerySchema = z.strictObject({
-  selectedUser: z.string().trim().min(1).max(128).default("all"),
-  timeRange: z.enum(["7d", "30d", "90d", "365d", "all"]).default("30d"),
-  selectedDataType: z
-    .enum(["all", "insulin", "food", "exercise", "period", "mood"])
-    .default("all"),
-  dateFilter: dateFilterSchema.optional(),
-});
+export const decryptedDataQuerySchema = z
+  .strictObject({
+    selectedUser: z.string().trim().min(1).max(128).default("all"),
+    timeRange: z.enum(["7d", "30d", "90d", "365d", "all"]).default("30d"),
+    selectedDataType: z
+      .enum(["all", "insulin", "food", "exercise", "period", "mood"])
+      .default("all"),
+    dateFilter: dateFilterSchema.optional(),
+    dateFrom: dateFilterSchema.optional(),
+    dateTo: dateFilterSchema.optional(),
+  })
+  .refine(
+    (query) =>
+      query.dateFrom === undefined ||
+      query.dateTo === undefined ||
+      query.dateFrom <= query.dateTo,
+    { message: "dateFrom debe ser anterior o igual a dateTo" },
+  );
 
 export const legacyDataQuerySchema = z.strictObject({
   type: z.enum(["all", "exercise", "mood", "insulin", "meal"]).default("all"),
