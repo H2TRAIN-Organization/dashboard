@@ -633,6 +633,8 @@ export interface Translations {
       participantsError: string
       retryParticipants: string
       tableCaption: string
+      chartsTitle: string
+      chartsHint: string
       participant: string
       measuredAt: string
       syncedAt: string
@@ -1392,6 +1394,9 @@ export const translations: Record<Language, Translations> = {
         participantsError: 'No se pudieron cargar los participantes.',
         retryParticipants: 'Reintentar participantes',
         tableCaption: 'Mediciones Kubios de los participantes',
+        chartsTitle: 'Gráficos del participante',
+        chartsHint:
+          '{count} mediciones del participante seleccionado; desliza en ambos ejes si hay muchos datos.',
         participant: 'Participante',
         measuredAt: 'Medición',
         syncedAt: 'Sincronización',
@@ -2141,6 +2146,9 @@ export const translations: Record<Language, Translations> = {
         participantsError: 'The participants could not be loaded.',
         retryParticipants: 'Retry participants',
         tableCaption: 'Kubios measurements for participants',
+        chartsTitle: 'Participant charts',
+        chartsHint:
+          '{count} measurements for the selected participant; scroll on both axes when there is a lot of data.',
         participant: 'Participant',
         measuredAt: 'Measurement',
         syncedAt: 'Synchronization',
