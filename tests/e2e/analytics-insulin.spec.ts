@@ -112,13 +112,21 @@ test('daily injections and the real average dose are two separate honest charts'
   await expect(doseCard.getByText('Muestra la cantidad promedio de insulina administrada cada día.')).toBeVisible();
 });
 
-test('the mood pie follows the same label threshold', async ({ page }) => {
+test('the mood distribution is an ordinal bar chart across the full 0-10 scale', async ({ page }) => {
   await mockAnalytics(page);
   await page.goto('/analytics');
   await expect(page.getByRole('heading', { name: 'Distribución de Estado de Ánimo' })).toBeVisible();
 
-  // 20/21 records ≈ 95% keeps its label…
-  await expect(page.getByText('8/10 95%')).toBeVisible();
-  // …and 1/21 ≈ 4.8% (displayed as 5% after rounding) draws no label.
-  await expect(page.getByText('3/10 5%')).toHaveCount(0);
+  // Since T04 the mood distribution is an ordinal bar chart, not a pie: the
+  // axis shows every level 0..10 (zeros included) and each level is a bar.
+  const moodCard = page.locator('div', { has: page.getByRole('heading', { name: 'Distribución de Estado de Ánimo' }) }).last();
+  const ticks = moodCard.locator('.recharts-xAxis .recharts-cartesian-axis-tick-value');
+  await expect(ticks).toHaveCount(11);
+  await expect(ticks.first()).toHaveText('0');
+  await expect(ticks.nth(8)).toHaveText('8');
+  await expect(ticks.last()).toHaveText('10');
+
+  // 21 mood rows spread over levels 3 and 8 -> both levels draw a rectangle.
+  const bars = moodCard.locator('.recharts-bar-rectangle path');
+  await expect(bars).toHaveCount(2);
 });

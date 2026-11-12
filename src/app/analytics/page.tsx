@@ -29,6 +29,7 @@ import {
   countByDate,
   countByField,
   countByLevel,
+  dailyChartRows,
   mergeDailyCounts,
   sortByValueDescending,
   summarizeDosesByDate,
@@ -224,8 +225,9 @@ export default function AnalyticsPage() {
 
   // Datos combinados para el gráfico de actividad general: la fusión agrupa y
   // ordena por milisegundo, nunca por etiqueta localizada.
-  const activityData = mergeDailyCounts([insulinByDate, foodByDate, exerciseByDate, moodByDate])
-    .map((entry) => ({ date: entry.label, count: entry.count }))
+  const activityData = dailyChartRows(
+    mergeDailyCounts([insulinByDate, foodByDate, exerciseByDate, moodByDate]),
+  )
 
   return (
     <ProtectedRoute>
@@ -661,15 +663,15 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </p>
                       <ScrollableChart height={300} minInnerWidth={insulinByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
-                        <BarChart data={insulinByDate}>
+                        <BarChart data={dailyChartRows(insulinByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
-                          <XAxis 
-                            dataKey="date" 
+                          <XAxis
+                            dataKey="date"
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
                           tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <YAxis 
+                          <YAxis
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
                           tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.numberOfInjections, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
@@ -829,7 +831,7 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </p>
                       <ScrollableChart height={300} minInnerWidth={insulinByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
-                        <LineChart data={insulinByDate}>
+                        <LineChart data={dailyChartRows(insulinByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
@@ -877,7 +879,7 @@ export default function AnalyticsPage() {
                         <strong className="text-green-400"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMeals}
                       </p>
                       <ScrollableChart height={300} minInnerWidth={foodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
-                        <LineChart data={foodByDate}>
+                        <LineChart data={dailyChartRows(foodByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
@@ -925,7 +927,7 @@ export default function AnalyticsPage() {
                         <strong className="text-orange-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfSessions}
                       </p>
                       <ScrollableChart height={300} minInnerWidth={exerciseByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
-                        <LineChart data={exerciseByDate}>
+                        <LineChart data={dailyChartRows(exerciseByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
@@ -973,7 +975,7 @@ export default function AnalyticsPage() {
                         <strong className="text-pink-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMoodRecords}
                       </p>
                       <ScrollableChart height={300} minInnerWidth={moodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
-                        <LineChart data={moodByDate}>
+                        <LineChart data={dailyChartRows(moodByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 

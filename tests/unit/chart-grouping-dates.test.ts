@@ -3,6 +3,7 @@ import {
   countByDate,
   countByField,
   countByLevel,
+  dailyChartRows,
   mergeDailyCounts,
   sortByValueDescending,
   type DailyCount,
@@ -76,6 +77,30 @@ describe('mergeDailyCounts', () => {
 
   it('returns an empty series with no input', () => {
     expect(mergeDailyCounts([])).toEqual([])
+  })
+})
+
+describe('dailyChartRows', () => {
+  it('maps localized labels to the `date` axis key recharts consumes', () => {
+    expect(
+      dailyChartRows([
+        { ms: 1000, label: '3 nov', count: 2 },
+        { ms: 2000, label: '12 nov', count: 5 },
+      ]),
+    ).toEqual([
+      { date: '3 nov', count: 2 },
+      { date: '12 nov', count: 5 },
+    ])
+  })
+
+  it('keeps chronology and zero counts untouched', () => {
+    expect(dailyChartRows([{ ms: 1000, label: '3 nov', count: 0 }])).toEqual([
+      { date: '3 nov', count: 0 },
+    ])
+  })
+
+  it('returns an empty series with no input', () => {
+    expect(dailyChartRows([])).toEqual([])
   })
 })
 
