@@ -9,6 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import StatCard from '@/components/analytics/StatCard'
+import ChartCard from '@/components/analytics/ChartCard'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
 import {
@@ -522,16 +523,12 @@ export default function AnalyticsPage() {
           ) : showData ? (
             <div className="space-y-8">
               {/* Gráfico de actividad general */}
-              <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                
-                <div className="relative z-10">
-                  <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center">
-                    <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg mr-3">
-                      <LineChartIcon className="h-5 w-5 text-white" />
-                    </div>
-                    {t.analytics.generalActivityByDate}
-                  </h3>
+              <ChartCard
+                icon={LineChartIcon}
+                iconGradient="from-blue-500 to-indigo-600"
+                title={t.analytics.generalActivityByDate}
+                titleClassName="text-xl"
+              >
                   {/* T12: con muchas fechas el interior crece y el contenedor
                       se desliza (ScrollableChart ya soporta ambos ejes); el
                       scroll horizontal es el que aplica a una serie diaria. */}
@@ -554,27 +551,23 @@ export default function AnalyticsPage() {
                       </defs>
                     </AreaChart>
                   </ScrollableChart>
-                </div>
-              </div>
+              </ChartCard>
 
               {/* Gráficos por tipo de dato */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Insulina por tipo */}
                 {insulinByType.length > 0 && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg mr-3">
-                          <Pill className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.insulinTypesUsed}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsInsulinTypes} 
+                  <ChartCard
+                    icon={Pill}
+                    iconGradient="from-blue-500 to-blue-600"
+                    title={t.analytics.insulinTypesUsed}
+                    description={
+                      <>
+                        {t.analytics.showsInsulinTypes}
                         <strong className="text-blue-600"> {t.analytics.eachSector}:</strong> {t.analytics.percentageUsage}
-                      </p>
+                      </>
+                    }
+                  >
                       <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                           <Pie
@@ -634,27 +627,23 @@ export default function AnalyticsPage() {
                           )}
                         </div>
                       )}
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
 
                 {/* Comidas por tipo */}
                 {foodByType.length > 0 && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg mr-3">
-                          <Utensils className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.registeredMealTypes}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsMealTypes} 
-                        <strong className="text-green-600"> {t.analytics.xAxis}:</strong> {t.analytics.mealTypes} | 
+                  <ChartCard
+                    icon={Utensils}
+                    iconGradient="from-green-500 to-green-600"
+                    title={t.analytics.registeredMealTypes}
+                    description={
+                      <>
+                        {t.analytics.showsMealTypes}
+                        <strong className="text-green-600"> {t.analytics.xAxis}:</strong> {t.analytics.mealTypes} |
                         <strong className="text-green-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
-                      </p>
+                      </>
+                    }
+                  >
                       {glucoseEvents.length > 0 && (
                         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
                           {t.analytics.glucoseEventsExcluded.replace('{count}', String(glucoseEvents.length))}
@@ -692,27 +681,23 @@ export default function AnalyticsPage() {
                           <Bar dataKey="value" fill="#10B981" name={t.analytics.registeredMeals} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
 
                 {/* Inyecciones de insulina por día */}
                 {insulinByDate.length > 0 && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg mr-3">
-                          <Pill className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.injectionsPerDay}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsInsulinInjections} 
-                        <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
+                  <ChartCard
+                    icon={Pill}
+                    iconGradient="from-blue-500 to-blue-600"
+                    title={t.analytics.injectionsPerDay}
+                    description={
+                      <>
+                        {t.analytics.showsInsulinInjections}
+                        <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} |
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
-                      </p>
+                      </>
+                    }
+                  >
                       <ScrollableChart height={300} minInnerWidth={insulinByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={dailyChartRows(insulinByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
@@ -740,27 +725,23 @@ export default function AnalyticsPage() {
                           <Bar dataKey="count" fill="#3B82F6" name={t.analytics.insulinInjections} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
 
                 {/* Promedio de dosis de insulina por día */}
                 {insulinDosesByDate.length > 0 && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg mr-3">
-                          <Pill className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.averageInsulinDose}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsAverageInsulin} 
-                        <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
+                  <ChartCard
+                    icon={Pill}
+                    iconGradient="from-indigo-500 to-indigo-600"
+                    title={t.analytics.averageInsulinDose}
+                    description={
+                      <>
+                        {t.analytics.showsAverageInsulin}
+                        <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} |
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.averageDoseUnits}
-                      </p>
+                      </>
+                    }
+                  >
                       <ScrollableChart height={300} minInnerWidth={insulinDosesByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={insulinDosesByDate}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
@@ -788,8 +769,7 @@ export default function AnalyticsPage() {
                           <Bar dataKey="averageDose" fill="#6366F1" name={t.analytics.averageDose} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
 
                 {/* Distribución de ánimo: barras ordinales 0..10 (anti-patrón
@@ -797,21 +777,18 @@ export default function AnalyticsPage() {
                     ni admite más de 5 sectores). Los niveles sin registros
                     cuentan 0 y siguen visibles en la escala. */}
                 {moodLevelsHaveData && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg mr-3">
-                          <Smile className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.moodDistribution}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsMoodFrequency} 
-                        <strong className="text-pink-600"> {t.analytics.xAxis}:</strong> {t.analytics.level} | 
+                  <ChartCard
+                    icon={Smile}
+                    iconGradient="from-pink-500 to-pink-600"
+                    title={t.analytics.moodDistribution}
+                    description={
+                      <>
+                        {t.analytics.showsMoodFrequency}
+                        <strong className="text-pink-600"> {t.analytics.xAxis}:</strong> {t.analytics.level} |
                         <strong className="text-pink-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
-                      </p>
+                      </>
+                    }
+                  >
                       <ScrollableChart height={300} minInnerWidth={moodLevels.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={moodLevels}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
@@ -840,8 +817,7 @@ export default function AnalyticsPage() {
                           <Bar dataKey="count" fill="#EC4899" name={t.analytics.moodRecords} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
               </div>
 
@@ -866,21 +842,18 @@ export default function AnalyticsPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Correlación Insulina vs Carbohidratos */}
                 {insulinData.length > 0 && foodData.length > 0 && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-blue-500 to-green-600 rounded-lg mr-3">
-                          <TrendingUp className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.insulinEvolution}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsInsulinInjections} 
-                        <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
+                  <ChartCard
+                    icon={TrendingUp}
+                    iconGradient="from-blue-500 to-green-600"
+                    title={t.analytics.insulinEvolution}
+                    description={
+                      <>
+                        {t.analytics.showsInsulinInjections}
+                        <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} |
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
-                      </p>
+                      </>
+                    }
+                  >
                       <ScrollableChart height={300} minInnerWidth={insulinByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={dailyChartRows(insulinByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
@@ -908,27 +881,23 @@ export default function AnalyticsPage() {
                           <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} name={t.analytics.insulinInjections} />
                         </LineChart>
                       </ScrollableChart>
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
 
                 {/* Patrones de Actividad Diaria */}
                 {foodByDate.length > 0 && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg mr-3">
-                          <Activity className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.mealEvolution}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsMealRegistrations} 
-                        <strong className="text-green-400"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
+                  <ChartCard
+                    icon={Activity}
+                    iconGradient="from-green-500 to-emerald-600"
+                    title={t.analytics.mealEvolution}
+                    description={
+                      <>
+                        {t.analytics.showsMealRegistrations}
+                        <strong className="text-green-400"> {t.analytics.xAxis}:</strong> {t.analytics.dates} |
                         <strong className="text-green-400"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMeals}
-                      </p>
+                      </>
+                    }
+                  >
                       <ScrollableChart height={300} minInnerWidth={foodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={dailyChartRows(foodByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
@@ -956,27 +925,23 @@ export default function AnalyticsPage() {
                           <Line type="monotone" dataKey="count" stroke="#10B981" strokeWidth={2} name={t.analytics.registeredMeals} />
                         </LineChart>
                       </ScrollableChart>
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
 
                 {/* Tendencias de Ejercicio */}
                 {exerciseByDate.length > 0 && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg mr-3">
-                          <Dumbbell className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.exerciseEvolution}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsExerciseSessions} 
-                        <strong className="text-orange-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
+                  <ChartCard
+                    icon={Dumbbell}
+                    iconGradient="from-orange-500 to-orange-600"
+                    title={t.analytics.exerciseEvolution}
+                    description={
+                      <>
+                        {t.analytics.showsExerciseSessions}
+                        <strong className="text-orange-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} |
                         <strong className="text-orange-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfSessions}
-                      </p>
+                      </>
+                    }
+                  >
                       <ScrollableChart height={300} minInnerWidth={exerciseByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={dailyChartRows(exerciseByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
@@ -1004,27 +969,23 @@ export default function AnalyticsPage() {
                           <Line type="monotone" dataKey="count" stroke="#F59E0B" strokeWidth={2} name={t.analytics.exerciseSessions} />
                         </LineChart>
                       </ScrollableChart>
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
 
                 {/* Bienestar Emocional */}
                 {moodByDate.length > 0 && (
-                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
-                    
-                    <div className="relative z-10">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
-                        <div className="p-2 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg mr-3">
-                          <Heart className="h-5 w-5 text-white" />
-                        </div>
-                        {t.analytics.moodEvolution}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsMoodRecords} 
-                        <strong className="text-pink-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
+                  <ChartCard
+                    icon={Heart}
+                    iconGradient="from-pink-500 to-pink-600"
+                    title={t.analytics.moodEvolution}
+                    description={
+                      <>
+                        {t.analytics.showsMoodRecords}
+                        <strong className="text-pink-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} |
                         <strong className="text-pink-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMoodRecords}
-                      </p>
+                      </>
+                    }
+                  >
                       <ScrollableChart height={300} minInnerWidth={moodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={dailyChartRows(moodByDate)}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
@@ -1052,8 +1013,7 @@ export default function AnalyticsPage() {
                           <Line type="monotone" dataKey="count" stroke="#EC4899" strokeWidth={2} name={t.analytics.moodRecords} />
                         </LineChart>
                       </ScrollableChart>
-                    </div>
-                  </div>
+                </ChartCard>
                 )}
               </div>
             </div>

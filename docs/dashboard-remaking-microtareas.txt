@@ -227,7 +227,8 @@ Criterios de aceptación:
 Dependencias: T10.
 
 === T15 — Mejoras de estética/coherencia del frontend (opcional) ===
-Estado: pendiente
+Estado: hecho (rama feature/analytics-chart-card; ChartCard compartida,
+estilo idéntico, verificado por los 13 e2e de analytics)
 Descripción:
   En analytics/page.tsx el markup de tarjeta de gráfico
   ("relative bg-white/90 backdrop-blur-xl border border-blue-200/50
