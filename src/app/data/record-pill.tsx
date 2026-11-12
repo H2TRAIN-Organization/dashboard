@@ -204,6 +204,27 @@ export function RecordPill({
   )
 }
 
+/**
+ * Clave estable para reconciliar las pills de una página. El contrato declara
+ * `id`, pero las respuestas reales y los fixtures pueden omitirlo; se usa
+ * `rowKey` como respaldo y, en último caso, el índice dentro de la página.
+ */
+function recordKey(
+  record: HealthRecord,
+  type: HealthRecordType,
+  index: number,
+): string {
+  if (typeof record.id === 'string' && record.id.length > 0) return record.id
+  if (
+    'rowKey' in record &&
+    typeof record.rowKey === 'string' &&
+    record.rowKey.length > 0
+  ) {
+    return record.rowKey
+  }
+  return `${type}-${index}`
+}
+
 /** Wrapping list of record pills for one data type and page. */
 export function RecordPillList({
   records,
@@ -218,9 +239,9 @@ export function RecordPillList({
 }) {
   return (
     <div className="flex flex-wrap items-start gap-2.5">
-      {records.map((record) => (
+      {records.map((record, index) => (
         <RecordPill
-          key={record.id}
+          key={recordKey(record, type, index)}
           record={record}
           type={type}
           locale={locale}

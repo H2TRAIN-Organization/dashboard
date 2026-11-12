@@ -77,9 +77,15 @@ test('records render as pills paginated to 10 with a 10/25/50 selector', async (
   await page.getByRole('button', { name: 'Última página' }).click();
   await expect(page.getByText('11-12 / 12')).toBeVisible();
   await expect(page.getByText('2 / 2')).toBeVisible();
-  // Both end buttons stay disabled while sitting at the boundary.
-  await expect(page.getByRole('button', { name: 'Primera página' })).toBeDisabled();
+  // Both end buttons reflect the boundary: at the last page only "first" is
+  // enabled; jumping back to the first page flips the pair.
   await expect(page.getByRole('button', { name: 'Última página' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Primera página' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Primera página' }).click();
+  await expect(page.getByText('1-10 / 12')).toBeVisible();
+  await expect(page.getByText('1 / 2')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Primera página' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Última página' })).toBeEnabled();
 
   // MT35: the selector accepts 10, 25 and 50. With 25 every record fits on
   // one page, so the pagination footer disappears.

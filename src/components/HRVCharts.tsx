@@ -246,7 +246,6 @@ export default function HRVCharts({ results }: HRVChartsProps) {
           <HrvLineChart
             rows={rows}
             yLabel={t.kubios.charts.spectralPower}
-            height={380}
             lines={[
               {
                 dataKey: 'hfPower',
