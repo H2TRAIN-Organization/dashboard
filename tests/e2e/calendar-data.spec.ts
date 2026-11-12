@@ -1,4 +1,5 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page } from './support/language'
+import type { Route } from '@playwright/test'
 import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from "../../src/lib/privacy-policy";
 
 /**

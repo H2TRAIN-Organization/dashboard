@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from './support/language'
 
 /**
  * These tests require the new API handlers to be mounted, a disposable test
