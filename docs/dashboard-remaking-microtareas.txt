@@ -133,3 +133,123 @@ Dependencias: T08.
 ---
 ORDEN DE EJECUCIÓN: T01 -> T02 -> (T03, T04, T05, T06, T07 en paralelo por
 feature branches) -> T08 -> T09.
+
+=== LOTE 2 — 2026-11-12 (Analytics: correciones y filtro de fechas) ===
+
+=== T10 — Confirmar: ¿mezcla de tipos de comida e insulina en "Registered Meal Types"? ===
+Estado: confirmado por código (hallazgo: no mezcla en el pipeline del dashboard; ver T14)
+Descripción:
+  Verificar por código y datos si el gráfico "Tipos de Comida Registrados"
+  (src/app/analytics/page.tsx, foodByType) mezcla tipos de comida con tipos
+  de insulina.
+  Pipeline a auditar: /api/decrypted-data -> SupabaseHealthDataRepository
+  (solo tabla fooddata) -> mapHealthRecord (food_type descifrado de fooddata)
+  -> splitFoodRecords (MT38 excluye eventos de glucemia) -> countByField.
+  Criterio de confirmación: el pipeline del dashboard no puede introducir
+  insulinType (vive en insulindata); si "Rápida"/"Lenta" aparecen en el
+  gráfico es porque la app móvil escribe registros de insulina en fooddata
+  (mismo patrón de datos sucios que MT38).
+Criterios de aceptación:
+  - Hallazgo documentado con file:line del pipeline.
+  - Si hay evidencia de registros de insulina en fooddata, abrir T14.
+Dependencias: ninguna.
+
+=== T11 — Fix: gráficos de evolución temporal sin datos ===
+Estado: hecho (rama feature/analytics-evolution-fix)
+Descripción:
+  Los 4 LineChart de "Evolución temporal" (insulina, comidas, ejercicio,
+  ánimo) en src/app/analytics/page.tsx usan XAxis dataKey="date", pero las
+  filas de countByDate son {ms,label,count} (src/lib/chart-grouping.ts):
+  la clave "date" no existe y recharts descarta la serie -> solo se ve el
+  marco. La misma causa raíz rompe las barras de "Inyecciones de insulina
+  por día" (dataKey="date" sobre insulinByDate).
+  Fix: helper diarioChartRows/dailyChartRows en chart-grouping que mapee
+  {date: label, count} como única fuente de verdad y usarlo en todos los
+  gráficos temporales (barras diarias, líneas de evolución y actividad
+  general).
+Criterios de aceptación:
+  - Los 4 gráficos de evolución pintan la línea y los ejes con etiquetas.
+  - "Inyecciones de insulina por día" también corregido (misma raíz).
+  - Test unitario del helper + spec e2e de que la serie renderiza path.
+Dependencias: ninguna.
+
+=== T12 — "General Activity by Date" desplazable en ambos ejes ===
+Estado: pendiente
+Descripción:
+  Envolber el AreaChart de actividad general en ScrollableChart
+  (src/components/analytics/ScrollableChart.tsx ya soporta scroll X/Y) con
+  minInnerWidth proporcional al nº de fechas (LINE_INNER_WIDTH_PER_ITEM) y
+  minInnerHeight si hay muchos datos.
+Criterios de aceptación:
+  - Con muchas fechas aparece scroll horizontal (y vertical si procede).
+  - Con pocas fechas el aspecto no cambia.
+Dependencias: T11 (para no chocar en el mismo bloque del page.tsx).
+
+=== T13 — Filtro de fechas "desde - hasta" en Advanced Analytics ===
+Estado: pendiente
+Descripción:
+  Backend: aceptar dateFrom/dateTo (YYYY-MM-DD) en /api/decrypted-data
+  (schemas/data.ts + data-use-cases.ts: ventana autoritativa cuando hay
+  rango, validación dateFrom <= dateTo, 400 en inválidos) + openapi.yaml +
+  api-client/api-types. Repositorio ya filtra por from/to: no se toca.
+  Frontend: dos inputs date "desde - hasta" en los filtros de
+  src/app/analytics/page.tsx siguiendo el estilo del data page; botón
+  limpiar; traducciones es/en.
+Criterios de aceptación:
+  - El rango define la ventana consultada (se anuncia en el contrato).
+  - 400 si dateFrom > dateTo o formato inválido.
+  - Los gráficos reflejan el rango aplicado.
+Dependencias: ninguna (T11 recomendado antes por el mismo archivo).
+
+=== T14 — Defensa de datos: insulina/glucemia escritos en fooddata ===
+Estado: pendiente
+Descripción:
+  Extender src/lib/meal-classification.ts (patrón MT38): las entradas de
+  fooddata cuyo food_type nombre insulina (Rápida, Lenta, corrección de
+  insulina...) se clasifican como no-comida, se excluyen del gráfico de
+  tipos de comida y se avisan con contador, igual que los eventos de
+  glucemia. Revisar la copia del aviso en el resto de gráficos de comidas.
+Criterios de aceptación:
+  - "Rápida"/"Lenta" nunca aparecen como tipos de comida.
+  - Aviso con el nº de registros excluidos; unit tests del clasificador.
+Dependencias: T10.
+
+=== T15 — Mejoras de estética/coherencia del frontend (opcional) ===
+Estado: pendiente
+Descripción:
+  En analytics/page.tsx el markup de tarjeta de gráfico
+  ("relative bg-white/90 backdrop-blur-xl border border-blue-200/50
+  rounded-3xl p-8 overflow-hidden shadow-xl") se repite ~10 veces.
+  Extraer ChartCard (título, icono, gradiente, children) manteniendo el
+  estilo idéntico; revisión ligera de jerarquía/espaciado si mejora la
+  lectura sin cambiar el lenguaje visual (degradados suaves, esquinas
+  redondeadas, slate).
+Criterios de aceptación:
+  - Cero duplicaciones del wrapper; captura visual equivalente antes/después.
+  - Sin librerías nuevas.
+Dependencias: T11-T13 (los merges deben estar hechos).
+
+=== T16 — Tests de integración del lote ===
+Estado: pendiente
+Descripción:
+  - Unit: dailyChartRows, meal-classification extendido, resolución
+    dateFrom/dateTo (data-use-cases.test.ts), esquema HTTP.
+  - E2E Playwright (mock de APIs, igual que analytics-meals.spec.ts):
+    evolución renderiza serie, filtro desde-hasta filtra, scroll activo
+    con muchas fechas, aviso de registros no-comida.
+  - npm run check en verde (typecheck + lint + capas + test).
+Dependencias: T11-T15.
+
+=== T17 — Gitflow + push codex/release/0.2.0 (preview Vercel) ===
+Estado: pendiente
+Descripción:
+  Feature branch por microtarea (feature/analytics-*), merges a
+  codex/release/0.2.0 con historial limpio, verificación completa y push
+  final. Vercel despliega preview (NO production) para la rama.
+Criterios de aceptación:
+  - Sin commits directos en la rama de release.
+  - Push final -> preview de Vercel en codex/release/0.2.0.
+Dependencias: T16.
+
+ORDEN DE EJECUCIÓN (LOTE 2): T10 -> T11 -> (T12, T13 en paralelo) ->
+T14 -> T15 -> T16 -> T17.

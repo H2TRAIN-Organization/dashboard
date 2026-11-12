@@ -29,6 +29,25 @@ export function countByDate<T>(
     .map(([ms, entry]) => ({ ms, label: entry.label, count: entry.count }))
 }
 
+/** Fila lista para los gráficos temporales de recharts: eje X = `date`. */
+export interface DailyChartRow {
+  readonly date: string
+  readonly count: number
+}
+
+/**
+ * Convierte un recuento diario en filas para recharts: los gráficos
+ * temporales consumen `date` (etiqueta localizada) y `count`. La conversión
+ * vive aquí para que la clave del eje (`date`) coincida siempre con el campo
+ * de la fila: una clave que no existe en los datos hace que recharts
+ * descarte la serie y dibuje solo el marco del gráfico (T11).
+ */
+export function dailyChartRows(
+  series: readonly DailyCount[],
+): DailyChartRow[] {
+  return series.map((entry) => ({ date: entry.label, count: entry.count }))
+}
+
 /**
  * Fusiona varios recuentos diarios en una sola serie cronológica: agrupa por
  * ms y ordena por ms, nunca por etiqueta localizada.
