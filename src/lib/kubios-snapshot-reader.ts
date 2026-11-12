@@ -8,6 +8,7 @@ import {
   type KubiosCsvResult,
   type KubiosCsvRow
 } from './kubios-csv'
+import { normalizeSnapshotRow } from './kubios-snapshot-shape'
 
 /**
  * K50 - Lógica pura de `GET /api/kubios/me`,
@@ -311,7 +312,10 @@ function parseSnapshotRow(row: unknown): ValidSnapshotRow | null {
 
 /**
  * Parsea el texto plano descifrado como JSON estricto con forma
- * `{ results: object[] }`. Se descartan los campos extra del objeto raíz.
+ * `{ results: object[] }`. Se descartan los campos extra del objeto raíz y
+ * cada fila se normaliza a la forma canónica (`kubios-snapshot-shape`), de
+ * modo que la vista personal y la administrativa interpreten el mismo
+ * snapshot legado de la misma manera.
  */
 function parseSnapshotPayload(plaintext: string): Record<string, unknown>[] | null {
   let parsed: unknown
@@ -332,7 +336,7 @@ function parseSnapshotPayload(plaintext: string): Record<string, unknown>[] | nu
       return null
     }
 
-    results.push(item)
+    results.push(normalizeSnapshotRow(item))
   }
 
   return results

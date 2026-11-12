@@ -444,6 +444,41 @@ describe('K50 snapshot reader', () => {
       })
     })
 
+    it('normalizes legacy rows: JSON-string results and epoch timestamps', async () => {
+      // Forma legada observada: sin measured_timestamp, época en segundos como
+      // alias y métricas anidadas serializadas como cadena JSON (MT48).
+      const ms = Date.parse('2026-11-02T10:00:00.000Z')
+      const legacy = {
+        result_id: 'synthetic-legacy',
+        timestamp: Math.floor(ms / 1000),
+        result: JSON.stringify({
+          readiness: 61,
+          mean_hr_bpm: 58,
+          freq_domain: { HF_power: 1 }
+        })
+      }
+      const row = rowForResults([legacy])
+      const response = await callHrv({ identity: LINKED_A, service: serviceForRow(row) })
+
+      expect(response.status).toBe(200)
+      expect(response.body).toEqual({
+        status: 'ready',
+        results: [
+          {
+            result_id: 'synthetic-legacy',
+            timestamp: Math.floor(ms / 1000),
+            measured_timestamp: '2026-11-02T10:00:00.000Z',
+            result: {
+              readiness: 61,
+              mean_hr_bpm: 58,
+              freq_domain: { HF_power: 1 }
+            }
+          }
+        ],
+        synced_at: atOffset(-60_000)
+      })
+    })
+
     it('filters inclusively by from/to ISO dates and preserves nested results', async () => {
       const dayOne = {
         ...resultA('synthetic-day-1', '2026-11-01T10:00:00.000Z'),
