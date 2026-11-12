@@ -8,7 +8,11 @@ import {
 } from 'react'
 import { Language, translations } from '@/lib/translations'
 
-const DEFAULT_LANGUAGE: Language = 'es'
+/**
+ * English is the primary language of the dashboard. Spanish is only active
+ * after the user picks it explicitly; the choice persists in storage.
+ */
+const DEFAULT_LANGUAGE: Language = 'en'
 const LANGUAGE_STORAGE_KEY = 'language'
 const listeners = new Set<() => void>()
 
@@ -87,8 +91,9 @@ export function useLanguage() {
 }
 
 /**
- * Variante tolerante para componentes que también se renderizan aislados en
- * pruebas o fuera del proveedor. Mantiene el español como respaldo explícito.
+ * Tolerant variant for components that are also rendered in isolation inside
+ * tests or outside the provider. Falls back to the primary language
+ * (English) explicitly.
  */
 export function useOptionalLanguage(): LanguageContextType {
   const context = useContext(LanguageContext)
