@@ -11,8 +11,9 @@ import { Language, translations } from '@/lib/translations'
 /**
  * English is the primary language of the dashboard. Spanish is only active
  * after the user picks it explicitly; the choice persists in storage.
+ * Exported for tests and tolerant consumers.
  */
-const DEFAULT_LANGUAGE: Language = 'en'
+export const DEFAULT_LANGUAGE: Language = 'en'
 const LANGUAGE_STORAGE_KEY = 'language'
 const listeners = new Set<() => void>()
 
