@@ -11,7 +11,28 @@ import Navigation from '@/components/Navigation'
 import StatCard from '@/components/analytics/StatCard'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
-import { aggregatePieTail, summarizeDosesByDate } from '@/lib/chart-grouping'
+import {
+  CHART_AREA_FILL,
+  CHART_AXIS_LABEL_STYLE,
+  CHART_AXIS_LINE_STYLE,
+  CHART_GRID_DASH,
+  CHART_GRID_STROKE,
+  CHART_OTHERS_COLOR,
+  CHART_TICK_STYLE,
+  CHART_TOOLTIP_CONTENT_STYLE,
+  CHART_TOOLTIP_ITEM_STYLE,
+  CHART_TOOLTIP_LABEL_STYLE,
+  seriesColor,
+} from '@/components/analytics/chart-theme'
+import {
+  aggregatePieTail,
+  countByDate,
+  countByField,
+  countByLevel,
+  mergeDailyCounts,
+  sortByValueDescending,
+  summarizeDosesByDate,
+} from '@/lib/chart-grouping'
 import { splitFoodRecords } from '@/lib/meal-classification'
 import { finiteAverage, latestValidDate, parseFiniteNumber, parseFiniteNumberOrZero } from '@/lib/number-stats'
 import { useSession } from '@/contexts/SessionContext'
@@ -19,8 +40,6 @@ import { useLanguage } from '@/contexts/LanguageContext'
 
 /** Tipos de insulina que se muestran individualmente antes de agrupar en "Otros". */
 const INSULIN_TOP_TYPES = 5
-/** Color del sector "Otros" del pie chart de insulina. */
-const OTHERS_COLOR = '#94A3B8'
 /** Ancho interior por categoría en los gráficos de barras deslizables. */
 const BAR_INNER_WIDTH_PER_ITEM = 80
 /** Ancho interior por fecha en los gráficos de evolución temporal deslizables. */
@@ -106,46 +125,40 @@ export default function AnalyticsPage() {
     }
   }, [session, fetchData, fetchUsers])
 
-  // Función para agrupar datos por fecha. El orden es cronológico real: se
-  // agrupa por milisegundo y la etiqueta localizada se genera al final, porque
-  // ordenar fechas ya localizadas ("12 nov") no parsea y degradaba el orden
-  // al de inserción (MT38). Los registros con fecha inválida se omiten.
-  const dayKey = (value: Date): string =>
-    value.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-  const groupDataByDate = <T extends object>(
-    data: T[],
-    dateField: string = 'date_time',
-  ): Array<{ date: string; count: number }> => {
-    const grouped = new Map<number, { date: string; count: number }>()
-    for (const item of data) {
-      const ms = new Date(String((item as Record<string, unknown>)[dateField] ?? '')).getTime()
-      if (!Number.isFinite(ms)) continue
-      const entry = grouped.get(ms) ?? { date: dayKey(new Date(ms)), count: 0 }
-      entry.count++
-      grouped.set(ms, entry)
-    }
+  // Agrupación por fecha y por tipo delegada en la lib compartida: el orden es
+  // cronológico real (clave = milisegundo de la fecha, MT38) y las etiquetas
+  // localizadas se generan al final. Los registros con fecha inválida se
+  // omiten.
+  const dayLabelOf = (ms: number): string =>
+    new Date(ms).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+  const timeOf = (value: string): number => new Date(String(value)).getTime()
 
-    return [...grouped.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([, entry]) => entry)
-  }
+  const insulinByDate = countByDate(insulinData, (row) => timeOf(row.date_time), dayLabelOf)
+  const foodByDate = countByDate(mealData, (row) => timeOf(row.date_time), dayLabelOf)
+  const exerciseByDate = countByDate(exerciseData, (row) => timeOf(row.date_time), dayLabelOf)
+  const moodByDate = countByDate(moodData, (row) => timeOf(row.date_time), dayLabelOf)
 
-  // Función para agrupar datos por tipo
-  const groupDataByType = <T extends object>(
-    data: T[],
-    typeField: string,
-  ): Array<{ name: string; value: number }> => {
-    const grouped = data.reduce<Record<string, number>>((acc, item) => {
-      const type = String((item as Record<string, unknown>)[typeField] || t.common.noData)
-      if (!acc[type]) {
-        acc[type] = 0
-      }
-      acc[type]++
-      return acc
-    }, {})
+  // Las barras por categoría se ordenan de mayor a menor para que el ranking
+  // sea directo (anti-patrón: barras sin orden).
+  const insulinByType = sortByValueDescending(
+    countByField(insulinData, (row) => row.insulinType, t.common.noData),
+  )
+  const foodByType = sortByValueDescending(
+    countByField(mealData, (row) => row.food_type, t.common.noData),
+  )
 
-    return Object.entries(grouped).map(([name, value]) => ({ name, value }))
-  }
+  // Distribución de ánimo: escala ordinal completa 0..10 con ceros incluidos
+  // (los niveles ausentes son parte de la respuesta, no desaparecen). Solo
+  // valores numéricos participan; "Sin datos/10" no es un nivel.
+  const moodLevels = countByLevel(
+    moodData.flatMap((item) => {
+      const level = parseFiniteNumber(item.mood_value)
+      return level === null ? [] : [level]
+    }),
+    0,
+    10,
+  )
+  const moodLevelsHaveData = moodLevels.some((entry) => entry.count > 0)
 
   // Estadísticas generales. Los promedios usan parseo tolerante: los campos
   // con texto vacío o no numérico no pueden convertir la media en NaN (MT41).
@@ -184,28 +197,13 @@ export default function AnalyticsPage() {
   const hasAnyData = stats.totalRecords > 0
   const showData = !loading && error === null && hasAnyData
 
-  // Datos para gráficos. Las comidas usan solo registros de comida reales
-  // (MT38); el ánimo solo incluye valores numéricos, porque "Sin datos/10"
-  // en el pie de niveles no es coherente.
-  const insulinByDate = groupDataByDate(insulinData)
-  const foodByDate = groupDataByDate(mealData)
-  const exerciseByDate = groupDataByDate(exerciseData)
-  const moodByDate = groupDataByDate(moodData)
-
-  const insulinByType = groupDataByType(insulinData, 'insulinType')
-  const foodByType = groupDataByType(mealData, 'food_type')
-  const moodByValue = groupDataByType(
-    moodData.filter(item => parseFiniteNumber(item.mood_value) !== null),
-    'mood_value',
-  )
-
   // Inyecciones y promedio de dosis reales por día; dos gráficos separados
   // para que cada título represente exactamente lo que dibuja. La clave de
   // día se genera a partir de la fecha ya parseada (MT38) y la dosis usa
   // parseo tolerante.
   const insulinDosesByDate = summarizeDosesByDate(
     insulinData,
-    (row) => dayKey(new Date(String(row.date_time))),
+    (row) => dayLabelOf(timeOf(row.date_time)),
     (row) => parseFiniteNumberOrZero(row.dose),
   )
 
@@ -217,18 +215,10 @@ export default function AnalyticsPage() {
     : insulinPie.slices
   const insulinTotal = insulinByType.reduce((total, entry) => total + entry.value, 0)
 
-  // Datos combinados para gráfico de actividad general
-  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce<Array<{ date: string; count: number }>>((acc, item) => {    const existing = acc.find(x => x.date === item.date)
-    if (existing) {
-      existing.count += item.count
-    } else {
-      acc.push({ ...item })
-    }
-    return acc
-  }, []).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-  // Colores para gráficos
-  const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16']
+  // Datos combinados para el gráfico de actividad general: la fusión agrupa y
+  // ordena por milisegundo, nunca por etiqueta localizada.
+  const activityData = mergeDailyCounts([insulinByDate, foodByDate, exerciseByDate, moodByDate])
+    .map((entry) => ({ date: entry.label, count: entry.count }))
 
   return (
     <ProtectedRoute>
@@ -484,21 +474,21 @@ export default function AnalyticsPage() {
                   </h3>
                   <ResponsiveContainer width="100%" height={400}>
                     <AreaChart data={activityData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="date" stroke="#9CA3AF" />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: '1px solid rgba(59, 130, 246, 0.3)',
-                          borderRadius: '12px',
-                          color: '#1e293b',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                        }}
-                        itemStyle={{ color: '#1e293b' }}
-                        labelStyle={{ color: '#1e293b' }}
+                      <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                      <XAxis dataKey="date" stroke={CHART_AXIS_LINE_STYLE.stroke} />
+                      <YAxis stroke={CHART_AXIS_LINE_STYLE.stroke} />
+                      <Tooltip
+                        contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                        itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                        labelStyle={CHART_TOOLTIP_LABEL_STYLE}
                       />
-                      <Area type="monotone" dataKey="count" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.3} />
+                      <Area type="monotone" dataKey="count" stroke={CHART_AREA_FILL} fill="url(#activityGradient)" strokeWidth={2} />
+                      <defs>
+                        <linearGradient id="activityGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={CHART_AREA_FILL} stopOpacity={0.35} />
+                          <stop offset="100%" stopColor={CHART_AREA_FILL} stopOpacity={0.04} />
+                        </linearGradient>
+                      </defs>
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -537,20 +527,14 @@ export default function AnalyticsPage() {
                             {insulinPieData.map((entry, index) => (
                               <Cell
                                 key={`cell-${index}`}
-                                fill={index === insulinPieData.length - 1 && insulinPie.others !== null ? OTHERS_COLOR : colors[index % colors.length]}
+                                fill={index === insulinPieData.length - 1 && insulinPie.others !== null ? CHART_OTHERS_COLOR : seriesColor(index)}
                               />
                             ))}
                           </Pie>
                           <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
                             formatter={(value) => [
                               `${value} ${t.analytics.injections}`,
                               t.analytics.insulinType
@@ -575,7 +559,7 @@ export default function AnalyticsPage() {
                               {insulinPie.othersBreakdown.map((entry) => (
                                 <li key={entry.name} className="flex items-center justify-between gap-3 text-sm text-slate-700">
                                   <span className="flex items-center gap-2 min-w-0">
-                                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: OTHERS_COLOR }} aria-hidden="true"></span>
+                                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: CHART_OTHERS_COLOR }} aria-hidden="true"></span>
                                     <span className="truncate">{entry.name}</span>
                                   </span>
                                   <span className="font-semibold shrink-0">
@@ -615,35 +599,29 @@ export default function AnalyticsPage() {
                       )}
                       <ScrollableChart height={300} minInnerWidth={foodByType.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={foodByType}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="name" 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.mealTypes, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.mealTypes, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <YAxis 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
-                            formatter={(value) => [
+                          <Tooltip
+                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                          formatter={(value) => [
                               `${value} ${t.analytics.records}`,
                               t.analytics.mealType
                             ]}
                             labelFormatter={(label) => `${t.analytics.type}: ${label}`}
                           />
-                          <Bar dataKey="value" fill="#10B981" name={t.analytics.registeredMeals} />
+                          <Bar dataKey="value" fill="#10B981" name={t.analytics.registeredMeals} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
                     </div>
@@ -669,35 +647,29 @@ export default function AnalyticsPage() {
                       </p>
                       <ScrollableChart height={300} minInnerWidth={insulinByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={insulinByDate}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <YAxis 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.numberOfInjections, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.numberOfInjections, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
-                            formatter={(value) => [
+                          <Tooltip
+                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                          formatter={(value) => [
                               `${value} ${t.analytics.injections}`,
                               t.analytics.quantity
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Bar dataKey="count" fill="#3B82F6" name={t.analytics.insulinInjections} />
+                          <Bar dataKey="count" fill="#3B82F6" name={t.analytics.insulinInjections} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
                     </div>
@@ -723,43 +695,40 @@ export default function AnalyticsPage() {
                       </p>
                       <ScrollableChart height={300} minInnerWidth={insulinDosesByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={insulinDosesByDate}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <YAxis 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.averageDoseUnits, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.averageDoseUnits, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
-                            formatter={(value) => [
+                          <Tooltip
+                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                          formatter={(value) => [
                               `${value} ${t.analytics.units}`,
                               t.analytics.averageDose
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Bar dataKey="averageDose" fill="#6366F1" name={t.analytics.averageDose} />
+                          <Bar dataKey="averageDose" fill="#6366F1" name={t.analytics.averageDose} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
                     </div>
                   </div>
                 )}
 
-                {/* Tendencias de Estado de Ánimo */}
-                {moodByValue.length > 0 && (
+                {/* Distribución de ánimo: barras ordinales 0..10 (anti-patrón
+                    16: la distribución ordinal en un pie no expresa el orden
+                    ni admite más de 5 sectores). Los niveles sin registros
+                    cuentan 0 y siguen visibles en la escala. */}
+                {moodLevelsHaveData && (
                   <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
                     
@@ -772,42 +741,37 @@ export default function AnalyticsPage() {
                       </h3>
                       <p className="text-sm text-slate-600 mb-6">
                         {t.analytics.showsMoodFrequency} 
-                        <strong className="text-pink-600"> {t.analytics.eachSector}:</strong> {t.analytics.percentageRecords}
+                        <strong className="text-pink-600"> {t.analytics.xAxis}:</strong> {t.analytics.level} | 
+                        <strong className="text-pink-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={moodByValue}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={<PieSliceLabel format={(name, percent) => `${name}/10 ${(percent * 100).toFixed(0)}%`} />}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
-                          >
-                            {moodByValue.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
+                      <ScrollableChart height={300} minInnerWidth={moodLevels.length * BAR_INNER_WIDTH_PER_ITEM}>
+                        <BarChart data={moodLevels}>
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                          <XAxis
+                            dataKey="level"
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                            tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.level, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
+                          />
+                          <YAxis
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                            tick={CHART_TICK_STYLE}
+                            allowDecimals={false}
+                            label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
+                          />
+                          <Tooltip
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
                             formatter={(value) => [
-                              `${value} ${t.analytics.records}`, 
+                              `${value} ${t.analytics.records}`,
                               t.analytics.mood
                             ]}
                             labelFormatter={(label) => `${t.analytics.level}: ${label}/10`}
                           />
-                        </PieChart>
-                      </ResponsiveContainer>
+                          <Bar dataKey="count" fill="#EC4899" name={t.analytics.moodRecords} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -851,29 +815,23 @@ export default function AnalyticsPage() {
                       </p>
                       <ScrollableChart height={300} minInnerWidth={insulinByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={insulinByDate}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <YAxis 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.numberOfInjections, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.numberOfInjections, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
-                            formatter={(value) => [
+                          <Tooltip
+                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                          formatter={(value) => [
                               `${value} ${t.analytics.injections}`, 
                               t.analytics.insulin
                             ]}
@@ -905,29 +863,23 @@ export default function AnalyticsPage() {
                       </p>
                       <ScrollableChart height={300} minInnerWidth={foodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={foodByDate}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <YAxis 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.numberOfMeals, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.numberOfMeals, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
-                            formatter={(value) => [
+                          <Tooltip
+                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                          formatter={(value) => [
                               `${value} ${t.analytics.meals}`, 
                               t.analytics.records
                             ]}
@@ -959,29 +911,23 @@ export default function AnalyticsPage() {
                       </p>
                       <ScrollableChart height={300} minInnerWidth={exerciseByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={exerciseByDate}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <YAxis 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.numberOfSessions, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.numberOfSessions, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
-                            formatter={(value) => [
+                          <Tooltip
+                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                          formatter={(value) => [
                               `${value} ${t.analytics.sessions}`, 
                               t.analytics.exercise
                             ]}
@@ -1013,29 +959,23 @@ export default function AnalyticsPage() {
                       </p>
                       <ScrollableChart height={300} minInnerWidth={moodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={moodByDate}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis 
                             dataKey="date" 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <YAxis 
-                            stroke="#9CA3AF" 
-                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                            label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                          tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#1e293b',
-                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }}
-                            itemStyle={{ color: '#1e293b' }}
-                            labelStyle={{ color: '#1e293b' }}
-                            formatter={(value) => [
+                          <Tooltip
+                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                          formatter={(value) => [
                               `${value} ${t.analytics.records}`, 
                               t.analytics.mood
                             ]}
