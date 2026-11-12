@@ -1,3 +1,55 @@
+/**
+ * Recuento por fecha cronológico: agrupa por milisegundo (orden real), genera
+ * la etiqueta localizada al final y descarta las filas con fecha inválida.
+ * Ordenar etiquetas ya localizadas no parsea degradando el orden al de
+ * inserción, así que la clave siempre es el ms de la fecha (MT38).
+ */
+export interface DailyCount {
+  readonly ms: number
+  readonly label: string
+  readonly count: number
+}
+
+export function countByDate<T>(
+  data: readonly T[],
+  timeOf: (row: T) => number,
+  labelOf: (ms: number) => string,
+): DailyCount[] {
+  const grouped = new Map<number, { label: string; count: number }>()
+  for (const row of data) {
+    const ms = timeOf(row)
+    if (!Number.isFinite(ms)) continue
+    const entry = grouped.get(ms) ?? { label: labelOf(ms), count: 0 }
+    entry.count++
+    grouped.set(ms, entry)
+  }
+
+  return [...grouped.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([ms, entry]) => ({ ms, label: entry.label, count: entry.count }))
+}
+
+/**
+ * Fusiona varios recuentos diarios en una sola serie cronológica: agrupa por
+ * ms y ordena por ms, nunca por etiqueta localizada.
+ */
+export function mergeDailyCounts(
+  series: ReadonlyArray<readonly DailyCount[]>,
+): DailyCount[] {
+  const merged = new Map<number, { label: string; count: number }>()
+  for (const rows of series) {
+    for (const row of rows) {
+      const entry = merged.get(row.ms) ?? { label: row.label, count: 0 }
+      entry.count += row.count
+      merged.set(row.ms, entry)
+    }
+  }
+
+  return [...merged.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([ms, entry]) => ({ ms, label: entry.label, count: entry.count }))
+}
+
 export interface NamedValue {
   readonly name: string
   readonly value: number
@@ -56,6 +108,59 @@ export function shouldLabelPieSlice(percent: number): boolean {
 /** Texto estándar de la etiqueta de un sector: "Rápida 66%". */
 export function pieLabelText(name: string, percent: number): string {
   return `${name} ${(percent * 100).toFixed(0)}%`
+}
+
+/**
+ * Cuenta registros por valor de un campo de tipo (p. ej. tipo de comida o de
+ * insulina). Los campos vacíos caen en el nombre de reserva (`noData`).
+ */
+export function countByField<T>(
+  data: readonly T[],
+  fieldOf: (row: T) => string,
+  fallbackName: string,
+): NamedValue[] {
+  const grouped = data.reduce<Record<string, number>>((acc, row) => {
+    const type = fieldOf(row) || fallbackName
+    acc[type] = (acc[type] ?? 0) + 1
+    return acc
+  }, {})
+
+  return Object.entries(grouped).map(([name, value]) => ({ name, value }))
+}
+
+/** Ordena valores nominales de mayor a menor (anti-patrón 14: barras sin orden). */
+export function sortByValueDescending(
+  entries: readonly NamedValue[],
+): NamedValue[] {
+  return [...entries].sort(byValueDescending)
+}
+
+export interface LevelCount {
+  readonly level: number
+  readonly count: number
+}
+
+/**
+ * Recuento de niveles ordinales completos (p. ej. ánimo 0-10): devuelve todos
+ * los niveles del rango en orden, incluso los que cuentan 0, para que la
+ * escala del eje sea la real y no la de los valores presentes (anti-patrón 16:
+ * usar el gráfico equivocado para la pregunta de distribución).
+ */
+export function countByLevel(
+  levels: readonly number[],
+  minLevel: number,
+  maxLevel: number,
+): LevelCount[] {
+  const counts = new Map<number, number>()
+  for (const level of levels) {
+    counts.set(level, (counts.get(level) ?? 0) + 1)
+  }
+
+  const ordered: LevelCount[] = []
+  for (let level = minLevel; level <= maxLevel; level++) {
+    ordered.push({ level, count: counts.get(level) ?? 0 })
+  }
+  return ordered
 }
 
 export interface DailyDoseSummary {

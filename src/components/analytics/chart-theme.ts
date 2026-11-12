@@ -10,9 +10,12 @@
  * son blancas/blanco-roto), con contraste verificado para ticks y etiquetas.
  */
 
+/** Color primario de la paleta (primera serie, azul de la app). */
+export const CHART_PRIMARY_COLOR = '#3B82F6' // blue-500
+
 /** Paleta categórica de series: ≤8 matices de luminosidad similar. */
 export const CHART_SERIES_COLORS = [
-  '#3B82F6', // blue-500
+  CHART_PRIMARY_COLOR,
   '#10B981', // emerald-500
   '#F59E0B', // amber-500
   '#EF4444', // red-500
@@ -61,7 +64,9 @@ export const CHART_TOOLTIP_LABEL_STYLE = { color: '#1e293b' } as const
 /** Color de la serie `index` (cíclico; la paleta tiene 8 matices). */
 export function seriesColor(index: number): string {
   const palette = CHART_SERIES_COLORS
-  return palette[((index % palette.length) + palette.length) % palette.length]
+  const offset =
+    ((index % palette.length) + palette.length) % palette.length
+  return palette[offset] ?? CHART_PRIMARY_COLOR
 }
 
 /** Etiqueta de eje Y rotada lista para el prop `label` de Recharts. */

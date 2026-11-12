@@ -1,0 +1,135 @@
+TABLERO: Dashboard Remaking
+Fecha: 2026-11-12
+Nota: Tanausu caído — tarjetas preparadas aquí para subir al MCP cuando responda.
+Etiqueta sugerida por tarjeta: [data-viz], [refactor], [test], [release]
+
+=== T01 — Auditoría de visualización con skills de data-viz ===
+Estado: pendiente
+Descripción:
+  Cargar las skills del harness (router data-visualization, charting,
+  dashboard-design) y auditar TODOS los gráficos del dashboard:
+  - src/app/analytics/page.tsx (área actividad general, pies insulina/ánimo,
+    barras por tipo, líneas de evolución)
+  - src/components/HRVCharts.tsx + kubios/HrvLineChart.tsx (vista personal)
+  - src/components/kubios/AdminKubiosCharts.tsx (vista admin MT42)
+  - src/components/StudyCharts.tsx (vista estudio)
+  Registrar hallazgos con file:line y anti-patrón citado por nombre
+  (grid oscuro sobre fondo claro #374151, doble eje Y en StudyCharts,
+  contraste de ticks #9CA3AF, tooltips sin estilo compartido, etc.).
+Criterios de aceptación:
+  - Documento de hallazgos con anti-patrones nombrados y archivo/línea.
+  - Router de data-visualization clasificado antes de elegir especialista.
+Dependencias: ninguna.
+
+=== T02 — Primitivas compartidas de gráficos (tokens + tooltip + tema) ===
+Estado: pendiente
+Descripción:
+  Extraer a un módulo de presentación de gráficos (p. ej.
+  src/components/analytics/chart-theme.ts + tooltip compartido) los estilos
+  repetidos en toda la app: colores de series, grid, ticks, Tooltip
+  contentStyle, etiquetas de eje. Un solo origen de verdad (SRP/DIP); las
+  páginas consumen los tokens en vez de hardcodear hex.
+  Mantener Recharts (ya en dependencias; regla: la librería del árbol gana).
+Criterios de aceptación:
+  - Tokens de color con rol (contexto, acento primario, comparación, alerta).
+  - Tooltip y estilos de eje reutilizables; sin hex duplicados por página.
+  - No rompe el estilo visual actual (mismo lenguaje: tarjetas redondeadas,
+    degradados suaves, espinas slate).
+Dependencias: T01.
+
+=== T03 — Analytics: corregir contraste y estilo de gráficos existentes ===
+Estado: pendiente
+Descripción:
+  En src/app/analytics/page.tsx:
+  - Grid con stroke #374151 (casi negro) sobre fondo blanco -> token de grid
+    claro legible.
+  - Ticks/etiquetas #9CA3AF por debajo del contraste razonable -> slate-500+.
+  - Área de actividad general: relleno con degradado suave, línea con
+    strokeWidth consistente, tooltip con desglose correcto.
+  - Barras: radios de esquina y color por tarjeta coherente con su cabecera.
+Criterios de aceptación:
+  - Todos los gráficos usan los tokens de T02.
+  - Captura/verificación visual de que nada se rompe en móvil (375px).
+Dependencias: T02.
+
+=== T04 — Analytics: repensar distribución de ánimo y pie de insulina ===
+Estado: pendiente
+Descripción:
+  - "Distribución de ánimo" es hoy un pie con niveles 1..10: distribución
+    ordinal -> cambiar a barras ordenadas por nivel (anti-patrón: pie con
+    demasiados sectores y orden no expresable en sectores).
+  - Pie de insulina: mantener (<=5 sectores + Otros ya agrupados) pero añadir
+    leyenda embebida y % directos legibles (PieSliceLabel ya existe).
+Criterios de aceptación:
+  - Barras de ánimo en orden 1..10 con todos los niveles presentes aunque
+    cuenten 0.
+  - El pie de insulina conserva el desplegable "Otros" (MT38) sin regresión.
+Dependencias: T02, T03.
+
+=== T05 — StudyCharts: eliminar doble eje y separar métricas ===
+Estado: pendiente
+Descripción:
+  src/components/StudyCharts.tsx dibuja ejercicio (min) y ánimo (1-10) en el
+  MISMO LineChart con dos YAxis (anti-patrón: dual-axis, escalas
+  incomparables). Separar en dos gráficos por participante (o small
+  multiples), uno por métrica, con estilo compartido de T02 y traducciones
+  del diccionario existente.
+Criterios de aceptación:
+  - Ningún gráfico con dos escalas Y independientes.
+  - Sin hover obligatorio para leer valores (dot + tooltip estilizado).
+  - aria-label actualizado a las nuevas secciones.
+Dependencias: T02.
+
+=== T06 — HRVCharts/HrvLineChart: línea de referencia y tooltip enriquecido ===
+Estado: pendiente
+Descripción:
+  Vista personal y admin comparten HrvLineChart. Mejoras:
+  - Línea de referencia punteada con la media de la serie (ReferenceLine).
+  - Tooltip con fecha completa localizada y unidades (ms, bpm, %).
+  - Dots más discretos cuando hay muchas mediciones (r dinámico).
+  - Mantener connectNulls={false} y dominio [0,100] de readiness.
+Criterios de aceptación:
+  - Mejora aplicada a ambas vistas (personal y admin MT42) sin duplicar código.
+  - Los huecos (null) siguen sin conectarse ni convertirse en 0.
+Dependencias: T02.
+
+=== T07 — Nueva gráfica: resumen semanal / sparklines en tarjetas ===
+Estado: pendiente
+Descripción:
+  Añadir una visual nueva de valor: p. ej. sparkline de readiness en la
+  tarjeta resumen de Kubios (KubiosSummaryCard) y/o mini-barras de actividad
+  de los últimos 7 días en Analytics. Criterio: debe responder una pregunta
+  con menos carga de lectura, no decorar.
+Criterios de aceptación:
+  - Sparkline accesible (aria-label descriptivo, alternativa textual).
+  - Reutiliza tokens de T02; no añade librerías nuevas.
+Dependencias: T02.
+
+=== T08 — Tests de integración de los gráficos nuevos/refactorizados ===
+Estado: pendiente
+Descripción:
+  Vitest para los componentes y transformaciones afectados:
+  - chart-theme: tokens y tooltip compartidos.
+  - Agrupaciones de ánimo 1..10 (orden y ceros).
+  - buildRows de HRV (huecos null intactos, orden cronológico).
+  - Smoke de render de los gráficos refactorizados (study, analytics, HRV).
+  Si vitest no cubre componentes con Recharts en este repo, documentar el
+  límite y cubrir con pruebas de la lógica pura + e2e Playwright existente.
+Criterios de aceptación:
+  - npm run check en verde (typecheck + lint + capas + test).
+Dependencias: T03-T07.
+
+=== T09 — Gitflow, release 0.2.0 y push a Vercel ===
+Estado: pendiente
+Descripción:
+  - Feature branches por microtarea sobre develop (gitflow).
+  - Merge a develop, release/codex-release-0.2.0 con verificación completa.
+  - Push final a rama codex/release/0.2.0 para que Vercel despliegue.
+Criterios de aceptación:
+  - Historial limpio por feature, sin commits directos en develop/release.
+  - CI local verde antes del push final.
+Dependencias: T08.
+
+---
+ORDEN DE EJECUCIÓN: T01 -> T02 -> (T03, T04, T05, T06, T07 en paralelo por
+feature branches) -> T08 -> T09.
