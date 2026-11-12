@@ -528,14 +528,7 @@ export default function DataPage() {
           <div className="absolute top-40 left-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-500"></div>
         </div>
         
-        <Navigation title={isIndividualUser ? t.dashboard.healthData : t.dashboard.healthData} showBackButton={true} />
-        {currentRole === 'admin' && (
-          <div className="relative z-10 mx-auto max-w-7xl px-4 pt-6">
-            <Link href="/admin/kubios" className="inline-flex rounded-xl bg-indigo-700 px-5 py-3 font-semibold text-white hover:bg-indigo-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700">
-              {t.navigation.adminKubios}
-            </Link>
-          </div>
-        )}
+        <Navigation title={t.dashboard.healthData} showBackButton={true} />
 
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8 xl:py-12 relative z-10">
           {/* Header con estad├¡sticas */}
