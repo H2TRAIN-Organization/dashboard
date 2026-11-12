@@ -174,7 +174,7 @@ Criterios de aceptación:
 Dependencias: ninguna.
 
 === T12 — "General Activity by Date" desplazable en ambos ejes ===
-Estado: pendiente
+Estado: hecho (rama feature/analytics-activity-scroll)
 Descripción:
   Envolber el AreaChart de actividad general en ScrollableChart
   (src/components/analytics/ScrollableChart.tsx ya soporta scroll X/Y) con
