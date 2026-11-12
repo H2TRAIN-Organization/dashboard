@@ -1,0 +1,16 @@
+$kind: http-request
+name: '14e-admin-export'
+method: GET
+url: '{{baseUrl}}/api/admin/database/export?table=insulindata&format=json'
+order: 14500
+headers:
+  - key: Cookie
+    value: '{{admin_cookie}}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('expected status', () => pm.response.to.have.status(200));
+      pm.test('contract', () => pm.expect(pm.response.json().content).to.be.a('string'));
+    language: text/javascript
+settings:
+  disableCookies: true

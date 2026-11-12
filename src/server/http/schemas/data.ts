@@ -19,7 +19,7 @@ const dateFilterSchema = z
 
 export const decryptedDataQuerySchema = z.strictObject({
   selectedUser: z.string().trim().min(1).max(128).default("all"),
-  timeRange: z.enum(["7d", "30d", "90d", "all"]).default("30d"),
+  timeRange: z.enum(["7d", "30d", "90d", "365d", "all"]).default("30d"),
   selectedDataType: z
     .enum(["all", "insulin", "food", "exercise", "period", "mood"])
     .default("all"),

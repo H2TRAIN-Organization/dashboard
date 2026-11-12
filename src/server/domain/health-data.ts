@@ -9,7 +9,7 @@ export const DATA_TYPES = [
 
 export type DataType = (typeof DATA_TYPES)[number];
 
-export const TIME_RANGES = ["7d", "30d", "90d", "all"] as const;
+export const TIME_RANGES = ["7d", "30d", "90d", "365d", "all"] as const;
 
 export type TimeRange = (typeof TIME_RANGES)[number];
 
@@ -83,6 +83,8 @@ export function daysForTimeRange(range: TimeRange): number | null {
       return 30;
     case "90d":
       return 90;
+    case "365d":
+      return 365;
     case "all":
       return null;
   }

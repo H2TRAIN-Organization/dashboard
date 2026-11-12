@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -6,6 +6,7 @@ import { AppAuthProvider } from "@/contexts/AppAuthContext";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import GlobalLanguageSelector from "@/components/GlobalLanguageSelector";
+import PrivacyBoundary from '@/components/privacy/PrivacyBoundary';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,6 +19,9 @@ export const metadata: Metadata = {
     shortcut: '/favicon.svg',
     apple: '/favicon.svg',
   },
+};
+
+export const viewport: Viewport = {
   themeColor: '#2563EB',
 };
 
@@ -33,7 +37,7 @@ export default function RootLayout({
           <SessionProvider>
             <AuthProvider>
               <AppAuthProvider>
-                {children}
+                <PrivacyBoundary>{children}</PrivacyBoundary>
                 <GlobalLanguageSelector />
               </AppAuthProvider>
             </AuthProvider>

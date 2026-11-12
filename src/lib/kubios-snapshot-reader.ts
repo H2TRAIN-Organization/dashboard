@@ -8,6 +8,7 @@ import {
   type KubiosCsvResult,
   type KubiosCsvRow
 } from './kubios-csv'
+import { normalizeSnapshotRow } from './kubios-snapshot-shape'
 
 /**
  * K50 - Lógica pura de `GET /api/kubios/me`,
@@ -120,8 +121,14 @@ export interface KubiosMeBody {
 }
 
 /** Cuerpo de error genérico, sin detalle ni datos de la petición. */
+export interface KubiosPrivacyError { readonly code: 'PRIVACY_ACTION_REQUIRED'; readonly message: string }
+
+function privacyResponse() {
+  return { status: 403, body: { error: { code: 'PRIVACY_ACTION_REQUIRED' as const, message: 'Debes leer y aceptar la politica de privacidad' } }, headers: { 'Cache-Control': CACHE_CONTROL_NO_STORE } }
+}
+
 export interface KubiosMeErrorBody {
-  readonly error: 'unauthorized' | 'unavailable'
+  readonly error: KubiosPrivacyError | 'unauthorized' | 'unavailable'
 }
 
 /** Resultado plano que el adaptador convierte en `NextResponse`. */
@@ -305,7 +312,10 @@ function parseSnapshotRow(row: unknown): ValidSnapshotRow | null {
 
 /**
  * Parsea el texto plano descifrado como JSON estricto con forma
- * `{ results: object[] }`. Se descartan los campos extra del objeto raíz.
+ * `{ results: object[] }`. Se descartan los campos extra del objeto raíz y
+ * cada fila se normaliza a la forma canónica (`kubios-snapshot-shape`), de
+ * modo que la vista personal y la administrativa interpreten el mismo
+ * snapshot legado de la misma manera.
  */
 function parseSnapshotPayload(plaintext: string): Record<string, unknown>[] | null {
   let parsed: unknown
@@ -326,7 +336,7 @@ function parseSnapshotPayload(plaintext: string): Record<string, unknown>[] | nu
       return null
     }
 
-    results.push(item)
+    results.push(normalizeSnapshotRow(item))
   }
 
   return results
@@ -459,7 +469,7 @@ function readSnapshotEnvelope(response: unknown): SnapshotEnvelope | null {
 /** Resultado de resolver la identidad sin lanzar hacia el adaptador. */
 type ResolvedRequestIdentity =
   | { readonly ok: true; readonly identity: KubiosMeIdentity }
-  | { readonly ok: false; readonly status: 401 | 503 }
+  | { readonly ok: false; readonly status: 401 | 403 | 503 }
 
 /**
  * Extrae el token de sesión y resuelve la identidad. Un token ausente o vacío
@@ -478,6 +488,7 @@ async function resolveRequestIdentity(
     const identity = await deps.resolveIdentity(sessionToken)
     return { ok: true, identity }
   } catch (error) {
+    if (isRecord(error) && error.code === 'PRIVACY_ACTION_REQUIRED' && error.statusCode === 403) return { ok: false, status: 403 }
     return { ok: false, status: authErrorStatus(error) === 401 ? 401 : 503 }
   }
 }
@@ -573,6 +584,7 @@ export async function handleKubiosMeRequest(
 ): Promise<KubiosMeResult> {
   const resolved = await resolveRequestIdentity(requestLike, deps)
   if (!resolved.ok) {
+    if (resolved.status === 403) return privacyResponse()
     return resolved.status === 401 ? unauthorizedResponse() : unavailableResponse()
   }
 
@@ -657,7 +669,7 @@ export interface KubiosHrvResultsBody {
 
 /** Cuerpo de error genérico, sin detalle ni datos de la petición. */
 export interface KubiosHrvResultsErrorBody {
-  readonly error: 'unauthorized' | 'unavailable' | 'invalid_query'
+  readonly error: KubiosPrivacyError | 'unauthorized' | 'unavailable' | 'invalid_query'
 }
 
 /** Resultado plano que el adaptador convierte en `NextResponse`. */
@@ -949,6 +961,7 @@ export async function handleKubiosHrvResultsRequest(
 ): Promise<KubiosHrvResultsResult> {
   const resolved = await resolveRequestIdentity(requestLike, deps)
   if (!resolved.ok) {
+    if (resolved.status === 403) return privacyResponse()
     return resolved.status === 401
       ? hrvResultsError(401, 'unauthorized')
       : hrvResultsError(503, 'unavailable')
@@ -1010,7 +1023,7 @@ const CSV_HEADERS_BASE: Readonly<Record<string, string>> = {
 
 /** Cuerpo de error del export; nunca incluye detalles ni identificadores. */
 export interface KubiosExportErrorBody {
-  readonly error: 'unauthorized' | 'unavailable' | 'invalid_query'
+  readonly error: KubiosPrivacyError | 'unauthorized' | 'unavailable' | 'invalid_query'
 }
 
 /** Resultado plano del export; el adaptador decide texto o JSON. */
@@ -1077,6 +1090,7 @@ export async function handleKubiosExportRequest(
 ): Promise<KubiosExportResult> {
   const resolved = await resolveRequestIdentity(requestLike, deps)
   if (!resolved.ok) {
+    if (resolved.status === 403) return privacyResponse()
     return resolved.status === 401
       ? exportError(401, 'unauthorized')
       : exportError(503, 'unavailable')

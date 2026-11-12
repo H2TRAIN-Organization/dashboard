@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthUseCases } from "@/server/application/auth/auth-use-cases";
 import { createDataUseCases } from "@/server/application/data/data-use-cases";
 import { ValidationError } from "@/server/domain/errors";
+import { PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from "@/server/domain/privacy";
 import type { Session } from "@/server/domain/session";
 import {
   extractRequestId,
@@ -250,6 +251,11 @@ describe("sanitized server error diagnostics", () => {
       token: "admin-session",
       method: "username",
       expiresAt: "2026-12-31T23:59:59.000Z",
+      privacy: {
+        policyVersion: PRIVACY_POLICY_VERSION,
+        policyHash: PRIVACY_POLICY_HASH,
+        state: "complete",
+      },
     };
     const auth: AuthUseCases = {
       login: async () => session,

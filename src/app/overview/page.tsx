@@ -6,11 +6,13 @@ import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
 import { Users, Activity, TrendingUp, AlertTriangle, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Database, Target } from 'lucide-react'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
+import PieSliceLabel from '@/components/analytics/PieSliceLabel'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridNavigation from '@/components/HybridNavigation'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { hasAnyRecords } from '@/components/dashboard-shell/metrics'
+import { finiteAverage, latestValidDate } from '@/lib/number-stats'
 
 interface ActivityRecord {
   date_time?: string
@@ -123,18 +125,14 @@ export default function OverviewPage() {
         return isRecentlyActive(allUserData, now)
       }).length,
 
-      // Promedios
-      avgInsulinDose: insulinData.length > 0
-        ? Math.round(insulinData.reduce((sum, item) => sum + parseFloat(item.dose || '0'), 0) / insulinData.length * 10) / 10
-        : 0,
-      avgCarbs: foodData.length > 0
-        ? Math.round(foodData.reduce((sum, item) => sum + parseFloat(item.carbs || '0'), 0) / foodData.length * 10) / 10
-        : 0,
-      avgMood: moodData.length > 0
-        ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(String(item.mood_value ?? 0)), 0) / moodData.length * 10) / 10
-        : 0,
+      // Promedios: los parseos tolerantes evitan el NaN de registros con
+      // campos numéricos vacíos o no numéricos (MT41).
+      avgInsulinDose: finiteAverage(insulinData.map((item) => item.dose)) ?? 0,
+      avgCarbs: finiteAverage(foodData.map((item) => item.carbs)) ?? 0,
+      avgMood: finiteAverage(moodData.map((item) => item.mood_value)) ?? 0,
 
-      // Última actividad del sistema
+      // Última actividad del sistema: solo fechas válidas participan del
+      // máximo, una marca de tiempo rota ya no invalida la métrica.
       lastActivity: null as Date | null
     }
 
@@ -147,9 +145,7 @@ export default function OverviewPage() {
       ...moodData.map(d => new Date(d.date_time))
     ]
 
-    if (allDates.length > 0) {
-      stats.lastActivity = new Date(Math.max(...allDates.map(d => d.getTime())))
-    }
+    stats.lastActivity = latestValidDate(allDates)
 
     return stats
   }, [insulinData, foodData, exerciseData, periodData, moodData, users, now])
@@ -536,7 +532,7 @@ export default function OverviewPage() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                        label={<PieSliceLabel />}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"

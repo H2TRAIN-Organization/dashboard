@@ -100,6 +100,9 @@ export default function SimpleNavigation({ title, showBackButton = true }: Simpl
           </div>
         </div>
       </div>
+      <div className="relative mx-auto max-w-7xl px-4 pb-3 text-sm text-white">
+        <Link href="/privacy" className="underline underline-offset-4">{t.navigation.privacy}</Link>
+      </div>
     </div>
   )
 }

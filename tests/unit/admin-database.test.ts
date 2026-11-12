@@ -30,6 +30,8 @@ describe("admin database use cases", () => {
     expect(result.totalRecords).toBe(3);
     expect(result.totalCount).toBe(2);
     expect(result.accessibleCount).toBe(1);
+    expect(result.status).toBe("partial");
+    expect(Number.isFinite(Date.parse(result.observedAt ?? ""))).toBe(true);
   });
 
   it("rejects unsafe table names and out-of-range limits", async () => {
@@ -52,5 +54,18 @@ describe("admin database use cases", () => {
     expect(page.returnedRecords).toBe(1);
     expect(page.totalRecords).toBe(2);
     expect(page.limit).toBe(1);
+    expect(page.offset).toBe(0);
+    expect(page.hasMore).toBe(true);
+    const next = await useCases.getTableData(adminActor, "users", 1, 1);
+    expect(next.data).toEqual([{ UserID: 2 }]);
+    expect(next.hasMore).toBe(false);
+    await expect(useCases.getTableData(adminActor, "users", 1, -1)).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it("reports failed and complete observations from actual availability", async () => {
+    const failed = createAdminDatabaseUseCases(new InMemoryAdminDatabaseRepository({ users: { records: [], accessible: false } }));
+    expect((await failed.listTables(adminActor)).status).toBe("failed");
+    const complete = createAdminDatabaseUseCases(new InMemoryAdminDatabaseRepository({ users: { records: [] } }));
+    expect((await complete.listTables(adminActor)).status).toBe("complete");
   });
 });

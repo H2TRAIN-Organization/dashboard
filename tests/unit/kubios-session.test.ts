@@ -1,3 +1,4 @@
+import { initialPrivacyStatus } from '@/server/domain/privacy'
 import { NextRequest } from 'next/server'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -299,7 +300,7 @@ describe('K50 composition with getServerRuntime', () => {
   }
 
   it('uses the runtime session method and the lazy service factory', async () => {
-    const getSession = vi.fn(async () => ({ user: { id: String(USER_A) } }))
+    const getSession = vi.fn(async () => ({ user: { id: String(USER_A) }, privacy: { ...initialPrivacyStatus(), state: 'complete' as const } }))
     const rpc = vi.fn(async () => ({ data: [linkRow()], error: null }))
     const createService = vi.fn((): KubiosRpcClient => ({ rpc }))
     const getRuntime = vi.fn(async () => fakeApplication(getSession))

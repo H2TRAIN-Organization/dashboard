@@ -1,10 +1,10 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, Eye, EyeOff, Database, type LucideIcon } from 'lucide-react'
+import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronFirst, ChevronLast, Database, Trash2, type LucideIcon } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import CalendarDatePicker from '@/components/calendar/CalendarDatePicker'
@@ -18,7 +18,20 @@ import {
   healthCsvFilename,
   type HealthDataCategory,
 } from '@/lib/health-csv'
-import { isUserGroupExpanded, usersForRecordGroups, visibleMetricCards } from '@/lib/dashboard-data'
+import {
+  DEFAULT_RECORDS_PAGE_SIZE,
+  RECORDS_PAGE_SIZES,
+  clampUsersPage,
+  isRecordsPageSize,
+  isUserGroupExpanded,
+  usersForRecordGroups,
+  usersOffset,
+  usersRange,
+  usersTotalPages,
+  visibleMetricCards,
+} from '@/lib/dashboard-data'
+import { RecordPillList } from './record-pill'
+import type { HealthRecordType } from './record-pill'
 
 // Errors raised locally use a translation key so the visible text follows the
 // language selector; backend errors are shown unchanged.
@@ -45,7 +58,10 @@ export default function DataPage() {
   const [timeRange, setTimeRange] = useState<string>('all')
   const [selectedDataType, setSelectedDataType] = useState<string>('all')
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())
-  const [showAllRecords, setShowAllRecords] = useState<Set<string>>(new Set())
+  // MT35: records are paginated instead of the old "view all" toggle.
+  // The size is shared by every record group; the current page is per group.
+  const [recordsPageSize, setRecordsPageSize] = useState<number>(DEFAULT_RECORDS_PAGE_SIZE)
+  const [recordPages, setRecordPages] = useState<Record<string, number>>({})
   const [usersError, setUsersError] = useState<string | null>(null)
   const [usersLoading, setUsersLoading] = useState(true)
   
@@ -94,6 +110,8 @@ export default function DataPage() {
       setLoading(true)
       setLoadingProgress(0)
       setError(null)
+      // New filters reload the record set; old page numbers no longer apply.
+      setRecordPages({})
       // A new filter/account must not retain the previous owner's records if
       // its request later fails or times out.
       setInsulinData([])
@@ -224,14 +242,15 @@ export default function DataPage() {
     setExpandedUsers(newExpanded)
   }
 
-  const toggleShowAllRecords = (userId: string) => {
-    const newShowAll = new Set(showAllRecords)
-    if (newShowAll.has(userId)) {
-      newShowAll.delete(userId)
-    } else {
-      newShowAll.add(userId)
-    }
-    setShowAllRecords(newShowAll)
+  const changeRecordsPageSize = (nextSize: number) => {
+    if (!isRecordsPageSize(nextSize)) return
+    setRecordsPageSize(nextSize)
+    // Every group restarts from its first page with the new size.
+    setRecordPages({})
+  }
+
+  const goToRecordPage = (pageKey: string, page: number) => {
+    setRecordPages((previous) => ({ ...previous, [pageKey]: page }))
   }
 
   const clearFilters = () => {
@@ -276,7 +295,7 @@ export default function DataPage() {
     window.URL.revokeObjectURL(url)
   }
 
-  // Estadísticas de los datos
+  // Estad├¡sticas de los datos
   const stats = {
     totalInsulin: insulinData.length,
     totalFood: foodData.length,
@@ -382,7 +401,7 @@ export default function DataPage() {
       lastActivity: null as Date | null
     }
 
-    // Encontrar la actividad más reciente
+    // Encontrar la actividad m├ís reciente
     const allDates = [
       ...userInsulin.map(d => new Date(d.date_time)),
       ...userFood.map(d => new Date(d.date_time)),
@@ -406,111 +425,103 @@ export default function DataPage() {
     }
   }).filter(group => group.stats.totalRecords > 0)
 
-  const getDataTypeIcon = (type: string) => {
-    switch (type) {
-      case 'insulin': return <Pill className="h-4 w-4" />
-      case 'food': return <Utensils className="h-4 w-4" />
-      case 'exercise': return <Dumbbell className="h-4 w-4" />
-      case 'period': return <CalendarDays className="h-4 w-4" />
-      case 'mood': return <Smile className="h-4 w-4" />
-      default: return <Activity className="h-4 w-4" />
-    }
-  }
-
+  /**
+   * MT34/MT35: records render as compact pills with type-specific details,
+   * paginated by page size instead of the old "view all" expansion. The page
+   * key combines the owner group and the data type so every section keeps
+   * its own position.
+   */
   const renderDataRecords = (
     data: Array<InsulinData | FoodData | ExerciseData | PeriodRecord | MoodData>,
-    type: string,
-    maxRecords: number = 2,
+    type: HealthRecordType,
+    pageKey: string,
   ) => {
-    const recordsToShow = showAllRecords.has(type) ? data : data.slice(0, maxRecords)
-    
-    const getTypeColors = (type: string) => {
-      switch (type) {
-        case 'insulin': return { bg: 'from-blue-50 to-blue-100', border: 'border-blue-200', text: 'text-blue-600', icon: 'from-blue-500 to-blue-600' }
-        case 'food': return { bg: 'from-green-50 to-green-100', border: 'border-green-200', text: 'text-green-600', icon: 'from-green-500 to-green-600' }
-        case 'exercise': return { bg: 'from-orange-50 to-orange-100', border: 'border-orange-200', text: 'text-orange-600', icon: 'from-orange-500 to-orange-600' }
-        case 'period': return { bg: 'from-purple-50 to-purple-100', border: 'border-purple-200', text: 'text-purple-600', icon: 'from-purple-500 to-purple-600' }
-        case 'mood': return { bg: 'from-pink-50 to-pink-100', border: 'border-pink-200', text: 'text-pink-600', icon: 'from-pink-500 to-pink-600' }
-        default: return { bg: 'from-gray-50 to-gray-100', border: 'border-gray-200', text: 'text-gray-600', icon: 'from-gray-500 to-gray-600' }
-      }
-    }
-    
-    const colors = getTypeColors(type)
-    
+    const total = data.length
+    const totalPages = usersTotalPages(total, recordsPageSize)
+    const currentPage = clampUsersPage(
+      recordPages[pageKey] ?? 1,
+      total,
+      recordsPageSize,
+    )
+    const range = usersRange(total, currentPage, recordsPageSize)
+    const pageStart = usersOffset(currentPage, recordsPageSize)
+    const pageRecords = data.slice(pageStart, pageStart + recordsPageSize)
+
     return (
-      <div className="space-y-4">
-        {recordsToShow.map((item) => (
-          <div key={item.id} className={`bg-gradient-to-br ${colors.bg} backdrop-blur-sm border ${colors.border} rounded-xl p-4`}>
-            <div className="flex items-center justify-between mb-3">
-              <span className={`inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full ${colors.text} bg-gradient-to-r ${colors.icon} text-white`}>
-                {getDataTypeIcon(type)}
-                <span className="ml-2">
-                  {type === 'insulin' ? t.dashboard.insulin :
-                   type === 'food' ? t.dashboard.meals :
-                   type === 'exercise' ? t.dashboard.exercise :
-                   type === 'period' ? t.dashboard.periods : t.dashboard.mood}
-                </span>
+      <div className="space-y-3">
+        <RecordPillList records={pageRecords} type={type} locale={locale} t={t} />
+
+        {totalPages > 1 && (
+          <div className="flex flex-col gap-3 border-t border-gray-200 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-gray-700 sm:text-sm" aria-live="polite">
+              {range.from}-{range.to} / {total}
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <label
+                htmlFor={`records-page-size-${pageKey}`}
+                className="text-xs text-gray-700 sm:text-sm"
+              >
+                {t.dashboard.rowsPerPage}
+              </label>
+              <select
+                id={`records-page-size-${pageKey}`}
+                value={recordsPageSize}
+                onChange={(event) =>
+                  changeRecordsPageSize(Number(event.target.value))
+                }
+                className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+              >
+                {RECORDS_PAGE_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => goToRecordPage(pageKey, 1)}
+                disabled={currentPage <= 1}
+                aria-label={t.common.firstPage}
+                title={t.common.firstPage}
+                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronFirst className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => goToRecordPage(pageKey, currentPage - 1)}
+                disabled={currentPage <= 1}
+                aria-label={t.common.previous}
+                title={t.common.previous}
+                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-[56px] text-center text-sm font-semibold text-gray-800">
+                {currentPage} / {totalPages}
               </span>
-              <span className="text-sm text-gray-600">
-                {new Date(item.date_time || ('startDate' in item ? item.startDate : '')).toLocaleDateString(locale)}
-              </span>
-            </div>
-            <div className="text-sm text-gray-800">
-              {type === 'insulin' && 'insulinType' in item && (
-                <>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.type}:</strong> <span className="text-gray-700">{item.insulinType}</span></p>
-                  <p><strong className="text-gray-900">{t.dashboard.dose}:</strong> <span className="text-gray-700">{item.dose}</span></p>
-                </>
-              )}
-              {type === 'food' && 'food_type' in item && (
-                <>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.type}:</strong> <span className="text-gray-700">{item.food_type}</span></p>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.quantity}:</strong> <span className="text-gray-700">{item.quantity}</span></p>
-                  <p><strong className="text-gray-900">{t.dashboard.carbs}:</strong> <span className="text-gray-700">{item.carbs}</span></p>
-                </>
-              )}
-              {type === 'exercise' && 'exercise_type' in item && (
-                <>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.type}:</strong> <span className="text-gray-700">{item.exercise_type}</span></p>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.intensity}:</strong> <span className="text-gray-700">{item.intensity}</span></p>
-                  <p><strong className="text-gray-900">{t.dashboard.description}:</strong> <span className="text-gray-700">{item.exercise_description}</span></p>
-                </>
-              )}
-              {type === 'period' && 'symptoms' in item && (
-                <>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.intensity}:</strong> <span className="text-gray-700">{item.intensity}</span></p>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.symptoms}:</strong> <span className="text-gray-700">{Array.isArray(item.symptoms) ? item.symptoms.join(', ') : item.symptoms}</span></p>
-                  <p><strong className="text-gray-900">{t.dashboard.notes}:</strong> <span className="text-gray-700">{item.notes}</span></p>
-                </>
-              )}
-              {type === 'mood' && 'emotions' in item && (
-                <>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.value}:</strong> <span className="text-gray-700">{item.mood_value}/10</span></p>
-                  <p className="mb-1"><strong className="text-gray-900">{t.dashboard.outOfRoutine}:</strong> <span className="text-gray-700">{item.out_of_routine ? t.dashboard.yes : t.dashboard.no}</span></p>
-                  <p><strong className="text-gray-900">{t.dashboard.emotions}:</strong> <span className="text-gray-700">{Array.isArray(item.emotions) ? item.emotions.join(', ') : item.emotions}</span></p>
-                </>
-              )}
+              <button
+                type="button"
+                onClick={() => goToRecordPage(pageKey, currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                aria-label={t.common.next}
+                title={t.common.next}
+                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => goToRecordPage(pageKey, totalPages)}
+                disabled={currentPage >= totalPages}
+                aria-label={t.common.lastPage}
+                title={t.common.lastPage}
+                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronLast className="h-4 w-4" />
+              </button>
             </div>
           </div>
-        ))}
-        
-        {data.length > maxRecords && (
-          <button
-            onClick={() => toggleShowAllRecords(type)}
-            className="w-full text-center text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 border border-blue-200 rounded-xl hover:from-blue-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105 flex items-center justify-center"
-          >
-            {showAllRecords.has(type) ? (
-              <>
-                <EyeOff className="h-4 w-4 mr-2" />
-                {t.dashboard.showLess}
-              </>
-            ) : (
-              <>
-                <Eye className="h-4 w-4 mr-2" />
-                {t.dashboard.viewAll} {data.length} {t.dashboard.records2}
-              </>
-            )}
-          </button>
         )}
       </div>
     )
@@ -526,10 +537,10 @@ export default function DataPage() {
           <div className="absolute top-40 left-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-500"></div>
         </div>
         
-        <Navigation title={isIndividualUser ? t.dashboard.healthData : t.dashboard.healthData} showBackButton={true} />
-        
+        <Navigation title={t.dashboard.healthData} showBackButton={true} />
+
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8 xl:py-12 relative z-10">
-          {/* Header con estadísticas */}
+          {/* Header con estad├¡sticas */}
           <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-10 mb-6 sm:mb-12 overflow-hidden shadow-2xl">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 sm:mb-8 space-y-4 lg:space-y-0">
@@ -542,7 +553,7 @@ export default function DataPage() {
                     <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900">
                       {t.dashboard.healthData}
                     </h2>
-                    <p className="text-gray-600 text-sm sm:text-base lg:text-xl font-light">{t.dashboard.healthDataDescription}</p>
+                    <p className="text-gray-600 text-sm sm:text-base lg:text-xl font-light max-w-xl lg:pr-6">{t.dashboard.healthDataDescription}</p>
                   </div>
                 </div>
               </div>
@@ -577,7 +588,7 @@ export default function DataPage() {
             </div>
           )}
 
-          {/* Estadísticas generales: solo roles privilegiados y solo categorías
+          {/* Estad├¡sticas generales: solo roles privilegiados y solo categor├¡as
               con datos tras terminar la carga (DR09/DR12). */}
           {!isIndividualUser && !loading && !error && metricCards.length > 0 && (
             <div className="mb-8 sm:mb-12">
@@ -617,7 +628,7 @@ export default function DataPage() {
                   onClick={clearFilters}
                   className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105 flex items-center"
                 >
-                  <span className="mr-1 sm:mr-2">🗑️</span>
+                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
                   {t.dashboard.clearFilters}
                 </button>
               </div>
@@ -785,8 +796,8 @@ export default function DataPage() {
                     {isExpanded && (
                       <div className="relative z-10 p-4 sm:p-6 lg:p-8">
                         {/* Resumen por tipo de dato: el usuario normal ve sus
-                            categorías directamente y sin resumen redundante
-                            (DR09); las tarjetas vacías no se muestran (DR12). */}
+                            categor├¡as directamente y sin resumen redundante
+                            (DR09); las tarjetas vac├¡as no se muestran (DR12). */}
                         {!isIndividualUser && group.stats.totalRecords > 0 && (
                           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
                             {group.stats.insulinCount > 0 && (
@@ -848,7 +859,7 @@ export default function DataPage() {
                                 </div>
                                 {t.dashboard.insulinData} ({group.insulin.length} {t.dashboard.records})
                               </h4>
-                              {renderDataRecords(group.insulin, 'insulin')}
+                              {renderDataRecords(group.insulin, 'insulin', `${group.user.UserID}:insulin`)}
                             </div>
                           )}
 
@@ -861,7 +872,7 @@ export default function DataPage() {
                                 </div>
                                 {t.dashboard.food} ({group.food.length} {t.dashboard.records})
                               </h4>
-                              {renderDataRecords(group.food, 'food')}
+                              {renderDataRecords(group.food, 'food', `${group.user.UserID}:food`)}
                             </div>
                           )}
 
@@ -874,11 +885,11 @@ export default function DataPage() {
                                 </div>
                                 {t.dashboard.exercise} ({group.exercise.length} {t.dashboard.records})
                               </h4>
-                              {renderDataRecords(group.exercise, 'exercise')}
+                              {renderDataRecords(group.exercise, 'exercise', `${group.user.UserID}:exercise`)}
                             </div>
                           )}
 
-                          {/* Períodos */}
+                          {/* Per├¡odos */}
                           {group.periods.length > 0 && (
                             <div>
                               <h4 className="text-base sm:text-lg font-bold text-purple-900 mb-3 sm:mb-4 flex items-center">
@@ -887,11 +898,11 @@ export default function DataPage() {
                                 </div>
                                 {t.dashboard.periods} ({group.periods.length} {t.dashboard.records})
                               </h4>
-                              {renderDataRecords(group.periods, 'period')}
+                              {renderDataRecords(group.periods, 'period', `${group.user.UserID}:period`)}
                             </div>
                           )}
 
-                          {/* Estado de ánimo */}
+                          {/* Estado de ├ínimo */}
                           {group.mood.length > 0 && (
                             <div>
                               <h4 className="text-base sm:text-lg font-bold text-pink-900 mb-3 sm:mb-4 flex items-center">
@@ -900,7 +911,7 @@ export default function DataPage() {
                                 </div>
                                 {t.dashboard.mood} ({group.mood.length} {t.dashboard.records})
                               </h4>
-                              {renderDataRecords(group.mood, 'mood')}
+                              {renderDataRecords(group.mood, 'mood', `${group.user.UserID}:mood`)}
                             </div>
                           )}
                         </div>

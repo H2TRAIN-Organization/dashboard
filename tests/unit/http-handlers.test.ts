@@ -1,3 +1,4 @@
+import { initialPrivacyStatus } from '@/server/domain/privacy';
 import { describe, expect, it } from "vitest";
 import { createAdminDatabaseUseCases } from "@/server/application/admin/admin-database-use-cases";
 import { createAuthUseCases } from "@/server/application/auth/auth-use-cases";
@@ -78,7 +79,7 @@ function setup() {
       expiresAt: "2026-12-31T23:59:59.000Z",
     },
   ];
-  const auth = createAuthUseCases(new TestAuthGateway(accounts));
+  const auth = createAuthUseCases(new TestAuthGateway(accounts.map(account => ({ ...account, privacy: { ...initialPrivacyStatus(), state: 'complete' } }))));
   const users = createUserUseCases(
     new InMemoryUserRepository([admin, doctor, user, allUser, legacyEmailUser]),
     new InMemoryUserDataPresence(),

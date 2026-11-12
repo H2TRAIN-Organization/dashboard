@@ -2,6 +2,7 @@ import { canReadAdminDatabase } from "@/server/domain/access-policy";
 import {
   assertSafeTableName,
   assertTableLimit,
+  assertTableOffset,
   type DatabaseTablePage,
   type DatabaseTablesResult,
 } from "@/server/domain/admin-database";
@@ -15,6 +16,7 @@ export interface AdminDatabaseUseCases {
     actor: ActiveActor,
     tableName: string,
     limit: number,
+    offset?: number,
   ): Promise<DatabaseTablePage>;
 }
 
@@ -30,18 +32,21 @@ export function createAdminDatabaseUseCases(
   return {
     async listTables(actor: ActiveActor): Promise<DatabaseTablesResult> {
       assertDatabaseReader(actor);
-      return repository.listTables();
+      const result = await repository.listTables();
+      return { ...result, observedAt: new Date().toISOString(), status: result.accessibleCount === result.totalCount ? "complete" : result.accessibleCount === 0 ? "failed" : "partial" };
     },
 
     async getTableData(
       actor: ActiveActor,
       tableName: string,
       limit: number,
+      offset = 0,
     ): Promise<DatabaseTablePage> {
       assertDatabaseReader(actor);
       assertSafeTableName(tableName);
       assertTableLimit(limit);
-      return repository.getTableData(tableName, limit);
+      assertTableOffset(offset);
+      return repository.getTableData(tableName, limit, offset);
     },
   };
 }

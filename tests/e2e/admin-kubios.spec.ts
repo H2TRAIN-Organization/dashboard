@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from './support/language'
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from "../../src/lib/privacy-policy";
 
 /**
  * UI de la vista administrativa de Kubios.
@@ -58,6 +59,7 @@ function sessionBody(role: Role, username: string) {
     },
     method: "email" as const,
     expiresAt: "2026-12-01T00:00:00.000Z",
+    privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: "complete" },
   };
 }
 
@@ -1020,5 +1022,150 @@ test.describe("Admin Kubios overview", () => {
       };
     });
     expect(scroller.scrollWidth).toBeGreaterThan(scroller.clientWidth);
+  });
+
+  test("the participant sync button refreshes a frozen cached copy", async ({ page }) => {
+    await mockSession(page);
+    await mockParticipantPages(page, [
+      participantsPage([{ userId: 1, username: "alice" }], null),
+    ]);
+    let measurementLoads = 0;
+    await page.route("**/api/admin/kubios/measurements*", (route) => {
+      measurementLoads += 1;
+      return route.fulfill({
+        json: measurementsPage(
+          [
+            measurementRow(1, "alice", {
+              measuredTimestamp: "2026-10-30T13:11:00.000Z",
+              status: "stale",
+            }),
+          ],
+          { status: "stale" },
+        ),
+      });
+    });
+    const syncRequests: Array<Record<string, unknown> | undefined> = [];
+    await page.route("**/api/admin/kubios/participants/1/sync", async (route) => {
+      syncRequests.push(route.request().postDataJSON());
+      return route.fulfill({
+        json: { status: "ok", memberSynced: true, synced: 1, failed: 0 },
+      });
+    });
+
+    await page.goto("/admin/kubios");
+
+    // Selección 'Todos': sin botón individual y sin refresco posible.
+    await expect(page.getByTestId("admin-kubios-sync")).toHaveCount(0);
+
+    await expect(page.getByTestId("admin-kubios-row")).toContainText("alice");
+    const initialLoads = measurementLoads;
+    await selectParticipant(page, "alice");
+
+    const button = page.getByTestId("admin-kubios-sync");
+    await expect(button).toBeVisible();
+    const loadsAtClick = measurementLoads;
+    await button.click();
+    await expect(page.getByTestId("admin-kubios-sync-message")).toBeVisible();
+    await expect(page.getByTestId("admin-kubios-sync-message")).toContainText(
+      "Copia sincronizada con Kubios",
+    );
+
+    // La vista se recarga tras el refresco para enseñar la copia nueva.
+    expect(syncRequests).toHaveLength(1);
+    expect(measurementLoads).toBeGreaterThan(loadsAtClick);
+    void initialLoads;
+  });
+
+  test("the sync button answers honestly when another worker holds the turn", async ({ page }) => {
+    await mockSession(page);
+    await mockParticipantPages(page, [
+      participantsPage([{ userId: 1, username: "alice" }], null),
+    ]);
+    await page.route("**/api/admin/kubios/measurements*", (route) =>
+      route.fulfill({ json: measurementsPage([measurementRow(1, "alice")]) }),
+    );
+    await page.route("**/api/admin/kubios/participants/1/sync", (route) =>
+      route.fulfill({
+        json: { status: "locked", memberSynced: false, synced: 0, failed: 0 },
+      }),
+    );
+
+    await page.goto("/admin/kubios");
+    await expect(page.getByTestId("admin-kubios-row")).toContainText("alice");
+    await selectParticipant(page, "alice");
+
+    await page.getByTestId("admin-kubios-sync").click();
+    await expect(page.getByTestId("admin-kubios-sync-message")).toContainText(
+      "Otra sincronización de Kubios tiene el turno",
+    );
+  });
+
+  test("a partial sync explains which internal step failed", async ({ page }) => {
+    await mockSession(page);
+    await mockParticipantPages(page, [
+      participantsPage([{ userId: 1, username: "alice" }], null),
+    ]);
+    await page.route("**/api/admin/kubios/measurements*", (route) =>
+      route.fulfill({ json: measurementsPage([measurementRow(1, "alice")]) }),
+    );
+    await page.route("**/api/admin/kubios/participants/1/sync", (route) =>
+      route.fulfill({
+        json: {
+          status: "partial",
+          memberSynced: false,
+          synced: 0,
+          failed: 1,
+          errorCode: "config.invalid",
+        },
+      }),
+    );
+
+    await page.goto("/admin/kubios");
+    await expect(page.getByTestId("admin-kubios-row")).toContainText("alice");
+    await selectParticipant(page, "alice");
+
+    await page.getByTestId("admin-kubios-sync").click();
+    await expect(page.getByTestId("admin-kubios-sync-message")).toContainText(
+      "Este despliegue no tiene la configuración de Kubios",
+    );
+    await expect(page.getByTestId("admin-kubios-sync-message")).not.toContainText(
+      "config.invalid",
+    );
+  });
+
+  test("a failed sync shows a recoverable alert without exposing secrets", async ({ page }) => {
+    await mockSession(page);
+    await mockParticipantPages(page, [
+      participantsPage([{ userId: 1, username: "alice" }], null),
+    ]);
+    await page.route("**/api/admin/kubios/measurements*", (route) =>
+      route.fulfill({ json: measurementsPage([measurementRow(1, "alice")]) }),
+    );
+    let attempts = 0;
+    await page.route("**/api/admin/kubios/participants/1/sync", (route) => {
+      attempts += 1;
+      return attempts === 1
+        ? route.fulfill({
+            status: 503,
+            json: { error: { code: "SERVICE_UNAVAILABLE", message: "Fallo sintético interno" } },
+          })
+        : route.fulfill({
+            json: { status: "ok", memberSynced: true, synced: 1, failed: 0 },
+          });
+    });
+
+    await page.goto("/admin/kubios");
+    await expect(page.getByTestId("admin-kubios-row")).toContainText("alice");
+    await selectParticipant(page, "alice");
+
+    await page.getByTestId("admin-kubios-sync").click();
+    const message = page.getByTestId("admin-kubios-sync-message");
+    await expect(message).toContainText("Fallo interno del refresco en este despliegue");
+    await expect(message).not.toContainText("Fallo sintético interno");
+    await page.getByTestId("admin-kubios-sync-retry").click();
+    await expect(page.getByTestId("admin-kubios-sync-message")).toContainText(
+      "Copia sincronizada",
+    );
+    expect(attempts).toBe(2);
   });
 });

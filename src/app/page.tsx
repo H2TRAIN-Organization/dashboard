@@ -5,9 +5,9 @@ import Link from 'next/link'
 import {
   Activity,
   BarChart3,
-  BookOpen,
   Home,
   Settings,
+  ShieldCheck,
   Sparkles,
   Users,
   Zap,
@@ -64,7 +64,6 @@ export default function DashboardPage() {
   const canViewUsers = role !== null && hasPermission(role, 'view_users')
   const canViewData = role !== null && hasPermission(role, 'view_data')
   const canViewAnalytics = role !== null && hasPermission(role, 'view_analytics')
-  const canViewStudy = role !== null && hasPermission(role, 'view_study')
   const canViewAdmin = role !== null && hasPermission(role, 'view_admin')
   const canViewOverview = role === 'admin' || role === 'doctor'
 
@@ -200,21 +199,17 @@ export default function DashboardPage() {
           },
         ]
       : []),
-    ...(canViewStudy
+    ...(canViewAdmin
       ? [
           {
-            href: '/study',
-            title: t.navigation.study,
-            description: t.study.pageSubtitle,
+            href: '/admin/kubios',
+            title: t.navigation.adminKubios,
+            description: t.navigation.adminKubios,
             action: t.dashboard.access,
-            icon: BookOpen,
+            icon: Activity,
             iconClass: 'from-indigo-600 to-indigo-700',
             accentClass: 'hover:border-indigo-300/70',
           },
-        ]
-      : []),
-    ...(canViewAdmin
-      ? [
           {
             href: '/admin',
             title: t.dashboard.administration,
@@ -226,6 +221,15 @@ export default function DashboardPage() {
           },
         ]
       : []),
+    {
+      href: '/privacy',
+      title: t.navigation.privacy,
+      description: t.dashboard.privacyCard,
+      action: t.dashboard.access,
+      icon: ShieldCheck,
+      iconClass: 'from-slate-500 to-slate-600',
+      accentClass: 'hover:border-slate-300/70',
+    },
   ]
 
   return (

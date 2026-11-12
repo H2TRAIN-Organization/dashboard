@@ -1,3 +1,5 @@
+import type { PrivacyStatus } from '@/server/domain/privacy'
+
 export type UserRole = 'admin' | 'doctor' | 'user'
 
 export type AuthMethod = 'email' | 'username'
@@ -48,6 +50,7 @@ export interface ClientSession {
   user: SessionUser
   method: AuthMethod
   expiresAt: string
+  privacy?: PrivacyStatus
 }
 
 export type LoginInput =
@@ -171,7 +174,7 @@ export interface DecryptedDataResponse {
 
 export interface DecryptedDataQuery {
   selectedUser?: string
-  timeRange?: '7d' | '30d' | '90d' | 'all'
+  timeRange?: '7d' | '30d' | '90d' | '365d' | 'all'
   selectedDataType?: 'all' | 'insulin' | 'food' | 'exercise' | 'period' | 'mood'
   dateFilter?: string
 }
@@ -189,6 +192,8 @@ export interface AdminTablesResponse {
   totalRecords: number
   accessibleCount: number
   totalCount: number
+  observedAt?: string
+  status?: 'complete' | 'partial' | 'failed'
 }
 
 export interface AdminTableDataResponse {
@@ -198,6 +203,8 @@ export interface AdminTableDataResponse {
   totalRecords: number
   returnedRecords: number
   limit: number
+  offset?: number
+  hasMore?: boolean
 }
 
 export interface ProblemBody {

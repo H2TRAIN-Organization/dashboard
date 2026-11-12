@@ -1,284 +1,116 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Database, Table, Download, Upload, RefreshCw, FileText, TrendingUp, CheckCircle, Database as DatabaseIcon } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Database, Download, RefreshCw, Table } from 'lucide-react'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
 import HybridNavigation from '@/components/HybridNavigation'
-import type { AdminTableInfo } from '@/lib/api-types'
-import { adminApi, errorMessage } from '@/lib/api-client'
+import { errorMessage } from '@/lib/api-client'
+import { databaseApi, saveDatabaseDownload, type DatabaseStats, type DatabasePage } from '@/lib/admin-database-client'
+import { databaseDictionary } from '@/lib/admin-database-dictionary'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 
+const button = 'rounded-xl bg-blue-700 px-4 py-3 font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:cursor-wait disabled:opacity-50'
+const input = 'min-w-0 rounded-lg border border-slate-300 bg-white p-3 text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-700'
+const panel = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7'
+
 export default function AdminDatabasePage() {
-  const { t, language } = useLanguage()
+  const { language } = useLanguage()
   const { session } = useSession()
-  const notAvailable = t.common.notAvailable
-  const locale = language === 'en' ? 'en-US' : 'es-ES'
-  
-  const [loading, setLoading] = useState(true)
+  const text = databaseDictionary[language === 'en' ? 'en' : 'es']
+  const [stats, setStats] = useState<DatabaseStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [table, setTable] = useState('users')
+  const [pageSize, setPageSize] = useState(50)
+  const [page, setPage] = useState<DatabasePage | null>(null)
+  const [pageLoading, setPageLoading] = useState(false)
+  const [action, setAction] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [dbStats, setDbStats] = useState({
-    totalTables: null as number | null,
-    totalRecords: null as number | null,
-    databaseSize: null as number | null,
-    lastBackup: null as string | null,
-    uptime: null as number | null
-  })
+  const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
 
-  const [tables, setTables] = useState<AdminTableInfo[]>([])
-
+  const refreshStats = useCallback(async () => {
+    setStatsLoading(true); setStatsError(null)
+    try { setStats(await databaseApi.stats()) }
+    catch (caught) { setStatsError(errorMessage(caught)) }
+    finally { setStatsLoading(false) }
+  }, [])
   useEffect(() => {
     if (session?.user.role !== 'admin') return
-    const loadDbStats = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const result = await adminApi.listTables()
-        setTables(result.tables)
-        setDbStats({
-          totalTables: result.totalCount,
-          totalRecords: result.totalRecords,
-          databaseSize: null,
-          lastBackup: null,
-          uptime: null
-        })
-      } catch (caught) {
-        console.error('Error loading database stats:', caught)
-        setError(errorMessage(caught))
-        setDbStats({
-          totalTables: null,
-          totalRecords: null,
-          databaseSize: null,
-          lastBackup: null,
-          uptime: null
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadDbStats()
+    let active = true
+    databaseApi.stats().then(result => {
+      if (active) { setStats(result); setStatsError(null) }
+    }).catch(caught => {
+      if (active) setStatsError(errorMessage(caught))
+    }).finally(() => {
+      if (active) setStatsLoading(false)
+    })
+    return () => { active = false }
   }, [session])
 
-  const formatCount = (value: number | null) =>
-    value === null ? null : value.toLocaleString(locale)
+  async function browse(offset = 0) {
+    setPageLoading(true); setPage(null); setError(null)
+    try { setPage(await databaseApi.page(table, pageSize, offset)) }
+    catch (caught) { setError(errorMessage(caught)) }
+    finally { setPageLoading(false) }
+  }
+  async function exportTable(format: 'json' | 'csv') {
+    setAction(format); setError(null); setMessage(null)
+    try { saveDatabaseDownload(await databaseApi.exportTable(table, format)); setMessage(text.success) }
+    catch (caught) { setError(errorMessage(caught)) }
+    finally { setAction(null) }
+  }
+  async function copy(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setError(null); setMessage(null)
+    if (password.length < 12 || password !== confirmation) { setError(text.mismatch); return }
+    setAction('copy')
+    try { saveDatabaseDownload(await databaseApi.logicalCopy(password)); setMessage(text.success) }
+    catch (caught) { setError(errorMessage(caught)) }
+    finally { setPassword(''); setConfirmation(''); setAction(null) }
+  }
 
-  const databaseFeatures = [
-    {
-      title: t.admin.tableExplorer,
-      description: t.admin.tableExplorerDescription,
-      icon: Table,
-      color: 'from-blue-500 to-cyan-500',
-      stats: dbStats.totalTables === null ? null : `${dbStats.totalTables.toLocaleString(locale)} ${t.admin.tables}`
-    },
-    {
-      title: t.admin.exportData,
-      description: t.admin.exportDataDescription,
-      icon: Download,
-      color: 'from-green-500 to-emerald-500',
-      stats: dbStats.totalRecords === null ? null : `${dbStats.totalRecords.toLocaleString(locale)} ${t.admin.records}`
-    },
-    {
-      title: t.admin.createBackup,
-      description: t.admin.createBackupDescription,
-      icon: Upload,
-      color: 'from-purple-500 to-pink-500',
-      stats: null
-    },
-    {
-      title: t.admin.refreshStats,
-      description: t.admin.refreshStatsDescription,
-      icon: RefreshCw,
-      color: 'from-orange-500 to-red-500',
-      stats: null
-    }
-  ]
-
-  return (
-    <HybridProtectedRoute>
-      <HybridRoleGuard requiredRole="admin">
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden" style={{ colorScheme: 'light' }}>
-        {/* Elementos decorativos de fondo */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-1000"></div>
-          <div className="absolute top-40 left-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-500"></div>
-        </div>
-        
-        <HybridNavigation title={t.admin.databaseManagement} showBackButton={true} />
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-          {error && (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {error}
-            </div>
-          )}
-          {/* Header con estadísticas generales */}
-          <div className="mb-12">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">
-              <div className="text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start mb-6">
-                  <div className="p-5 bg-gradient-to-br from-green-600 to-emerald-700 rounded-2xl shadow-lg">
-                    <DatabaseIcon className="h-12 w-12 text-white" />
-                  </div>
-                  <div className="ml-6">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">{t.admin.databaseManagement}</h1>
-                    <p className="text-gray-600 text-lg">{t.admin.databaseDescription}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex flex-wrap gap-4 mt-6 sm:mt-0">
-                {dbStats.totalTables !== null && (
-                <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl px-6 py-4 shadow-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Table className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">{t.admin.tables}</p>
-                      <p className="text-2xl font-bold text-gray-900">{formatCount(dbStats.totalTables)}</p>
-                    </div>
-                  </div>
-                </div>
-                )}
-                
-                {dbStats.totalRecords !== null && (
-                <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl px-6 py-4 shadow-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <FileText className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">{t.admin.records}</p>
-                      <p className="text-2xl font-bold text-gray-900">{formatCount(dbStats.totalRecords)}</p>
-                    </div>
-                  </div>
-                </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Funcionalidades de base de datos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-            {databaseFeatures.map((feature, index) => (
-              <div
-                key={index}
-                className="group relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-2 hover:scale-105 cursor-pointer"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-600/5"></div>
-                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-green-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className={`p-4 bg-gradient-to-br ${feature.color} rounded-2xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110`}>
-                      <feature.icon className="h-8 w-8 text-white" />
-                    </div>
-                    {feature.stats && (
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500 font-medium">{feature.stats}</p>
-                    </div>
-                    )}
-                  </div>
-                  
-                  <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-green-600 transition-colors duration-300">
-                    {feature.title}
-                  </h3>
-                  
-                  <p className="text-gray-600 leading-relaxed mb-4">
-                    {feature.description}
-                  </p>
-                  
-                  <div className="flex items-center text-green-600 font-semibold group-hover:text-green-700 transition-colors duration-300">
-                    <span>{t.admin.access}</span>
-                    <TrendingUp className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Tablas de la base de datos */}
-          <div className="bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 shadow-2xl mb-12">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl shadow-lg">
-                  <Table className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">{t.admin.tables}</h3>
-                  <p className="text-gray-600">{t.admin.tableStructure}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full animate-pulse ${error ? 'bg-gray-400' : 'bg-green-500'}`}></div>
-                <span className={`font-semibold ${error ? 'text-gray-500' : 'text-green-600'}`}>
-                  {error ? notAvailable : t.admin.operational}
-                </span>
-              </div>
-            </div>
-            
-            {loading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="flex items-center space-x-3">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <span className="text-gray-600 font-medium">{t.admin.loadingTables}</span>
-                </div>
-              </div>
-            ) : tables.length === 0 ? (
-              <div className="py-16 text-center text-gray-600 font-medium">
-                {t.common.noData}
-              </div>
-            ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tables.map((table) => (
-                <div key={table.name} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-2 bg-blue-500 rounded-lg">
-                      <Database className="h-5 w-5 text-white" />
-                    </div>
-                    <span className={`text-sm font-medium ${table.accessible ? 'text-green-600' : 'text-gray-500'}`}>
-                      {table.accessible ? t.admin.operational : notAvailable}
-                    </span>
-                  </div>
-                  <h4 className="text-lg font-bold text-gray-900 mb-2">{table.name}</h4>
-                  <p className="text-gray-600 text-sm">
-                    {table.accessible
-                      ? `${table.recordCount.toLocaleString(locale)} ${t.admin.records}`
-                      : notAvailable}
-                  </p>
-                </div>
-              ))}
-            </div>
-            )}
-          </div>
-
-          {/* Estado del sistema */}
-          <div className="bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl shadow-lg">
-                  <CheckCircle className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">{t.admin.systemStatus}</h3>
-                  <p className="text-gray-600">{t.admin.realTimeMonitoring}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full animate-pulse ${error ? 'bg-gray-400' : 'bg-green-500'}`}></div>
-                <span className={`font-semibold ${error ? 'text-gray-500' : 'text-green-600'}`}>
-                  {error ? notAvailable : t.admin.operational}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      </HybridRoleGuard>
-    </HybridProtectedRoute>
-  )
+  const columns = page ? [...new Set(page.data.flatMap(row => Object.keys(row)))] : []
+  const status = stats ? text[stats.status] : text.unknown
+  const locale = language === 'en' ? 'en-GB' : 'es-ES'
+  return <HybridProtectedRoute><HybridRoleGuard requiredRole="admin">
+    <div className="min-h-screen bg-slate-50 text-slate-900" style={{ colorScheme: 'light' }}>
+      <HybridNavigation title={text.title} showBackButton />
+      <main className="mx-auto max-w-7xl space-y-7 px-4 py-8 sm:px-6">
+        <header><h1 className="flex items-center gap-3 text-3xl font-bold"><Database aria-hidden="true" />{text.title}</h1><p className="mt-3 text-slate-600">{text.description}</p></header>
+        <nav aria-label={text.title} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <a className={button} href="#explorer"><Table className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.explorer}</a>
+          <a className={button} href="#exports"><Download className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.exports}</a>
+          <a className={button} href="#logical-copy"><Database className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.copy}</a>
+          <button className={button} disabled={statsLoading} onClick={() => void refreshStats()}><RefreshCw className="mr-2 inline h-5 w-5" aria-hidden="true" />{statsLoading ? text.loading : text.refresh}</button>
+        </nav>
+        <section className={panel} aria-busy={statsLoading} aria-label={text.refresh}>
+          <p role="status" className="font-semibold">{statsLoading ? text.loading : statsError ? text.failedAttempt : status}</p>
+          {statsError && <p role="alert" className="mt-2 text-red-700">{statsError}</p>}
+          {stats && <><p className="mt-2">{stats.accessibleCount} / {stats.totalCount} {text.available} · {stats.totalRecords.toLocaleString(locale)} {text.records}</p><p className="mt-2 text-sm text-slate-600">{text.observed}: <time dateTime={stats.observedAt}>{new Date(stats.observedAt).toLocaleString(locale)}</time></p>
+            <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{stats.tables.map(item => <li key={item.name} className="rounded-lg bg-slate-50 p-3"><span className="font-mono">{item.name}</span>: {item.accessible ? `${item.recordCount.toLocaleString(locale)} ${text.records}` : text.unavailable}</li>)}</ul></>}
+        </section>
+        {error && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</p>}
+        {message && <p role="status" className="rounded-xl border border-green-300 bg-green-50 p-4 text-green-800">{message}</p>}
+        {action && <p role="status">{text.busy}</p>}
+        <section id="explorer" className={panel} aria-busy={pageLoading}>
+          <h2 className="text-2xl font-bold">{text.explorer}</h2>
+          <form className="my-5 flex flex-wrap items-end gap-4" onSubmit={event => { event.preventDefault(); void browse() }}>
+            <label className="grid gap-2">{text.table}<select className={input} value={table} disabled={pageLoading || action !== null} onChange={event => { setTable(event.target.value); setPage(null) }}>{(stats?.tables ?? [{ name: 'users', accessible: true }]).map(item => <option key={item.name} value={item.name} disabled={!item.accessible}>{item.name}</option>)}</select></label>
+            <label className="grid gap-2">{text.pageSize}<select className={input} value={pageSize} disabled={pageLoading} onChange={event => { setPageSize(Number(event.target.value)); setPage(null) }}>{[25, 50, 100, 250].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+            <button className={button} disabled={pageLoading} type="submit">{pageLoading ? text.loading : text.browse}</button>
+          </form>
+          {page && <>
+            <p className="mb-3" role="status">{text.showing} {page.data.length === 0 ? 0 : page.offset + 1}–{page.offset + page.returnedRecords} {text.of} {page.totalRecords.toLocaleString(locale)}</p>
+            {page.data.length === 0 ? <p>{text.empty}</p> : <div className="max-h-[32rem] overflow-auto rounded-lg border border-slate-200" tabIndex={0} role="region" aria-label={`${text.table}: ${page.tableName}`}><table className="w-full border-collapse text-left text-sm"><thead className="sticky top-0 bg-slate-100"><tr>{columns.map(column => <th key={column} scope="col" className="whitespace-nowrap border-b p-3">{column}</th>)}</tr></thead><tbody>{page.data.map((row, index) => <tr key={String(row.UserID ?? row.id ?? index)} className="odd:bg-slate-50">{columns.map(column => <td key={column} className="max-w-xs break-words border-b p-3">{row[column] == null ? '—' : typeof row[column] === 'object' ? JSON.stringify(row[column]) : String(row[column])}</td>)}</tr>)}</tbody></table></div>}
+            <div className="mt-4 flex flex-wrap gap-3"><button className={button} disabled={pageLoading || page.offset === 0} onClick={() => void browse(Math.max(0, page.offset - pageSize))}>{text.previous}</button><button className={button} disabled={pageLoading || !page.hasMore} onClick={() => void browse(page.offset + page.returnedRecords)}>{text.next}</button></div>
+          </>}
+        </section>
+        <section id="exports" className={panel}><h2 className="text-2xl font-bold">{text.exports}</h2><p className="my-3 text-slate-600">{text.exportDescription}</p><p className="mb-4">{text.table}: <strong>{table}</strong></p><div className="flex flex-wrap gap-3"><button className={button} disabled={action !== null} onClick={() => void exportTable('csv')}>CSV</button><button className={button} disabled={action !== null} onClick={() => void exportTable('json')}>JSON</button></div></section>
+        <section id="logical-copy" className={panel}><h2 className="text-2xl font-bold">{text.copy}</h2><p className="mt-3 text-slate-600">{text.copyDescription}</p><p className="mt-3 text-slate-600">{text.recovery}</p><form onSubmit={event => void copy(event)} className="mt-5 grid max-w-lg gap-4"><label className="grid gap-2">{text.password}<input className={input} type="password" autoComplete="new-password" required minLength={12} maxLength={1024} value={password} onChange={event => setPassword(event.target.value)} disabled={action !== null} /></label><label className="grid gap-2">{text.confirm}<input className={input} type="password" autoComplete="new-password" required minLength={12} maxLength={1024} value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={action !== null} /></label><button type="submit" className={button} disabled={action !== null}>{action === 'copy' ? text.busy : text.downloadCopy}</button></form></section>
+      </main>
+    </div>
+  </HybridRoleGuard></HybridProtectedRoute>
 }

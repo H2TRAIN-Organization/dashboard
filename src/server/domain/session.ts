@@ -1,4 +1,5 @@
 import type { ActiveActor, User } from "./user";
+import { initialPrivacyStatus, type PrivacyStatus } from './privacy';
 
 export const AUTH_METHODS = ["email", "username"] as const;
 
@@ -9,6 +10,7 @@ export type AuthMethod = (typeof AUTH_METHODS)[number];
  * never be serialized to JSON; HTTP adapters place it in an HttpOnly cookie.
  */
 export interface Session {
+  readonly privacy?: PrivacyStatus;
   readonly user: User;
   readonly token: string;
   readonly method: AuthMethod;
@@ -19,6 +21,7 @@ export interface Session {
  * Public session DTO. There is deliberately no token, hash or cookie value.
  */
 export interface PublicSession {
+  readonly privacy?: PrivacyStatus;
   readonly user: User;
   readonly method: AuthMethod;
   readonly expiresAt: string;
@@ -26,6 +29,7 @@ export interface PublicSession {
 
 export function toPublicSession(session: Session): PublicSession {
   return {
+    privacy: session.privacy ?? initialPrivacyStatus(),
     user: session.user,
     method: session.method,
     expiresAt: session.expiresAt,

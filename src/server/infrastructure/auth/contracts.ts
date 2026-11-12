@@ -1,5 +1,11 @@
 import type { AuthMethod, PublicSession } from "@/server/domain/session";
 import type { User } from "@/server/domain/user";
+import type { PrivacyStatus, PrivacyDecision, PrivacyDecisionResult } from '@/server/domain/privacy';
+
+export interface PrivacyStore {
+  readPrivacy(sidHash: string, userId: string): Promise<PrivacyStatus>;
+  decidePrivacy(sidHash: string, userId: string, decision: PrivacyDecision): Promise<PrivacyDecisionResult>;
+}
 
 export type { AuthMethod };
 export type PublicSessionDto = PublicSession;

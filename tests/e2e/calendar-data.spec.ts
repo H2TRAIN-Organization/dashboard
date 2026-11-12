@@ -1,4 +1,6 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page } from './support/language'
+import type { Route } from '@playwright/test'
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from "../../src/lib/privacy-policy";
 
 /**
  * Browser contract for the shared Health Data calendar.
@@ -39,6 +41,7 @@ function sessionBody() {
     },
     method: "username" as const,
     expiresAt: "2026-12-01T00:00:00.000Z",
+    privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: "complete" },
   };
 }
 

@@ -5,6 +5,10 @@
   "engines": {
     "node": "24.x"
   },
+  "allowScripts": {
+    "@tailwindcss/oxide": false,
+    "unrs-resolver": false
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:https": "next dev --turbopack --experimental-https --experimental-https-key ../ssl/localhost.key --experimental-https-cert ../ssl/localhost.crt",

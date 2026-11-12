@@ -1,8 +1,10 @@
 import type { AuthGateway, LoginCredentials } from "@/server/application/ports/auth-gateway";
 import type { Session } from "@/server/domain/session";
 import type { User } from "@/server/domain/user";
+import { initialPrivacyStatus, type PrivacyStatus } from '@/server/domain/privacy';
 
 export interface TestAccount {
+  readonly privacy?: PrivacyStatus;
   readonly user: User;
   readonly password: string;
   readonly token: string;
@@ -25,6 +27,7 @@ export class TestAuthGateway implements AuthGateway {
 
   private sessionFor(account: TestAccount, method: "email" | "username"): Session {
     return {
+      privacy: account.privacy ?? initialPrivacyStatus(),
       user: account.user,
       token: account.token,
       method,

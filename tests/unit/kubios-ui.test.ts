@@ -98,6 +98,25 @@ describe('Kubios personal response parsing', () => {
     expect(parsed?.results[1]?.result.mean_hr_bpm).toBeUndefined()
   })
 
+  it('recovers legacy rows whose metrics arrive as a JSON string', () => {
+    // MT48: defensa en profundidad en el cliente; un snapshot legado puede
+    // llegar ya serializado con `result` como cadena.
+    const parsed = parseKubiosHrvResultsResponse({
+      status: 'ready',
+      synced_at: '2026-11-03T10:00:00.000Z',
+      results: [
+        {
+          measured_timestamp: '2026-11-01T08:30:00Z',
+          daily_result: null,
+          result: '{"readiness":71,"rmssd_ms":42}',
+        },
+      ],
+    })
+
+    expect(parsed).not.toBeNull()
+    expect(parsed?.results[0]?.result).toEqual({ readiness: 71, rmssd_ms: 42 })
+  })
+
   it('marks malformed results payloads as invalid', () => {
     expect(
       parseKubiosHrvResultsResponse({

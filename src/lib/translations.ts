@@ -8,6 +8,8 @@ export interface Translations {
     users: string
     data: string
     kubios: string
+    adminKubios: string
+    privacy: string
     analytics: string
     study: string
     admin: string
@@ -108,6 +110,7 @@ export interface Translations {
     hrvAnalysisDescription: string
     correlationStudyDescription: string
     administrationDescription: string
+    privacyCard: string
     generalSummary: string
     cuttingEdgeTechnology: string
     intelligentMonitoring: string
@@ -378,7 +381,11 @@ export interface Translations {
     dataTypeCharts: string
     insulinByType: string
     insulinTypesUsed: string
+    others: string
+    othersDetail: string
     averageInsulinDose: string
+    averageDoseUnits: string
+    averageDose: string
     moodDistribution: string
     temporalEvolution: string
     insulinEvolution: string
@@ -414,6 +421,8 @@ export interface Translations {
     correlations: string
     generalActivityByDate: string
     registeredMealTypes: string
+    timeEvolutionTitle: string
+    glucoseEventsExcluded: string
     // Textos específicos de gráficos
     average: string
     units: string
@@ -624,6 +633,8 @@ export interface Translations {
       participantsError: string
       retryParticipants: string
       tableCaption: string
+      chartsTitle: string
+      chartsHint: string
       participant: string
       measuredAt: string
       syncedAt: string
@@ -645,6 +656,17 @@ export interface Translations {
       next: string
       page: string
       readiness: string
+      sync: string
+      syncBusy: string
+      syncDone: string
+      syncPartial: string
+      syncNoConfig: string
+      syncAuth: string
+      syncCopy: string
+      syncDeadline: string
+      syncLocked: string
+      syncThrottled: string
+      syncError: string
     }
   }
   
@@ -712,6 +734,7 @@ export interface Translations {
   // Común
   common: {
     loading: string
+    menu: string
     error: string
     success: string
     warning: string
@@ -726,6 +749,8 @@ export interface Translations {
     back: string
     next: string
     previous: string
+    firstPage: string
+    lastPage: string
     search: string
     filter: string
     clear: string
@@ -762,6 +787,8 @@ export const translations: Record<Language, Translations> = {
       users: 'Usuarios',
       data: 'Datos',
       kubios: 'Kubios',
+      adminKubios: 'Kubios de participantes',
+      privacy: 'Política de privacidad',
       analytics: 'Analítica',
       study: 'Estudio',
       admin: 'Admin',
@@ -858,6 +885,7 @@ export const translations: Record<Language, Translations> = {
       hrvAnalysisDescription: 'Análisis de variabilidad cardíaca con tecnología Kubios',
       correlationStudyDescription: 'Correlaciones entre actividad física, HRV y control glucémico',
       administrationDescription: 'Configuración del sistema, base de datos y roles de usuario',
+      privacyCard: 'Consulta el aviso de privacidad, tus derechos y el contacto del responsable',
       generalSummary: 'Resumen General',
       cuttingEdgeTechnology: 'Tecnología de Vanguardia',
       intelligentMonitoring: 'Monitoreo Inteligente',
@@ -1121,6 +1149,8 @@ export const translations: Record<Language, Translations> = {
       dataTypeCharts: 'Gráficos por Tipo de Dato',
       insulinByType: 'Insulina por Tipo',
       insulinTypesUsed: 'Tipos de Insulina Utilizados',
+      others: 'Otros',
+      othersDetail: 'Tipos incluidos en «Otros»',
       averageInsulinDose: 'Promedio de Dosis de Insulina por Día',
       moodDistribution: 'Distribución de Estado de Ánimo',
       temporalEvolution: 'Evolución Temporal',
@@ -1157,6 +1187,9 @@ export const translations: Record<Language, Translations> = {
       correlations: 'Correlaciones',
       generalActivityByDate: 'Actividad General por Fecha',
       registeredMealTypes: 'Tipos de Comida Registrados',
+      timeEvolutionTitle: 'Evolución temporal',
+      glucoseEventsExcluded:
+        '{count} registros de eventos de glucemia (hipoglucemia/hiperglucemia) no son comidas y no se muestran en este gráfico.',
       // Textos específicos de gráficos
       average: 'Promedio',
       units: 'unidades',
@@ -1173,6 +1206,8 @@ export const translations: Record<Language, Translations> = {
       yAxis: 'Eje Y',
       numberOfRecords: 'Número de Registros',
       showsAverageInsulin: 'Muestra la cantidad promedio de insulina administrada cada día.',
+      averageDoseUnits: 'Dosis promedio (unidades)',
+      averageDose: 'Dosis promedio',
       numberOfInjections: 'Número de inyecciones',
       showsMoodFrequency: 'Muestra qué tan frecuente es cada nivel de estado de ánimo (0=Muy triste, 10=Muy feliz).',
       verySad: 'Muy triste',
@@ -1361,6 +1396,9 @@ export const translations: Record<Language, Translations> = {
         participantsError: 'No se pudieron cargar los participantes.',
         retryParticipants: 'Reintentar participantes',
         tableCaption: 'Mediciones Kubios de los participantes',
+        chartsTitle: 'Gráficos del participante',
+        chartsHint:
+          '{count} mediciones del participante seleccionado; desliza en ambos ejes si hay muchos datos.',
         participant: 'Participante',
         measuredAt: 'Medición',
         syncedAt: 'Sincronización',
@@ -1382,6 +1420,17 @@ export const translations: Record<Language, Translations> = {
         next: 'Siguiente',
         page: 'Página',
         readiness: 'Readiness',
+        sync: 'Sincronizar copia',
+        syncBusy: 'Sincronizando con Kubios…',
+        syncDone: 'Copia sincronizada con Kubios. Los datos mostrados ya son la copia más reciente.',
+        syncPartial: 'La sincronización no se completó del todo; la copia puede seguir desactualizada.',
+        syncNoConfig: 'Este despliegue no tiene la configuración de Kubios; no se puede sincronizar.',
+        syncAuth: 'No se pudo autenticar en Kubios con la configuración del despliegue; la copia no cambió.',
+        syncCopy: 'Kubios no entregó los resultados de este participante; la copia no cambió.',
+        syncDeadline: 'El refresco agotó su plazo antes de terminar; la copia puede seguir desactualizada.',
+        syncLocked: 'Otra sincronización de Kubios tiene el turno ahora mismo. Inténtalo de nuevo en unos segundos.',
+        syncThrottled: 'Kubios limitó la tasa de peticiones. Espera el plazo indicado antes de volver a sincronizar.',
+        syncError: 'Fallo interno del refresco en este despliegue; la copia no cambió. Vuelve a intentarlo y, si persiste, revisa el despliegue.',
       }
     },
     users: {
@@ -1443,6 +1492,7 @@ export const translations: Record<Language, Translations> = {
     },
     common: {
       loading: 'Cargando...',
+      menu: 'Abrir menú de navegación',
       error: 'Error',
       success: 'Éxito',
       warning: 'Advertencia',
@@ -1458,6 +1508,8 @@ export const translations: Record<Language, Translations> = {
       back: 'Atrás',
       next: 'Siguiente',
       previous: 'Anterior',
+      firstPage: 'Primera página',
+      lastPage: 'Última página',
       search: 'Buscar',
       filter: 'Filtrar',
       clear: 'Limpiar',
@@ -1489,6 +1541,8 @@ export const translations: Record<Language, Translations> = {
       users: 'Users',
       data: 'Data',
       kubios: 'Kubios',
+      adminKubios: 'Participant Kubios data',
+      privacy: 'Privacy policy',
       analytics: 'Analytics',
       study: 'Study',
       admin: 'Admin',
@@ -1585,6 +1639,7 @@ export const translations: Record<Language, Translations> = {
       hrvAnalysisDescription: 'Heart rate variability analysis with Kubios technology',
       correlationStudyDescription: 'Correlations between physical activity, HRV and glycemic control',
       administrationDescription: 'System configuration, database and user roles',
+      privacyCard: 'Read the privacy notice, your rights and the controller contact',
       generalSummary: 'General Summary',
       cuttingEdgeTechnology: 'Cutting-Edge Technology',
       intelligentMonitoring: 'Intelligent Monitoring',
@@ -1848,6 +1903,8 @@ export const translations: Record<Language, Translations> = {
       dataTypeCharts: 'Charts by Data Type',
       insulinByType: 'Insulin by Type',
       insulinTypesUsed: 'Insulin Types Used',
+      others: 'Others',
+      othersDetail: 'Types included in "Others"',
       averageInsulinDose: 'Average Insulin Dose per Day',
       moodDistribution: 'Mood Distribution',
       temporalEvolution: 'Temporal Evolution',
@@ -1884,6 +1941,9 @@ export const translations: Record<Language, Translations> = {
       correlations: 'Correlations',
       generalActivityByDate: 'General Activity by Date',
       registeredMealTypes: 'Registered Meal Types',
+      timeEvolutionTitle: 'Time Evolution',
+      glucoseEventsExcluded:
+        '{count} glucose event records (hypoglycemia/hyperglycemia) are not meals and are not shown in this chart.',
       // Textos específicos de gráficos
       average: 'Average',
       units: 'units',
@@ -1900,6 +1960,8 @@ export const translations: Record<Language, Translations> = {
       yAxis: 'Y Axis',
       numberOfRecords: 'Number of Records',
       showsAverageInsulin: 'Shows the average amount of insulin administered each day.',
+      averageDoseUnits: 'Average dose (units)',
+      averageDose: 'Average dose',
       numberOfInjections: 'Number of injections',
       showsMoodFrequency: 'Shows how frequent each mood level is (0=Very sad, 10=Very happy).',
       verySad: 'Very sad',
@@ -2088,6 +2150,9 @@ export const translations: Record<Language, Translations> = {
         participantsError: 'The participants could not be loaded.',
         retryParticipants: 'Retry participants',
         tableCaption: 'Kubios measurements for participants',
+        chartsTitle: 'Participant charts',
+        chartsHint:
+          '{count} measurements for the selected participant; scroll on both axes when there is a lot of data.',
         participant: 'Participant',
         measuredAt: 'Measurement',
         syncedAt: 'Synchronization',
@@ -2109,6 +2174,17 @@ export const translations: Record<Language, Translations> = {
         next: 'Next',
         page: 'Page',
         readiness: 'Readiness',
+        sync: 'Synchronize copy',
+        syncBusy: 'Synchronizing with Kubios…',
+        syncDone: 'Copy synchronized with Kubios. The data shown is now the freshest copy.',
+        syncPartial: 'The synchronization did not fully complete; the copy may still be outdated.',
+        syncNoConfig: 'This deployment has no Kubios configuration; synchronization is not possible.',
+        syncAuth: 'Kubios authentication failed with this deployment configuration; the copy did not change.',
+        syncCopy: 'Kubios did not deliver this participant results; the copy did not change.',
+        syncDeadline: 'The refresh ran out of time before finishing; the copy may still be outdated.',
+        syncLocked: 'Another Kubios synchronization holds the turn right now. Try again in a few seconds.',
+        syncThrottled: 'Kubios rate limited the requests. Wait for the indicated deadline before syncing again.',
+        syncError: 'Internal refresh failure in this deployment; the copy did not change. Try again and check the deployment if it persists.',
       }
     },
     users: {
@@ -2170,6 +2246,7 @@ export const translations: Record<Language, Translations> = {
     },
     common: {
       loading: 'Loading...',
+      menu: 'Open navigation menu',
       error: 'Error',
       success: 'Success',
       warning: 'Warning',
@@ -2185,6 +2262,8 @@ export const translations: Record<Language, Translations> = {
       back: 'Back',
       next: 'Next',
       previous: 'Previous',
+      firstPage: 'First page',
+      lastPage: 'Last page',
       search: 'Search',
       filter: 'Filter',
       clear: 'Clear',

@@ -25,6 +25,7 @@ scripts:
   - type: afterResponse
     code: |-
       const body = pm.response.json();
+      pm.collectionVariables.set('privacy_version', body.privacy.policyVersion);
       pm.test('login is 200', () => pm.response.to.have.status(200));
       pm.test('no JSON token', () => {
         pm.expect(body).to.not.have.property('token');

@@ -9,6 +9,8 @@ import type {
 } from "./contracts";
 import { AuthConfigurationError, AuthInfrastructureError } from "./errors";
 import { normalizeIdentity } from "./rate-limit";
+import { ConflictError, UnauthorizedError } from '@/server/domain/errors';
+import { initialPrivacyStatus, PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION, type PrivacyStatus, type PrivacyDecision, type PrivacyDecisionResult } from '@/server/domain/privacy';
 
 export type FetchLike = typeof fetch;
 
@@ -182,6 +184,60 @@ function mapUserRow(row: Record<string, unknown>): User {
 export class SupabaseAuthStore
   implements AuthUserStore, AuthSessionStore, LoginRateLimiter
 {
+  async readPrivacy(sidHash: string, userId: string): Promise<PrivacyStatus> {
+    // A per-user acceptance persists across sessions: no new sign-in repeats
+    // the notice for the audited policy version. Sessions without a user ack
+    // fall back to their own stage, mapped onto the single-stage flow.
+    const dbUserId = toDatabaseUserId(userId);
+    const ackResponse = await this.rest(`user_privacy_acks?select=policy_version,policy_hash&user_id=eq.${dbUserId}&limit=1`);
+    if (ackResponse.status === 404) {
+      // The ack table only exists after its migration is applied. Missing
+      // table degrades to the per-session flow instead of blocking logins.
+      return this.readSessionPrivacy(sidHash, dbUserId);
+    }
+    await this.requireOk(ackResponse, 'privacy.ack');
+    const acks = await this.readJson(ackResponse);
+    if (Array.isArray(acks) && acks.length > 0) {
+      const ack = acks[0];
+      if (!isRecord(ack) || typeof ack.policy_version !== "string" || typeof ack.policy_hash !== "string") {
+        throw new AuthInfrastructureError();
+      }
+      if (ack.policy_version === PRIVACY_POLICY_VERSION && ack.policy_hash === PRIVACY_POLICY_HASH) {
+        return { ...initialPrivacyStatus(), state: 'complete' };
+      }
+    }
+    return this.readSessionPrivacy(sidHash, dbUserId);
+  }
+
+  private async readSessionPrivacy(sidHash: string, dbUserId: number): Promise<PrivacyStatus> {
+    const response = await this.rest(`auth_sessions?select=privacy_version,privacy_hash,privacy_stage&sid_hash=eq.${encodeURIComponent(sidHash)}&user_id=eq.${dbUserId}&revoked_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=1`);
+    await this.requireOk(response, 'privacy.status');
+    const rows = await this.readJson(response);
+    if (!Array.isArray(rows) || rows.length !== 1 || !isRecord(rows[0])) throw new AuthInfrastructureError();
+    const row = rows[0];
+    if (row.privacy_version !== PRIVACY_POLICY_VERSION || row.privacy_hash !== PRIVACY_POLICY_HASH) return initialPrivacyStatus();
+    if (row.privacy_stage !== 0 && row.privacy_stage !== 1 && row.privacy_stage !== 2) throw new AuthInfrastructureError();
+    // Legacy stage 1 (two-step banner) restarts the single-stage flow once.
+    return { ...initialPrivacyStatus(), state: row.privacy_stage === 2 ? 'complete' : 'initial' };
+  }
+
+  async decidePrivacy(sidHash: string, userId: string, decision: PrivacyDecision): Promise<PrivacyDecisionResult> {
+    const response = await this.rest('rpc/auth_privacy_decide', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_sid_hash: sidHash, p_user_id: toDatabaseUserId(userId), p_policy_version: decision.policyVersion,
+        p_policy_hash: PRIVACY_POLICY_HASH, p_surface: decision.surface, p_decision: decision.decision,
+        p_language: decision.language, p_request_id: decision.requestId }),
+    });
+    if (response.status === 409) throw new ConflictError();
+    if (response.status === 401) throw new UnauthorizedError();
+    await this.requireOk(response, 'privacy.decision');
+    const body = await this.readJson(response);
+    const row: unknown = Array.isArray(body) && body.length === 1 ? body[0] : null;
+    if (!isRecord(row) || row.rejected !== (decision.decision === 'reject') ||
+      (decision.decision === 'accept' && row.stage !== 2) ||
+      (decision.decision === 'reject' && row.stage !== 0)) throw new AuthInfrastructureError();
+    return { ...initialPrivacyStatus(), state: row.stage === 2 ? 'complete' : 'initial', rejected: row.rejected };
+  }
   private readonly baseUrl: string;
   private readonly serviceRoleKey: string;
   private readonly fetchImpl: FetchLike;

@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from './api-client'
+import { tryParseJsonObject } from './kubios-snapshot-shape'
 
 /**
  * Contrato de presentación del Kubios personal.
@@ -94,6 +95,13 @@ function readSyncedAt(value: unknown): string | null {
   return text.length > 0 ? value : null
 }
 
+/**
+ * Normaliza una fila a la forma de presentación. Las métricas deben llegar
+ * como objeto anidado; un snapshot legado puede traerlas serializadas como
+ * cadena JSON, y se recuperan aquí para que ni las tarjetas ni las gráficas
+ * queden en "sin datos" con una fila válida. Una cadena que no sea un JSON de
+ * objeto no aporta métricas verificables y se trata como ausentes.
+ */
 function normalizeResultRow(value: unknown): KubiosLatestResult | null {
   if (!isRecord(value)) return null
 
@@ -107,7 +115,9 @@ function normalizeResultRow(value: unknown): KubiosLatestResult | null {
     value.daily_result.trim().length > 0
       ? value.daily_result
       : null
-  const result = isRecord(value.result) ? value.result : {}
+  const result = isRecord(value.result)
+    ? value.result
+    : (tryParseJsonObject(value.result) ?? {})
 
   return {
     measured_timestamp: measuredTimestamp,

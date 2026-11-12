@@ -123,6 +123,15 @@ describe("SupabaseAdminDatabaseRepository", () => {
     expect(JSON.stringify(page.data)).not.toContain("bcrypt");
   });
 
+  it("paginates by primary key using a bounded inclusive range", async () => {
+    const { gateway, repo } = setup();
+    const page = await repo.getTableData("users", 1, 1);
+    expect(page.data[0]).toMatchObject({ UserID: 2 });
+    expect(page.offset).toBe(1);
+    expect(page.hasMore).toBe(false);
+    expect(gateway.selectCalls.at(-1)).toMatchObject({ table: "users", request: { order: { column: "UserID", ascending: true }, range: { from: 1, to: 1 } } });
+  });
+
   it("decrypts health table data and removes IV/ciphertext fields", async () => {
     const { repo } = setup();
     const page = await repo.getTableData("insulindata", 10);

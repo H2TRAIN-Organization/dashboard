@@ -319,3 +319,109 @@ export async function fetchAdminKubiosVisiblePage(
     }
   }
 }
+
+export const ADMIN_KUBIOS_SYNC_PATH = '/api/admin/kubios/participants'
+
+export type AdminKubiosSyncStatus = 'ok' | 'partial' | 'locked' | 'throttled'
+
+export type AdminKubiosSyncErrorCode =
+  | 'config.invalid'
+  | 'service.unavailable'
+  | 'lease.unavailable'
+  | 'token.unavailable'
+  | 'team.unavailable'
+  | 'team_members.unavailable'
+  | 'members.partial'
+  | 'finish.failed'
+  | 'sync.deadline_exceeded'
+  | 'sync.internal'
+
+export interface AdminKubiosSyncResult {
+  status: AdminKubiosSyncStatus
+  memberSynced: boolean
+  synced: number
+  failed: number
+  errorCode?: AdminKubiosSyncErrorCode
+  retryAfterSeconds?: number
+}
+
+const SYNC_ERROR_CODES: readonly string[] = [
+  'config.invalid',
+  'service.unavailable',
+  'lease.unavailable',
+  'token.unavailable',
+  'team.unavailable',
+  'team_members.unavailable',
+  'members.partial',
+  'finish.failed',
+  'sync.deadline_exceeded',
+  'sync.internal',
+]
+
+function isSafeSyncErrorCode(value: unknown): value is AdminKubiosSyncErrorCode {
+  return (SYNC_ERROR_CODES as readonly string[]).includes(value as string)
+}
+
+function isKubiosSyncStatus(value: unknown): value is AdminKubiosSyncStatus {
+  return value === 'ok' || value === 'partial' || value === 'locked' || value === 'throttled'
+}
+
+function asCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : null
+}
+
+export function parseAdminKubiosSyncResult(
+  payload: unknown,
+): AdminKubiosSyncResult | null {
+  if (!isRecord(payload) || !isKubiosSyncStatus(payload.status)) return null
+  const synced = asCount(payload.synced)
+  const failed = asCount(payload.failed)
+  if (synced === null || failed === null) return null
+  if (typeof payload.memberSynced !== 'boolean') return null
+
+  let retryAfterSeconds: number | undefined
+  if (payload.retryAfterSeconds !== undefined) {
+    const value = asCount(payload.retryAfterSeconds)
+    if (value === null) return null
+    retryAfterSeconds = value
+  }
+
+  let errorCode: AdminKubiosSyncErrorCode | undefined
+  if (payload.errorCode !== undefined) {
+    if (!isSafeSyncErrorCode(payload.errorCode)) return null
+    errorCode = payload.errorCode
+  }
+
+  return {
+    status: payload.status,
+    memberSynced: payload.memberSynced,
+    synced,
+    failed,
+    ...(errorCode !== undefined ? { errorCode } : {}),
+    ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+  }
+}
+
+/**
+ * POST de refresco del participante. La copia del servidor se actualiza con la
+ * maquinaria completa de sincronización (lease, token, descarga y escritura
+ * fenceada) sin adelantar el plan durable del cron; el cuerpo solo contiene el
+ * estado saneado del refresco y nunca secretos ni identificadores externos.
+ */
+export async function syncAdminKubiosParticipant(
+  userId: number,
+  options: { signal?: AbortSignal } = {},
+): Promise<AdminKubiosSyncResult> {
+  if (!Number.isInteger(userId) || userId <= 0) {
+    contractError('El participante a sincronizar no es válido')
+  }
+  const raw = await apiRequest<unknown>(
+    `${ADMIN_KUBIOS_SYNC_PATH}/${encodeURIComponent(String(userId))}/sync`,
+    { method: 'POST', signal: options.signal },
+  )
+  const parsed = parseAdminKubiosSyncResult(raw)
+  if (parsed === null) contractError()
+  return parsed
+}

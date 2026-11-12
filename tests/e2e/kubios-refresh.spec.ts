@@ -1,4 +1,6 @@
-import { expect, test, type Page, type Route } from '@playwright/test'
+import { expect, test, type Page } from './support/language'
+import type { Route } from '@playwright/test'
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../src/lib/privacy-policy'
 
 /**
  * Ciclo de vida del botón Actualizar de la vista personal de Kubios.
@@ -156,6 +158,7 @@ test.describe('Kubios personal manual refresh', () => {
           },
           method: 'email',
           expiresAt: '2026-11-04T10:00:00.000Z',
+          privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' },
         },
       }),
     )

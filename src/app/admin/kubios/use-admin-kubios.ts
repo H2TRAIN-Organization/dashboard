@@ -5,9 +5,11 @@ import { errorMessage } from '@/lib/api-client'
 import {
   fetchAllAdminKubiosParticipants,
   fetchAdminKubiosVisiblePage,
+  syncAdminKubiosParticipant,
   type AdminKubiosMeasurement,
   type AdminKubiosPageStatus,
   type AdminKubiosParticipant,
+  type AdminKubiosSyncResult,
 } from './api'
 
 /**
@@ -55,11 +57,85 @@ const INITIAL_PAGE: AdminKubiosPageState = {
   error: null,
 }
 
+/** Mensajes honestos del refresco: cada estado del servidor tiene su texto. */
+export type AdminKubiosSyncMessageKey =
+  | 'syncDone'
+  | 'syncPartial'
+  | 'syncNoConfig'
+  | 'syncAuth'
+  | 'syncCopy'
+  | 'syncDeadline'
+  | 'syncLocked'
+  | 'syncThrottled'
+  | 'syncError'
+
+export interface AdminKubiosSyncState {
+  phase: 'idle' | 'busy' | 'done' | 'error'
+  message: AdminKubiosSyncMessageKey | null
+}
+
+/** El estado del refresco solo cuenta al participante seleccionado. */
+export const ADMIN_KUBIOS_SYNC_RESET: AdminKubiosSyncState = {
+  phase: 'idle',
+  message: null,
+}
+
+const INITIAL_SYNC: AdminKubiosSyncState = ADMIN_KUBIOS_SYNC_RESET
+
+function adminKubiosSyncMessageKey(
+  result: AdminKubiosSyncResult,
+): AdminKubiosSyncMessageKey {
+  switch (result.status) {
+    case 'ok':
+      return 'syncDone'
+    case 'locked':
+      return 'syncLocked'
+    case 'throttled':
+      return 'syncThrottled'
+    case 'partial':
+      switch (result.errorCode) {
+        case 'config.invalid':
+          return 'syncNoConfig'
+        case 'token.unavailable':
+        case 'team.unavailable':
+          return 'syncAuth'
+        case 'members.partial':
+          return 'syncCopy'
+        case 'sync.deadline_exceeded':
+          return 'syncDeadline'
+        case 'finish.failed':
+        case 'sync.internal':
+        case 'lease.unavailable':
+        case 'service.unavailable':
+        case 'team_members.unavailable':
+          return 'syncError'
+        default:
+          return 'syncPartial'
+      }
+    default:
+      return 'syncPartial'
+  }
+}
+
+function kubiosErrorToSyncMessage(): AdminKubiosSyncMessageKey {
+  return 'syncError'
+}
+
 export function useAdminKubios(enabled: boolean, selectedUserId: number | null) {
   const [participantsState, setParticipantsState] =
     useState<AdminKubiosParticipantsState>(INITIAL_PARTICIPANTS)
   const [page, setPage] = useState<AdminKubiosPageState>(INITIAL_PAGE)
   const [participantsReloadKey, setParticipantsReloadKey] = useState(0)
+  // El refresco dirigido pertenece al participante seleccionado viviente.
+  const [sync, setSync] = useState<AdminKubiosSyncState>(INITIAL_SYNC)
+  const [syncTarget, setSyncTarget] = useState<number | null>(null)
+  // El refresco manual pertenece al participante seleccionado: un cambio de
+  // selección borra cualquier mensaje anterior (reinicio derivado del render,
+  // el patrón oficial de React para restablecer estado con una clave lógica).
+  if (syncTarget !== selectedUserId) {
+    setSyncTarget(selectedUserId)
+    setSync(ADMIN_KUBIOS_SYNC_RESET)
+  }
 
   const pageRef = useRef(page)
   const participantsRequestRef = useRef(0)
@@ -224,6 +300,38 @@ export function useAdminKubios(enabled: boolean, selectedUserId: number | null) 
     setParticipantsReloadKey((current) => current + 1)
   }, [])
 
+  const syncRequestRef = useRef(0)
+
+  /**
+   * Refresco dirigido del participante seleccionado. Mientras dura, el estado
+   * queda publicado en el mismo clic y la vista se recarga al terminar para
+   * que la copia y los estados ready/stale reflejen lo obtenido ahora mismo.
+   */
+  const syncParticipant = useCallback(async () => {
+    if (selectedUserId === null) return
+    const requestId = syncRequestRef.current + 1
+    syncRequestRef.current = requestId
+    setSync({ phase: 'busy', message: null })
+
+    try {
+      const result = await syncAdminKubiosParticipant(selectedUserId)
+      if (syncRequestRef.current !== requestId) return
+      setSync({
+        phase: 'done',
+        message: adminKubiosSyncMessageKey(result),
+      })
+      reloadMeasurements()
+      reloadParticipants()
+    } catch (caught) {
+      if (syncRequestRef.current !== requestId) return
+      if (caught instanceof Error && caught.name === 'AbortError') return
+      setSync({
+        phase: 'error',
+        message: kubiosErrorToSyncMessage(),
+      })
+    }
+  }, [reloadMeasurements, reloadParticipants, selectedUserId])
+
   return {
     participantsState,
     page,
@@ -231,5 +339,7 @@ export function useAdminKubios(enabled: boolean, selectedUserId: number | null) 
     goPrevious,
     reloadMeasurements,
     reloadParticipants,
+    sync,
+    syncParticipant,
   }
 }

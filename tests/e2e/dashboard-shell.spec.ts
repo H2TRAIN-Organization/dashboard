@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../src/lib/privacy-policy'
+import { expect, test, type Page } from './support/language'
 
 const sessionFor = (role: 'admin' | 'doctor' | 'user') => ({
   user: {
@@ -13,6 +14,7 @@ const sessionFor = (role: 'admin' | 'doctor' | 'user') => ({
   },
   method: role === 'user' ? 'username' : 'email',
   expiresAt: '2030-01-01T00:00:00.000Z',
+  privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' },
 })
 
 async function mockUnauthenticated(page: Page) {
@@ -81,6 +83,7 @@ async function mockSession(page: Page, role: 'admin' | 'doctor' | 'user') {
 
 test.describe('dashboard shell', () => {
   test('las rutas antiguas redirigen al acceso y al inicio comunes', async ({ page }) => {
+    await mockUnauthenticated(page)
     await page.goto('/app-login')
     await expect(page).toHaveURL(/\/login$/)
 

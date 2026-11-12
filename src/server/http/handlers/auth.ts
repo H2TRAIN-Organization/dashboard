@@ -2,6 +2,7 @@ import type { AuthUseCases } from "@/server/application/auth/auth-use-cases";
 import { toActiveActor, toPublicSession } from "@/server/domain/session";
 import type { ActiveActor } from "@/server/domain/user";
 import { UnauthorizedError } from "@/server/domain/errors";
+import { assertPrivacyAcknowledged } from '@/server/domain/privacy';
 import { buildClearedSessionCookie, buildSessionCookie } from "../cookies";
 import { handle, jsonResult, parseInput, type HttpResult } from "../problem";
 import { loginBodySchema } from "../schemas/auth";
@@ -28,6 +29,7 @@ export async function requireActor(
   sessionToken: string | undefined,
 ): Promise<ActiveActor> {
   const session = await auth.getSession(requireToken(sessionToken));
+  assertPrivacyAcknowledged(session);
   return toActiveActor(session);
 }
 

@@ -8,6 +8,7 @@ import { registerServerRuntime } from '@/server/composition/runtime'
 import { KUBIOS_ENCRYPTION_KEY_ENV } from '@/lib/kubios-crypto'
 import { GET as getParticipants } from '@/app/api/admin/kubios/participants/route'
 import { GET as getMeasurements } from '@/app/api/admin/kubios/measurements/route'
+import { PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '@/server/domain/privacy'
 
 const KEY_B64 = Buffer.alloc(32, 0x5a).toString('base64')
 
@@ -48,6 +49,11 @@ beforeEach(() => {
   getSession.mockReset()
   getSession.mockResolvedValue({
     user: { id: '1', username: 'admin', role: 'admin' },
+    privacy: {
+      policyVersion: PRIVACY_POLICY_VERSION,
+      policyHash: PRIVACY_POLICY_HASH,
+      state: 'complete',
+    },
   })
 
   vi.stubEnv('SUPABASE_URL', 'https://synthetic.supabase.co')
@@ -109,6 +115,11 @@ describe('AK-02 administrative Kubios routes', () => {
     for (const role of ['doctor', 'user'] as const) {
       getSession.mockResolvedValueOnce({
         user: { id: '2', username: role, role },
+        privacy: {
+          policyVersion: PRIVACY_POLICY_VERSION,
+          policyHash: PRIVACY_POLICY_HASH,
+          state: 'complete',
+        },
       })
       const response = await getParticipants(
         cookieRequest('/api/admin/kubios/participants'),
@@ -121,6 +132,11 @@ describe('AK-02 administrative Kubios routes', () => {
 
     getSession.mockResolvedValueOnce({
       user: { id: '3', username: 'user', role: 'user' },
+      privacy: {
+        policyVersion: PRIVACY_POLICY_VERSION,
+        policyHash: PRIVACY_POLICY_HASH,
+        state: 'complete',
+      },
     })
     const measurements = await getMeasurements(
       cookieRequest('/api/admin/kubios/measurements?userId=1'),

@@ -1,4 +1,6 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../src/lib/privacy-policy'
+import { expect, test, type Page } from './support/language'
+import type { Route } from '@playwright/test'
 
 /**
  * UI contract for DR08/DR09/DR10/DR11/DR18/DR19.
@@ -40,6 +42,7 @@ function sessionBody(role: "admin" | "user", username: string) {
     },
     method: "username" as const,
     expiresAt: "2026-12-01T00:00:00.000Z",
+    privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' },
   };
 }
 

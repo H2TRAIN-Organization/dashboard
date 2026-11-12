@@ -4,12 +4,27 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
-import { TrendingUp, Activity, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, LineChart as LineChartIcon } from 'lucide-react'
+import { TrendingUp, Activity, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, LineChart as LineChartIcon, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
+import StatCard from '@/components/analytics/StatCard'
+import ScrollableChart from '@/components/analytics/ScrollableChart'
+import PieSliceLabel from '@/components/analytics/PieSliceLabel'
+import { aggregatePieTail, summarizeDosesByDate } from '@/lib/chart-grouping'
+import { splitFoodRecords } from '@/lib/meal-classification'
+import { finiteAverage, latestValidDate, parseFiniteNumber, parseFiniteNumberOrZero } from '@/lib/number-stats'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
+
+/** Tipos de insulina que se muestran individualmente antes de agrupar en "Otros". */
+const INSULIN_TOP_TYPES = 5
+/** Color del sector "Otros" del pie chart de insulina. */
+const OTHERS_COLOR = '#94A3B8'
+/** Ancho interior por categoría en los gráficos de barras deslizables. */
+const BAR_INNER_WIDTH_PER_ITEM = 80
+/** Ancho interior por fecha en los gráficos de evolución temporal deslizables. */
+const LINE_INNER_WIDTH_PER_ITEM = 80
 
 export default function AnalyticsPage() {
   const { t, language } = useLanguage()
@@ -26,10 +41,16 @@ export default function AnalyticsPage() {
   const [selectedUser, setSelectedUser] = useState<string>('all')
   const [timeRange, setTimeRange] = useState<string>('30d')
   const [selectedDataType, setSelectedDataType] = useState<string>('all')
+  const [insulinOthersOpen, setInsulinOthersOpen] = useState(false)
 
   const currentRole = session?.user.role ?? null
   const currentUsername = session?.user.username ?? null
   const isIndividualUser = currentRole === 'user'
+
+  // MT38: la app móvil escribe eventos de glucemia (hipoglucemia/hiperglucemia)
+  // en la tabla de comidas. No son comidas: se excluyen de las métricas y de
+  // todos los gráficos de comidas y se avisa al usuario en el gráfico afectado.
+  const { meals: mealData, glucoseEvents } = splitFoodRecords(foodData)
 
   const fetchData = useCallback(async () => {
     try {
@@ -85,24 +106,28 @@ export default function AnalyticsPage() {
     }
   }, [session, fetchData, fetchUsers])
 
-  // Función para agrupar datos por fecha
+  // Función para agrupar datos por fecha. El orden es cronológico real: se
+  // agrupa por milisegundo y la etiqueta localizada se genera al final, porque
+  // ordenar fechas ya localizadas ("12 nov") no parsea y degradaba el orden
+  // al de inserción (MT38). Los registros con fecha inválida se omiten.
+  const dayKey = (value: Date): string =>
+    value.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
   const groupDataByDate = <T extends object>(
     data: T[],
     dateField: string = 'date_time',
   ): Array<{ date: string; count: number }> => {
-    const grouped = data.reduce<Record<string, { date: string; count: number }>>((acc, item) => {
-      const rawDate = (item as Record<string, unknown>)[dateField]
-      const date = new Date(String(rawDate)).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-      if (!acc[date]) {
-        acc[date] = { date, count: 0 }
-      }
-      acc[date].count++
-      return acc
-    }, {})
+    const grouped = new Map<number, { date: string; count: number }>()
+    for (const item of data) {
+      const ms = new Date(String((item as Record<string, unknown>)[dateField] ?? '')).getTime()
+      if (!Number.isFinite(ms)) continue
+      const entry = grouped.get(ms) ?? { date: dayKey(new Date(ms)), count: 0 }
+      entry.count++
+      grouped.set(ms, entry)
+    }
 
-    return Object.values(grouped).sort((a, b) =>
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    )
+    return [...grouped.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, entry]) => entry)
   }
 
   // Función para agrupar datos por tipo
@@ -122,63 +147,78 @@ export default function AnalyticsPage() {
     return Object.entries(grouped).map(([name, value]) => ({ name, value }))
   }
 
-  // Estadísticas generales
+  // Estadísticas generales. Los promedios usan parseo tolerante: los campos
+  // con texto vacío o no numérico no pueden convertir la media en NaN (MT41).
   const stats = {
     totalInsulin: insulinData.length,
-    totalFood: foodData.length,
+    totalFood: mealData.length,
     totalExercise: exerciseData.length,
     totalPeriods: periodData.length,
     totalMood: moodData.length,
-    totalRecords: insulinData.length + foodData.length + exerciseData.length + periodData.length + moodData.length,
+    totalRecords: insulinData.length + mealData.length + exerciseData.length + periodData.length + moodData.length,
     
     // Promedios de dosis de insulina
-    avgInsulinDose: insulinData.length > 0 
-      ? Math.round(insulinData.reduce((sum, item) => sum + parseFloat(item.dose || '0'), 0) / insulinData.length * 10) / 10 
-      : 0,
+    avgInsulinDose: finiteAverage(insulinData.map(item => item.dose)) ?? 0,
     
-    // Promedio de carbohidratos
-    avgCarbs: foodData.length > 0 
-      ? Math.round(foodData.reduce((sum, item) => sum + parseFloat(item.carbs || '0'), 0) / foodData.length * 10) / 10 
-      : 0,
+    // Promedio de carbohidratos (solo comidas reales)
+    avgCarbs: finiteAverage(mealData.map(item => item.carbs)) ?? 0,
     
     // Promedio de estado de ánimo
-    avgMood: moodData.length > 0 
-      ? Math.round(moodData.reduce((sum, item) => sum + parseFloat(String(item.mood_value ?? 0)), 0) / moodData.length * 10) / 10
-      : 0,
+    avgMood: finiteAverage(moodData.map(item => item.mood_value)) ?? 0,
     
-    // Última actividad
+    // Última actividad: solo fechas válidas participan del máximo (MT41).
     lastActivity: null as Date | null
   }
 
   // Encontrar la actividad más reciente
   const allDates = [
     ...insulinData.map(d => new Date(d.date_time)),
-    ...foodData.map(d => new Date(d.date_time)),
+    ...mealData.map(d => new Date(d.date_time)),
     ...exerciseData.map(d => new Date(d.date_time)),
     ...periodData.map(d => new Date(d.startDate)),
     ...moodData.map(d => new Date(d.date_time))
   ]
 
-  if (allDates.length > 0) {
-    stats.lastActivity = new Date(Math.max(...allDates.map(d => d.getTime())))
-  }
+  stats.lastActivity = latestValidDate(allDates)
 
   const hasAnyData = stats.totalRecords > 0
   const showData = !loading && error === null && hasAnyData
 
-  // Datos para gráficos
+  // Datos para gráficos. Las comidas usan solo registros de comida reales
+  // (MT38); el ánimo solo incluye valores numéricos, porque "Sin datos/10"
+  // en el pie de niveles no es coherente.
   const insulinByDate = groupDataByDate(insulinData)
-  const foodByDate = groupDataByDate(foodData)
+  const foodByDate = groupDataByDate(mealData)
   const exerciseByDate = groupDataByDate(exerciseData)
   const moodByDate = groupDataByDate(moodData)
 
   const insulinByType = groupDataByType(insulinData, 'insulinType')
-  const foodByType = groupDataByType(foodData, 'food_type')
-  const moodByValue = groupDataByType(moodData, 'mood_value')
+  const foodByType = groupDataByType(mealData, 'food_type')
+  const moodByValue = groupDataByType(
+    moodData.filter(item => parseFiniteNumber(item.mood_value) !== null),
+    'mood_value',
+  )
+
+  // Inyecciones y promedio de dosis reales por día; dos gráficos separados
+  // para que cada título represente exactamente lo que dibuja. La clave de
+  // día se genera a partir de la fecha ya parseada (MT38) y la dosis usa
+  // parseo tolerante.
+  const insulinDosesByDate = summarizeDosesByDate(
+    insulinData,
+    (row) => dayKey(new Date(String(row.date_time))),
+    (row) => parseFiniteNumberOrZero(row.dose),
+  )
+
+  // Pie chart de insulina: los tipos menos representativos se agrupan en
+  // "Otros" con el porcentaje sumado, con desglose disponible en desplegable.
+  const insulinPie = aggregatePieTail(insulinByType, INSULIN_TOP_TYPES, t.analytics.others)
+  const insulinPieData = insulinPie.others !== null
+    ? [...insulinPie.slices, insulinPie.others]
+    : insulinPie.slices
+  const insulinTotal = insulinByType.reduce((total, entry) => total + entry.value, 0)
 
   // Datos combinados para gráfico de actividad general
-  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce<Array<{ date: string; count: number }>>((acc, item) => {
-    const existing = acc.find(x => x.date === item.date)
+  const activityData = [...insulinByDate, ...foodByDate, ...exerciseByDate, ...moodByDate].reduce<Array<{ date: string; count: number }>>((acc, item) => {    const existing = acc.find(x => x.date === item.date)
     if (existing) {
       existing.count += item.count
     } else {
@@ -332,131 +372,83 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* Estadísticas generales */}
+          {/* Estadísticas: una sola estructura de tarjeta, centrada en
+              filas de 3 arriba / 2 abajo en escritorio (MT06). */}
           {showData && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-12">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mb-6 sm:mb-12">
             {insulinData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 transform hover:-translate-y-1">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 sm:p-3 lg:p-4 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl sm:rounded-2xl shadow-lg">
-                    <Pill className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white" />
-                  </div>
-                </div>
-                <div className="ml-3 sm:ml-4 lg:ml-6">
-                  <h3 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-900">{t.dashboard.insulin}</h3>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600">{stats.totalInsulin}</p>
-                  <p className="text-xs sm:text-sm text-slate-600">{t.analytics.average}: {stats.avgInsulinDose} {t.analytics.units}</p>
-                </div>
-              </div>
-            </div>
+              <StatCard
+                icon={Pill}
+                iconGradient="from-blue-600 to-blue-700"
+                accent="text-blue-600"
+                title={t.dashboard.insulin}
+                value={String(stats.totalInsulin)}
+                description={`${t.analytics.average}: ${stats.avgInsulinDose} ${t.analytics.units}`}
+              />
             )}
 
             {foodData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-green-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg">
-                    <Utensils className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-3 sm:ml-4">
-                  <h3 className="text-sm sm:text-base lg:text-lg font-medium text-slate-800">{t.dashboard.meals}</h3>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600">{stats.totalFood}</p>
-                  <p className="text-xs sm:text-sm text-slate-600">{t.analytics.average}: {stats.avgCarbs} {t.analytics.carbohydrates}</p>
-                </div>
-              </div>
-            </div>
+              <StatCard
+                icon={Utensils}
+                iconGradient="from-green-500 to-green-600"
+                accent="text-green-600"
+                title={t.dashboard.meals}
+                value={String(stats.totalFood)}
+                description={`${t.analytics.average}: ${stats.avgCarbs} ${t.analytics.carbohydrates}`}
+              />
             )}
 
             {exerciseData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-orange-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg">
-                    <Dumbbell className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-3 sm:ml-4">
-                  <h3 className="text-sm sm:text-base lg:text-lg font-medium text-slate-800">{t.dashboard.exercise}</h3>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-600">{stats.totalExercise}</p>
-                  <p className="text-xs sm:text-sm text-slate-600">{t.analytics.registeredSessions}</p>
-                </div>
-              </div>
-            </div>
+              <StatCard
+                icon={Dumbbell}
+                iconGradient="from-orange-500 to-orange-600"
+                accent="text-orange-600"
+                title={t.dashboard.exercise}
+                value={String(stats.totalExercise)}
+                description={t.analytics.registeredSessions}
+              />
+            )}
+
+            <StatCard
+              icon={Activity}
+              iconGradient="from-indigo-500 to-indigo-600"
+              accent="text-indigo-600"
+              title={t.dashboard.total}
+              value={String(stats.totalRecords)}
+              description={t.analytics.allTypes}
+            />
+
+            {stats.lastActivity && (
+              <StatCard
+                icon={Calendar}
+                iconGradient="from-red-500 to-red-600"
+                accent="text-red-600"
+                title={t.dashboard.lastActivity}
+                value={new Date(stats.lastActivity).toLocaleDateString(locale)}
+                description={t.analytics.mostRecentDate}
+              />
+            )}
+
+            {periodData.length > 0 && (
+              <StatCard
+                icon={CalendarDays}
+                iconGradient="from-purple-500 to-purple-600"
+                accent="text-purple-600"
+                title={t.dashboard.periods}
+                value={String(stats.totalPeriods)}
+                description={t.analytics.cycleRecords}
+              />
             )}
 
             {moodData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-pink-200/50 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg">
-                    <Smile className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-3 sm:ml-4">
-                  <h3 className="text-sm sm:text-base lg:text-lg font-medium text-slate-800">{t.dashboard.mood}</h3>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-pink-600">{stats.totalMood}</p>
-                  <p className="text-xs sm:text-sm text-slate-600">{t.analytics.average}: {stats.avgMood}/10</p>
-                </div>
-              </div>
-            </div>
-            )}
-          </div>
-          )}
-
-          {/* Estadísticas adicionales */}
-          {showData && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            {periodData.length > 0 && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-purple-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg">
-                    <CalendarDays className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-lg font-medium text-slate-800">{t.dashboard.periods}</h3>
-                  <p className="text-3xl font-bold text-purple-600">{stats.totalPeriods}</p>
-                  <p className="text-sm text-slate-600">{t.analytics.cycleRecords}</p>
-                </div>
-              </div>
-            </div>
-            )}
-
-            <div className="relative bg-white/90 backdrop-blur-sm border border-indigo-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg">
-                    <Activity className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-lg font-medium text-slate-800">{t.dashboard.total}</h3>
-                  <p className="text-3xl font-bold text-indigo-600">{stats.totalRecords}</p>
-                  <p className="text-sm text-slate-600">{t.analytics.allTypes}</p>
-                </div>
-              </div>
-            </div>
-
-            {stats.lastActivity && (
-            <div className="relative bg-white/90 backdrop-blur-sm border border-red-200/50 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-lg">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-2 bg-gradient-to-br from-red-500 to-red-600 rounded-lg">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-lg font-medium text-slate-800">{t.dashboard.lastActivity}</h3>
-                  <p className="text-xl font-bold text-red-600">
-                    {new Date(stats.lastActivity).toLocaleDateString(locale)}
-                  </p>
-                  <p className="text-sm text-slate-600">{t.analytics.mostRecentDate}</p>
-                </div>
-              </div>
-            </div>
+              <StatCard
+                icon={Smile}
+                iconGradient="from-pink-500 to-pink-600"
+                accent="text-pink-600"
+                title={t.dashboard.mood}
+                value={String(stats.totalMood)}
+                description={`${t.analytics.average}: ${stats.avgMood}/10`}
+              />
             )}
           </div>
           )}
@@ -533,20 +525,23 @@ export default function AnalyticsPage() {
                       <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                           <Pie
-                            data={insulinByType}
+                            data={insulinPieData}
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                            label={<PieSliceLabel />}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"
                           >
-                            {insulinByType.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            {insulinPieData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={index === insulinPieData.length - 1 && insulinPie.others !== null ? OTHERS_COLOR : colors[index % colors.length]}
+                              />
                             ))}
                           </Pie>
-                          <Tooltip 
+                          <Tooltip
                             contentStyle={{
                               backgroundColor: 'rgba(255, 255, 255, 0.95)',
                               border: '1px solid rgba(59, 130, 246, 0.3)',
@@ -557,13 +552,41 @@ export default function AnalyticsPage() {
                             itemStyle={{ color: '#1e293b' }}
                             labelStyle={{ color: '#1e293b' }}
                             formatter={(value) => [
-                              `${value} ${t.analytics.injections}`, 
+                              `${value} ${t.analytics.injections}`,
                               t.analytics.insulinType
                             ]}
                             labelFormatter={(label) => `${t.analytics.type}: ${label}`}
                           />
                         </PieChart>
                       </ResponsiveContainer>
+                      {insulinPie.others !== null && (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            aria-expanded={insulinOthersOpen}
+                            onClick={() => setInsulinOthersOpen((open) => !open)}
+                            className="inline-flex items-center rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors"
+                          >
+                            <ChevronDown className={`h-4 w-4 mr-2 transition-transform ${insulinOthersOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                            {t.analytics.othersDetail} ({insulinPie.othersBreakdown.length})
+                          </button>
+                          {insulinOthersOpen && (
+                            <ul className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-white/80 p-3 sm:p-4">
+                              {insulinPie.othersBreakdown.map((entry) => (
+                                <li key={entry.name} className="flex items-center justify-between gap-3 text-sm text-slate-700">
+                                  <span className="flex items-center gap-2 min-w-0">
+                                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: OTHERS_COLOR }} aria-hidden="true"></span>
+                                    <span className="truncate">{entry.name}</span>
+                                  </span>
+                                  <span className="font-semibold shrink-0">
+                                    {insulinTotal > 0 ? `${((entry.value / insulinTotal) * 100).toFixed(1)}%` : '0%'}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -585,7 +608,12 @@ export default function AnalyticsPage() {
                         <strong className="text-green-600"> {t.analytics.xAxis}:</strong> {t.analytics.mealTypes} | 
                         <strong className="text-green-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      {glucoseEvents.length > 0 && (
+                        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                          {t.analytics.glucoseEventsExcluded.replace('{count}', String(glucoseEvents.length))}
+                        </p>
+                      )}
+                      <ScrollableChart height={300} minInnerWidth={foodByType.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={foodByType}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -617,12 +645,12 @@ export default function AnalyticsPage() {
                           />
                           <Bar dataKey="value" fill="#10B981" name={t.analytics.registeredMeals} />
                         </BarChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
 
-                {/* Promedio de dosis de insulina por día */}
+                {/* Inyecciones de insulina por día */}
                 {insulinByDate.length > 0 && (
                   <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
@@ -632,14 +660,14 @@ export default function AnalyticsPage() {
                         <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg mr-3">
                           <Pill className="h-5 w-5 text-white" />
                         </div>
-                        {t.analytics.averageInsulinDose}
+                        {t.analytics.injectionsPerDay}
                       </h3>
                       <p className="text-sm text-slate-600 mb-6">
-                        {t.analytics.showsAverageInsulin} 
+                        {t.analytics.showsInsulinInjections} 
                         <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={insulinByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
                         <BarChart data={insulinByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -671,7 +699,61 @@ export default function AnalyticsPage() {
                           />
                           <Bar dataKey="count" fill="#3B82F6" name={t.analytics.insulinInjections} />
                         </BarChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
+                    </div>
+                  </div>
+                )}
+
+                {/* Promedio de dosis de insulina por día */}
+                {insulinDosesByDate.length > 0 && (
+                  <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-8 overflow-hidden shadow-xl">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
+                    
+                    <div className="relative z-10">
+                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center">
+                        <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg mr-3">
+                          <Pill className="h-5 w-5 text-white" />
+                        </div>
+                        {t.analytics.averageInsulinDose}
+                      </h3>
+                      <p className="text-sm text-slate-600 mb-6">
+                        {t.analytics.showsAverageInsulin} 
+                        <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
+                        <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.averageDoseUnits}
+                      </p>
+                      <ScrollableChart height={300} minInnerWidth={insulinDosesByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
+                        <BarChart data={insulinDosesByDate}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="#9CA3AF" 
+                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                          />
+                          <YAxis 
+                            stroke="#9CA3AF" 
+                            tick={{ fontSize: 12, fill: '#9CA3AF' }}
+                            label={{ value: t.analytics.averageDoseUnits, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#9CA3AF' } }}
+                          />
+                          <Tooltip 
+                            contentStyle={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              borderRadius: '12px',
+                              color: '#1e293b',
+                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                            }}
+                            itemStyle={{ color: '#1e293b' }}
+                            labelStyle={{ color: '#1e293b' }}
+                            formatter={(value) => [
+                              `${value} ${t.analytics.units}`,
+                              t.analytics.averageDose
+                            ]}
+                            labelFormatter={(label) => `${t.analytics.date}: ${label}`}
+                          />
+                          <Bar dataKey="averageDose" fill="#6366F1" name={t.analytics.averageDose} />
+                        </BarChart>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -699,7 +781,7 @@ export default function AnalyticsPage() {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}/10 ${((percent || 0) * 100).toFixed(0)}%`}
+                            label={<PieSliceLabel format={(name, percent) => `${name}/10 ${(percent * 100).toFixed(0)}%`} />}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"
@@ -731,6 +813,23 @@ export default function AnalyticsPage() {
                 )}
               </div>
 
+              {/* MT39: separador entre las gráficas por tipo de dato y las
+                  gráficas de evolución temporal. */}
+              <div
+                className="flex items-center gap-4 pt-2"
+                role="separator"
+                aria-orientation="horizontal"
+              >
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-300/70 to-transparent" />
+                <h2 className="flex items-center gap-2 whitespace-nowrap text-base font-bold text-slate-800 sm:text-lg">
+                  <span className="inline-flex rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 p-1.5">
+                    <TrendingUp className="h-4 w-4 text-white" />
+                  </span>
+                  {t.analytics.timeEvolutionTitle}
+                </h2>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-300/70 to-transparent" />
+              </div>
+
               {/* Gráficos de evolución temporal */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Correlación Insulina vs Carbohidratos */}
@@ -750,7 +849,7 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={insulinByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={insulinByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -782,7 +881,7 @@ export default function AnalyticsPage() {
                           />
                           <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} name={t.analytics.insulinInjections} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -804,7 +903,7 @@ export default function AnalyticsPage() {
                         <strong className="text-green-400"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-green-400"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMeals}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={foodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={foodByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -836,7 +935,7 @@ export default function AnalyticsPage() {
                           />
                           <Line type="monotone" dataKey="count" stroke="#10B981" strokeWidth={2} name={t.analytics.registeredMeals} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -858,7 +957,7 @@ export default function AnalyticsPage() {
                         <strong className="text-orange-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-orange-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfSessions}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={exerciseByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={exerciseByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -890,7 +989,7 @@ export default function AnalyticsPage() {
                           />
                           <Line type="monotone" dataKey="count" stroke="#F59E0B" strokeWidth={2} name={t.analytics.exerciseSessions} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -912,7 +1011,7 @@ export default function AnalyticsPage() {
                         <strong className="text-pink-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-pink-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMoodRecords}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={moodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={moodByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -944,7 +1043,7 @@ export default function AnalyticsPage() {
                           />
                           <Line type="monotone" dataKey="count" stroke="#EC4899" strokeWidth={2} name={t.analytics.moodRecords} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}

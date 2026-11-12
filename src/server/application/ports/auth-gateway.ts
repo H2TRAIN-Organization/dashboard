@@ -1,4 +1,5 @@
 import type { Session } from "@/server/domain/session";
+import type { PrivacyDecision, PrivacyDecisionResult } from '@/server/domain/privacy';
 
 export interface LoginCredentials {
   readonly email?: string;
@@ -12,6 +13,7 @@ export interface LoginCredentials {
  * hash format is assumed by this foundation.
  */
 export interface AuthGateway {
+  decidePrivacy?(token: string, decision: PrivacyDecision): Promise<PrivacyDecisionResult>;
   authenticateByEmail(email: string, password: string): Promise<Session | null>;
   authenticateByUsername(username: string, password: string): Promise<Session | null>;
   /**

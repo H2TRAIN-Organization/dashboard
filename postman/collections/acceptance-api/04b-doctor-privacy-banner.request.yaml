@@ -1,0 +1,24 @@
+$kind: http-request
+name: '04b doctor privacy banner'
+method: POST
+url: '{{baseUrl}}/api/privacy/decision'
+order: 4200
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Origin
+    value: '{{baseUrl}}'
+  - key: Cookie
+    value: '{{doctor_cookie}}'
+body:
+  type: json
+  content: |-
+    {"policyVersion":"{{privacy_version}}","surface":"banner","decision":"accept","language":"es","requestId":"{{$guid}}"}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('privacy accepted', () => pm.response.to.have.status(200));
+      pm.test('stage is complete', () => pm.expect(pm.response.json().state).to.eql('complete'));
+    language: text/javascript
+settings:
+  disableCookies: true
