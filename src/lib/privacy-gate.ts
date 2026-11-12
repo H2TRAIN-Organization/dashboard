@@ -6,9 +6,11 @@
 export const privacyGateText = {
   es: {
     decisionConflict: 'La decisión no se pudo registrar por un conflicto del servidor. Se ha actualizado tu estado; vuelve a intentarlo.',
+    escape: 'Cerrar sesión y volver al inicio de sesión',
   },
   en: {
     decisionConflict: 'The decision could not be recorded due to a server conflict. Your state has been refreshed; please try again.',
+    escape: 'Sign out and return to the login',
   },
 } as const
 

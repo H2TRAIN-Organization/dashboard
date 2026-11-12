@@ -38,13 +38,16 @@ interface DecisionFailure {
 }
 
 /** Aviso inline cuando una decisión no se registró: el aviso legal sigue visible. */
-function DecisionFailureAlert({ failure, language, onRetry }: {
+function DecisionFailureAlert({ failure, language, onRetry, onEscape, showEscape }: {
   failure: DecisionFailure
   language: 'es' | 'en'
   onRetry: () => void
+  onEscape: () => void
+  showEscape: boolean
 }) {
   const text = privacyPolicy[language]
-  const message = failure.kind === 'transient' ? text.unavailable : privacyGateText[language].decisionConflict
+  const gate = privacyGateText[language]
+  const message = failure.kind === 'transient' ? text.unavailable : gate.decisionConflict
   return (
     <div role="alert" className="mt-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       <p className="font-medium">{message}</p>
@@ -58,19 +61,38 @@ function DecisionFailureAlert({ failure, language, onRetry }: {
         <Link href="/privacy" className="rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50">
           {text.policy}
         </Link>
+        {showEscape && (
+          <button
+            onClick={onEscape}
+            className="rounded-xl border border-red-300 bg-white px-4 py-2 font-semibold text-red-700 transition hover:bg-red-50"
+          >
+            {gate.escape}
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
 export default function PrivacyBoundary({ children }: { children: React.ReactNode }) {
-  const { session, loading, error, refresh } = useSession()
+  const { session, loading, error, refresh, logout } = useSession()
   const { language } = useLanguage()
   const path = usePathname()
   const router = useRouter()
   const [forced, setForced] = useState(false)
   const [busy, setBusy] = useState(false)
   const [decisionFailure, setDecisionFailure] = useState<DecisionFailure | null>(null)
+  const [conflictStreak, setConflictStreak] = useState(0)
+  // Transición de cierre de sesión: mientras se navega a /login no se pinta
+  // la aplicación (ni la home ni el gate), evitando el destello previo.
+  const [signingOut, setSigningOut] = useState(false)
+  const [lastPath, setLastPath] = useState(path)
+  if (lastPath !== path) {
+    // Ajuste de estado durante el render (patrón React para cambios de props):
+    // la transición termina en cuanto el router aterriza en /login.
+    setLastPath(path)
+    if (signingOut && path === '/login') setSigningOut(false)
+  }
   const initialDialogRef = useRef<HTMLDivElement>(null)
   const requestRef = useRef<{ key: string; id: string } | null>(null)
   const privacy = session?.privacy
@@ -83,6 +105,8 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
     return () => window.removeEventListener('privacy:required', required)
   }, [refresh])
   useEffect(() => { if (initial && session && path !== '/privacy') initialDialogRef.current?.focus({ preventScroll: true }) }, [initial, session, path])
+  // La navegación a /login se lanza tras renderizar el estado de salida.
+  useEffect(() => { if (signingOut) router.replace('/login') }, [signingOut, router])
 
   async function decide(decision: 'accept' | 'reject') {
     if (busy) return
@@ -97,24 +121,29 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
         body: JSON.stringify({ policyVersion: PRIVACY_POLICY_VERSION, surface: 'login', decision, language, requestId: requestRef.current.id }),
       })
       if (!response.ok) {
-        // Re-sync the authoritative stage: a conflict may mean the server
-        // already recorded another outcome for this session or request.
+        // Re-sync the authoritative stage in the background. With an existing
+        // session the gate stays mounted, so the loading card never flashes
+        // over the notice while the decision failure is shown.
+        const kind = classifyPrivacyDecisionFailure(response.status)
+        setConflictStreak((streak) => kind === 'conflict' ? streak + 1 : 0)
         await refresh().catch(() => undefined)
-        setDecisionFailure({ kind: classifyPrivacyDecisionFailure(response.status), decision })
-        return
-      }
-      if (decision === 'reject') {
-        // The atomic decision already revoked this app session and cleared its
-        // cookie. Clear the UI without invoking external-provider logout.
-        requestRef.current = null
-        window.dispatchEvent(new Event('auth:unauthorized'))
-        router.replace('/login')
+        setDecisionFailure({ kind, decision })
         return
       }
       requestRef.current = null
+      setConflictStreak(0)
       setForced(false)
+      if (decision === 'reject') {
+        // The atomic decision already revoked this app session and cleared its
+        // cookie. Enter the sign-out transition before clearing local state so
+        // the home is never rendered, and skip the external-provider logout.
+        setSigningOut(true)
+        window.dispatchEvent(new Event('auth:unauthorized'))
+        return
+      }
       await refresh()
     } catch {
+      setConflictStreak(0)
       await refresh().catch(() => undefined)
       setDecisionFailure({ kind: 'transient', decision })
     } finally { setBusy(false) }
@@ -132,8 +161,20 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
     void decide(decision)
   }
 
+  /** Salida de escape tras conflictos persistentes: logout limpio y vuelta a
+   * /login, sin renderizar la aplicación durante la transición. */
+  async function escapeToLogin() {
+    if (busy || signingOut) return
+    setBusy(true)
+    setSigningOut(true)
+    try { await logout() } finally { setBusy(false) }
+  }
+
+  if (signingOut) return null
   if (path === '/privacy') return children
-  if (loading) return (
+  // Solo la carga inicial sustituye la interfaz por la tarjeta de verificación:
+  // con una sesión existente el refresco es de fondo y el aviso no parpadea.
+  if (loading && !session) return (
     <PrivacyPanel className="max-w-sm">
       <div className="flex flex-col items-center space-y-4 text-center" role="status">
         <Loader2 className="h-10 w-10 animate-spin text-blue-600" aria-hidden="true" />
@@ -176,7 +217,15 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
         }}
       >
         <PrivacyNotice />
-        {decisionFailure && <DecisionFailureAlert failure={decisionFailure} language={language} onRetry={retryFailure} />}
+        {decisionFailure && (
+          <DecisionFailureAlert
+            failure={decisionFailure}
+            language={language}
+            onRetry={retryFailure}
+            onEscape={() => void escapeToLogin()}
+            showEscape={decisionFailure.kind === 'conflict' && conflictStreak >= 2}
+          />
+        )}
         <div className="mt-6 flex flex-wrap gap-3">
           <button disabled={busy} className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-3 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50" onClick={() => void decide('accept')}>{text.accept}</button>
           <button disabled={busy} className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50" onClick={() => void decide('reject')}>{text.reject}</button>
