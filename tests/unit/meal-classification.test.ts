@@ -18,6 +18,19 @@ describe("classifyFoodRecord", () => {
     expect(classifyFoodRecord("Hypoglycemia")).toBe("glucoseEvent");
   });
 
+  it("recognizes insulin shots stored in the food table (T14)", () => {
+    expect(classifyFoodRecord("Rápida")).toBe("insulinRecord");
+    expect(classifyFoodRecord("Lenta")).toBe("insulinRecord");
+    expect(classifyFoodRecord("Bolus")).toBe("insulinRecord");
+    expect(classifyFoodRecord("Insulina")).toBe("insulinRecord");
+    expect(classifyFoodRecord("Insulina rápida")).toBe("insulinRecord");
+  });
+
+  it("does not swallow real meals that merely resemble insulin labels", () => {
+    expect(classifyFoodRecord("Comida rápida")).toBe("meal");
+    expect(classifyFoodRecord("Lenta digestión")).toBe("meal");
+  });
+
   it("reports empty types as untyped meals, not glucose events", () => {
     expect(classifyFoodRecord("")).toBe("untyped");
     expect(classifyFoodRecord("   ")).toBe("untyped");
@@ -32,6 +45,7 @@ describe("splitFoodRecords", () => {
     { id: 3, food_type: "Almuerzo" },
     { id: 4, food_type: "HiperGlucemia" },
     { id: 5, food_type: "" },
+    { id: 6, food_type: "Rápida" },
   ];
 
   it("keeps meals and untyped records in the meals group", () => {
@@ -44,7 +58,16 @@ describe("splitFoodRecords", () => {
     expect(glucoseEvents.map((record) => record.id)).toEqual([2, 4]);
   });
 
+  it("isolates insulin records from the meal charts (T14)", () => {
+    const { insulinRecords } = splitFoodRecords(records);
+    expect(insulinRecords.map((record) => record.id)).toEqual([6]);
+  });
+
   it("returns empty groups for empty input", () => {
-    expect(splitFoodRecords([])).toEqual({ meals: [], glucoseEvents: [] });
+    expect(splitFoodRecords([])).toEqual({
+      meals: [],
+      glucoseEvents: [],
+      insulinRecords: [],
+    });
   });
 });
