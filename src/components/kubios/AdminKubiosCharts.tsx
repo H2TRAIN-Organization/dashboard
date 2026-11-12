@@ -14,38 +14,27 @@ import { useLanguage } from '@/contexts/LanguageContext'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
 import HrvLineChart, { type ChartLine, type ChartRow } from './HrvLineChart'
 import { parseKubiosDate } from '@/lib/kubios-personal'
+import { buildHrvChartRows, type HrvMeasurementInput } from '@/lib/hrv-chart-rows'
 import type { AdminKubiosMeasurement } from '@/app/admin/kubios/api'
 
 /** Ancho interior por medición en los gráficos deslizables (MT42). */
 const INNER_WIDTH_PER_MEASUREMENT = 80
 const CHART_HEIGHT = 300
 
-function buildRows(
+function buildInputs(
   measurements: readonly AdminKubiosMeasurement[],
-  locale: string,
-): ChartRow[] {
-  const rows: ChartRow[] = []
+): HrvMeasurementInput[] {
+  const inputs: HrvMeasurementInput[] = []
   for (const measurement of measurements) {
     const date = parseKubiosDate(measurement.measuredTimestamp)
     if (date === null) continue
 
-    const metrics = measurement.metrics
-    rows.push({
+    inputs.push({
       time: date.getTime(),
-      date: date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
-      readiness: metrics['readiness'] ?? null,
-      rmssd: metrics['rmssd_ms'] ?? null,
-      pnsIndex: metrics['pns_index'] ?? null,
-      snsIndex: metrics['sns_index'] ?? null,
-      heartRate: metrics['mean_hr_bpm'] ?? null,
-      hfPower: metrics['HF_power'] ?? null,
-      lfPower: metrics['LF_power'] ?? null,
-      vlfPower: metrics['VLF_power'] ?? null,
+      metrics: { ...measurement.metrics },
     })
   }
-
-  rows.sort((a, b) => a.time - b.time)
-  return rows
+  return inputs
 }
 
 function ChartCard({
@@ -82,7 +71,7 @@ export default function AdminKubiosCharts({
   const { t, language } = useLanguage()
   const locale = language === 'en' ? 'en-US' : 'es-ES'
 
-  const rows = buildRows(measurements, locale)
+  const rows = buildHrvChartRows(buildInputs(measurements), locale)
   if (rows.length === 0) return null
 
   return (
@@ -106,20 +95,20 @@ export default function AdminKubiosCharts({
           title={t.kubios.charts.readinessEvolution}
           yLabel={t.kubios.charts.readinessPercentage}
           rows={rows}
-          lines={[{ dataKey: 'readiness', name: t.kubios.charts.averageReadiness, color: '#10B981' }]}
+          lines={[{ dataKey: 'readiness', name: t.kubios.charts.averageReadiness, color: '#10B981', unit: '%' }]}
           domain={[0, 100]}
         />
         <ChartCard
           title={t.kubios.charts.heartRateRest}
           yLabel={t.kubios.charts.heartRateBpm}
           rows={rows}
-          lines={[{ dataKey: 'heartRate', name: t.kubios.charts.heartRateRestLabel, color: '#EF4444' }]}
+          lines={[{ dataKey: 'heartRate', name: t.kubios.charts.heartRateRestLabel, color: '#EF4444', unit: 'bpm' }]}
         />
         <ChartCard
           title={t.kubios.charts.rmssdEvolution}
           yLabel={t.kubios.charts.rmssdMs}
           rows={rows}
-          lines={[{ dataKey: 'rmssd', name: t.kubios.metrics.rmssd, color: '#3B82F6' }]}
+          lines={[{ dataKey: 'rmssd', name: t.kubios.metrics.rmssd, color: '#3B82F6', unit: 'ms' }]}
         />
         <ChartCard
           title={t.kubios.charts.pnsSnsIndices}
@@ -135,9 +124,9 @@ export default function AdminKubiosCharts({
           yLabel={t.kubios.charts.spectralPower}
           rows={rows}
           lines={[
-            { dataKey: 'hfPower', name: t.kubios.charts.hfPower, color: '#06B6D4' },
-            { dataKey: 'lfPower', name: t.kubios.charts.lfPower, color: '#8B5CF6', dashed: true },
-            { dataKey: 'vlfPower', name: t.kubios.charts.vlfPower, color: '#F97316', dashed: true },
+            { dataKey: 'hfPower', name: t.kubios.charts.hfPower, color: '#06B6D4', unit: 'ms²' },
+            { dataKey: 'lfPower', name: t.kubios.charts.lfPower, color: '#8B5CF6', dashed: true, unit: 'ms²' },
+            { dataKey: 'vlfPower', name: t.kubios.charts.vlfPower, color: '#F97316', dashed: true, unit: 'ms²' },
           ]}
         />
       </div>

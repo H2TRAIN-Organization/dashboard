@@ -6,8 +6,9 @@ import {
   parseKubiosDate,
   type KubiosLatestResult,
 } from '@/lib/kubios-personal'
+import { buildHrvChartRows, averageOfChartKey, type HrvMeasurementInput } from '@/lib/hrv-chart-rows'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
-import HrvLineChart, { type ChartRow } from './kubios/HrvLineChart'
+import HrvLineChart from './kubios/HrvLineChart'
 
 interface HRVChartsProps {
   results: KubiosLatestResult[]
@@ -17,68 +18,37 @@ interface HRVChartsProps {
 const INNER_WIDTH_PER_MEASUREMENT = 80
 const DEFAULT_CHART_HEIGHT = 340
 
-function numericMetric(
-  metrics: Record<string, unknown>,
-  key: string,
-): number | null {
-  const value = metrics[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
-function average(values: Array<number | null>): number | null {
-  const valid = values.filter((value): value is number => value !== null)
-  if (valid.length === 0) return null
-  return valid.reduce((sum, value) => sum + value, 0) / valid.length
+function frequencyMetrics(result: unknown): Record<string, unknown> {
+  if (typeof result !== 'object' || result === null) return {}
+  const freqDomain = (result as Record<string, unknown>).freq_domain
+  if (typeof freqDomain !== 'object' || freqDomain === null) return {}
+  return freqDomain as Record<string, unknown>
 }
 
 /**
- * Gráficos de las mediciones propias. Las filas sin fecha válida no se pintan y
- * las métricas ausentes quedan como huecos (`null`); no se convierten en 0 ni se
- * rellenan con datos de ejemplo.
+ * Gráficos de las mediciones propias. Las filas sin fecha válida no se pintan
+ * y las métricas ausentes quedan como huecos (`null`); no se convierten en 0
+ * ni se rellenan con datos de ejemplo.
  */
 export default function HRVCharts({ results }: HRVChartsProps) {
   const { t, language } = useLanguage()
   const locale = language === 'en' ? 'en-US' : 'es-ES'
   const notAvailable = t.kubios.personal.notAvailable
 
-  const rows: ChartRow[] = []
+  const inputs: HrvMeasurementInput[] = []
   for (const result of results) {
     const date = parseKubiosDate(result.measured_timestamp)
     if (date === null) continue
 
-    rows.push({
-      time: date.getTime(),
-      date: date.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
-      readiness: numericMetric(result.result, 'readiness'),
-      rmssd: numericMetric(result.result, 'rmssd_ms'),
-      pnsIndex: numericMetric(result.result, 'pns_index'),
-      snsIndex: numericMetric(result.result, 'sns_index'),
-      heartRate: numericMetric(result.result, 'mean_hr_bpm'),
-      hfPower: numericMetric(
-        typeof result.result.freq_domain === 'object' &&
-          result.result.freq_domain !== null
-          ? (result.result.freq_domain as Record<string, unknown>)
-          : {},
-        'HF_power',
-      ),
-      lfPower: numericMetric(
-        typeof result.result.freq_domain === 'object' &&
-          result.result.freq_domain !== null
-          ? (result.result.freq_domain as Record<string, unknown>)
-          : {},
-        'LF_power',
-      ),
-      vlfPower: numericMetric(
-        typeof result.result.freq_domain === 'object' &&
-          result.result.freq_domain !== null
-          ? (result.result.freq_domain as Record<string, unknown>)
-          : {},
-        'VLF_power',
-      ),
-    })
+    const resultMetrics =
+      typeof result.result === 'object' && result.result !== null
+        ? (result.result as Record<string, unknown>)
+        : {}
+    const metrics = { ...resultMetrics, ...frequencyMetrics(result.result) }
+    inputs.push({ time: date.getTime(), metrics })
   }
 
-  rows.sort((a, b) => a.time - b.time)
+  const rows = buildHrvChartRows(inputs, locale)
 
   if (rows.length === 0) {
     return (
@@ -88,9 +58,9 @@ export default function HRVCharts({ results }: HRVChartsProps) {
     )
   }
 
-  const avgReadiness = average(rows.map((row) => row.readiness))
-  const avgRmssd = average(rows.map((row) => row.rmssd))
-  const avgHeartRate = average(rows.map((row) => row.heartRate))
+  const avgReadiness = averageOfChartKey(rows, 'readiness')
+  const avgRmssd = averageOfChartKey(rows, 'rmssd')
+  const avgHeartRate = averageOfChartKey(rows, 'heartRate')
   const lastRecords = t.kubios.charts.lastRecords.replace(
     '{count}',
     rows.length.toString(),
@@ -169,6 +139,7 @@ export default function HRVCharts({ results }: HRVChartsProps) {
                 dataKey: 'readiness',
                 name: t.kubios.charts.averageReadiness,
                 color: '#10B981',
+                unit: '%',
               },
             ]}
           />
@@ -188,6 +159,7 @@ export default function HRVCharts({ results }: HRVChartsProps) {
                 dataKey: 'rmssd',
                 name: t.kubios.metrics.rmssd,
                 color: '#3B82F6',
+                unit: 'ms',
               },
             ]}
           />
@@ -232,6 +204,7 @@ export default function HRVCharts({ results }: HRVChartsProps) {
                 dataKey: 'heartRate',
                 name: t.kubios.charts.heartRateRestLabel,
                 color: '#EF4444',
+                unit: 'bpm',
               },
             ]}
           />
@@ -251,18 +224,21 @@ export default function HRVCharts({ results }: HRVChartsProps) {
                 dataKey: 'hfPower',
                 name: t.kubios.charts.hfPower,
                 color: '#06B6D4',
+                unit: 'ms²',
               },
               {
                 dataKey: 'lfPower',
                 name: t.kubios.charts.lfPower,
                 color: '#8B5CF6',
                 dashed: true,
+                unit: 'ms²',
               },
               {
                 dataKey: 'vlfPower',
                 name: t.kubios.charts.vlfPower,
                 color: '#F97316',
                 dashed: true,
+                unit: 'ms²',
               },
             ]}
           />
