@@ -14,6 +14,19 @@ export type UsersPageSize = (typeof USERS_PAGE_SIZES)[number]
 
 export const DEFAULT_USERS_PAGE_SIZE: UsersPageSize = 25
 
+/**
+ * Health Data record groups share the page size options with user
+ * management (DR18), but start smaller because record pills are read
+ * in long scans.
+ */
+export const DEFAULT_RECORDS_PAGE_SIZE: UsersPageSize = 10
+
+export const RECORDS_PAGE_SIZES = USERS_PAGE_SIZES
+
+export function isRecordsPageSize(value: number): value is UsersPageSize {
+  return isUsersPageSize(value)
+}
+
 export function isUsersPageSize(value: number): value is UsersPageSize {
   return value === 10 || value === 25 || value === 50
 }
