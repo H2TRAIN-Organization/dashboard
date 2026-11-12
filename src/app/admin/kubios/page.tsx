@@ -15,6 +15,7 @@ import {
 import HybridNavigation from '@/components/HybridNavigation'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
+import AdminKubiosCharts from '@/components/kubios/AdminKubiosCharts'
 import UserAutocomplete, {
   type UserAutocompleteItem,
 } from '@/app/data/user-autocomplete'
@@ -333,7 +334,14 @@ function AdminKubiosContent() {
               </div>
             </div>
           ) : hasMeasurements ? (
-            <AdminKubiosTable measurements={visibleMeasurements} />
+            <>
+              {selectedUserId !== null && (
+                <div className="mb-6">
+                  <AdminKubiosCharts measurements={visibleMeasurements} />
+                </div>
+              )}
+              <AdminKubiosTable measurements={visibleMeasurements} />
+            </>
           ) : visibleUnavailableCount > 0 ? null : (
             <StatusPanel
               title={t.admin.kubios.title}

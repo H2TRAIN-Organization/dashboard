@@ -14,6 +14,30 @@ export const privacyGateText = {
   },
 } as const
 
+/**
+ * Textos del rechazo desde la vista Política de Privacidad (MT37). Como el
+ * resto de textos del gate, no forman parte del aviso legal auditado: pueden
+ * ajustarse sin invalidar el hash de la política.
+ */
+export const privacyRejectionText = {
+  es: {
+    rejectButton: 'Rechazar la política de privacidad',
+    modalTitle: '¿Confirma el rechazo?',
+    modalBody:
+      'Si rechaza la política de privacidad, su sesión actual se cerrará y será redirigido a la pantalla de inicio de sesión. Esta acción no retira el consentimiento externo ni suprime sus datos.',
+    confirm: 'Sí, rechazar y cerrar sesión',
+    cancel: 'Cancelar',
+  },
+  en: {
+    rejectButton: 'Reject the privacy policy',
+    modalTitle: 'Do you confirm the rejection?',
+    modalBody:
+      'If you reject the privacy policy, your current session will be closed and you will be redirected to the sign-in screen. This action does not withdraw external consent or delete your data.',
+    confirm: 'Yes, reject and sign out',
+    cancel: 'Cancel',
+  },
+} as const
+
 export type PrivacyDecisionFailureKind = 'transient' | 'conflict'
 
 /**

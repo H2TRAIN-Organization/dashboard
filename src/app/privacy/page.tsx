@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import PrivacyNotice from '@/components/privacy/PrivacyNotice'
+import PrivacyRejection from '@/components/privacy/PrivacyRejection'
 import { PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
 
 export default function PrivacyPage() {
@@ -34,12 +35,16 @@ export default function PrivacyPage() {
               {language === 'es' ? 'Estado de esta sesión: ' : 'Current session status: '}
               {loading ? '…' : error ? (language === 'es' ? 'no disponible' : 'unavailable') : session ? states[currentPrivacy?.state ?? 'initial'] : (language === 'es' ? 'sin sesión' : 'signed out')}
             </p>
-            <Link
-              className="inline-flex items-center rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50"
-              href={session ? '/' : '/login'}
-            >
-              {language === 'es' ? 'Volver' : 'Back'}
-            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                className="inline-flex items-center rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50"
+                href={session ? '/' : '/login'}
+              >
+                {language === 'es' ? 'Volver' : 'Back'}
+              </Link>
+              {/* MT37: rechazo desde la propia vista de la política. */}
+              <PrivacyRejection />
+            </div>
           </div>
         </div>
       </div>

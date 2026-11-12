@@ -421,6 +421,8 @@ export interface Translations {
     correlations: string
     generalActivityByDate: string
     registeredMealTypes: string
+    timeEvolutionTitle: string
+    glucoseEventsExcluded: string
     // Textos específicos de gráficos
     average: string
     units: string
@@ -631,6 +633,8 @@ export interface Translations {
       participantsError: string
       retryParticipants: string
       tableCaption: string
+      chartsTitle: string
+      chartsHint: string
       participant: string
       measuredAt: string
       syncedAt: string
@@ -1181,6 +1185,9 @@ export const translations: Record<Language, Translations> = {
       correlations: 'Correlaciones',
       generalActivityByDate: 'Actividad General por Fecha',
       registeredMealTypes: 'Tipos de Comida Registrados',
+      timeEvolutionTitle: 'Evolución temporal',
+      glucoseEventsExcluded:
+        '{count} registros de eventos de glucemia (hipoglucemia/hiperglucemia) no son comidas y no se muestran en este gráfico.',
       // Textos específicos de gráficos
       average: 'Promedio',
       units: 'unidades',
@@ -1387,6 +1394,9 @@ export const translations: Record<Language, Translations> = {
         participantsError: 'No se pudieron cargar los participantes.',
         retryParticipants: 'Reintentar participantes',
         tableCaption: 'Mediciones Kubios de los participantes',
+        chartsTitle: 'Gráficos del participante',
+        chartsHint:
+          '{count} mediciones del participante seleccionado; desliza en ambos ejes si hay muchos datos.',
         participant: 'Participante',
         measuredAt: 'Medición',
         syncedAt: 'Sincronización',
@@ -1927,6 +1937,9 @@ export const translations: Record<Language, Translations> = {
       correlations: 'Correlations',
       generalActivityByDate: 'General Activity by Date',
       registeredMealTypes: 'Registered Meal Types',
+      timeEvolutionTitle: 'Time Evolution',
+      glucoseEventsExcluded:
+        '{count} glucose event records (hypoglycemia/hyperglycemia) are not meals and are not shown in this chart.',
       // Textos específicos de gráficos
       average: 'Average',
       units: 'units',
@@ -2133,6 +2146,9 @@ export const translations: Record<Language, Translations> = {
         participantsError: 'The participants could not be loaded.',
         retryParticipants: 'Retry participants',
         tableCaption: 'Kubios measurements for participants',
+        chartsTitle: 'Participant charts',
+        chartsHint:
+          '{count} measurements for the selected participant; scroll on both axes when there is a lot of data.',
         participant: 'Participant',
         measuredAt: 'Measurement',
         syncedAt: 'Synchronization',

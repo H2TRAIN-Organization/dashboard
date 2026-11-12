@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_RECORDS_PAGE_SIZE,
   DEFAULT_USERS_PAGE_SIZE,
+  RECORDS_PAGE_SIZES,
   USERS_PAGE_SIZES,
   clampUsersPage,
+  isRecordsPageSize,
   isUserGroupExpanded,
   isUsersPageSize,
   pageAfterDeletion,
   placeholderUser,
   usersForRecordGroups,
+  usersOffset,
   usersRange,
   usersTotalPages,
   visibleMetricCards,
@@ -65,6 +69,30 @@ describe("users pagination", () => {
     expect(pageAfterDeletion(2, 51, 25)).toBe(2);
     expect(pageAfterDeletion(1, 1, 25)).toBe(1);
     expect(pageAfterDeletion(4, 31, 25)).toBe(2);
+  });
+});
+
+describe("health data record pagination", () => {
+  it("uses 10 records per page by default with the shared size options", () => {
+    expect(RECORDS_PAGE_SIZES).toEqual([10, 25, 50]);
+    expect(DEFAULT_RECORDS_PAGE_SIZE).toBe(10);
+    expect(isRecordsPageSize(10)).toBe(true);
+    expect(isRecordsPageSize(25)).toBe(true);
+    expect(isRecordsPageSize(50)).toBe(true);
+    expect(isRecordsPageSize(2)).toBe(false);
+  });
+
+  it("paginates record groups like any other list", () => {
+    expect(usersTotalPages(25, 10)).toBe(3);
+    expect(clampUsersPage(4, 25, 10)).toBe(3);
+    expect(usersOffset(3, 10)).toBe(20);
+    expect(usersRange(25, 3, 10)).toEqual({ from: 21, to: 25 });
+  });
+
+  it("always keeps a first page for empty or out-of-range positions", () => {
+    expect(usersTotalPages(0, 10)).toBe(1);
+    expect(clampUsersPage(Number.NaN, 5, 10)).toBe(1);
+    expect(usersRange(0, 2, 10)).toEqual({ from: 0, to: 0 });
   });
 });
 

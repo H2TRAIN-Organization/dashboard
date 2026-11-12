@@ -1,5 +1,5 @@
 import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../src/lib/privacy-policy'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './support/language'
 
 const sessionFor = (role: 'admin' | 'doctor' | 'user') => ({
   user: {

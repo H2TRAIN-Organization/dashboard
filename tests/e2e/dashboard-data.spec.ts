@@ -1,5 +1,6 @@
 import { PRIVACY_POLICY_VERSION, PRIVACY_POLICY_HASH } from '../../src/lib/privacy-policy'
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page } from './support/language'
+import type { Route } from '@playwright/test'
 
 /**
  * UI contract for DR08/DR09/DR10/DR11/DR18/DR19.

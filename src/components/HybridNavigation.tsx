@@ -2,8 +2,8 @@
 
 import { useSession } from '@/contexts/SessionContext'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, LogOut, User, Sparkles, Shield, Stethoscope, UserIcon } from 'lucide-react'
 import Link from 'next/link'
+import { ArrowLeft, LogOut, User, Sparkles, Shield, Stethoscope, UserIcon } from 'lucide-react'
 import Image from 'next/image'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -99,10 +99,6 @@ export default function HybridNavigation({ title, showBackButton = true }: Hybri
             </button>
           </div>
         </div>
-      </div>
-      <div className="relative mx-auto flex max-w-7xl flex-wrap gap-4 px-4 pb-3 text-sm text-white">
-        <Link href="/privacy" className="underline underline-offset-4">{t.navigation.privacy}</Link>
-        {userRole === 'admin' && <Link href="/admin/kubios" className="underline underline-offset-4">{t.navigation.adminKubios}</Link>}
       </div>
     </div>
   )
