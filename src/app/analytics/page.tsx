@@ -23,6 +23,8 @@ const INSULIN_TOP_TYPES = 5
 const OTHERS_COLOR = '#94A3B8'
 /** Ancho interior por categoría en los gráficos de barras deslizables. */
 const BAR_INNER_WIDTH_PER_ITEM = 80
+/** Ancho interior por fecha en los gráficos de evolución temporal deslizables. */
+const LINE_INNER_WIDTH_PER_ITEM = 80
 
 export default function AnalyticsPage() {
   const { t, language } = useLanguage()
@@ -847,7 +849,7 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={insulinByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={insulinByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -879,7 +881,7 @@ export default function AnalyticsPage() {
                           />
                           <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} name={t.analytics.insulinInjections} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -901,7 +903,7 @@ export default function AnalyticsPage() {
                         <strong className="text-green-400"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-green-400"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMeals}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={foodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={foodByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -933,7 +935,7 @@ export default function AnalyticsPage() {
                           />
                           <Line type="monotone" dataKey="count" stroke="#10B981" strokeWidth={2} name={t.analytics.registeredMeals} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -955,7 +957,7 @@ export default function AnalyticsPage() {
                         <strong className="text-orange-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-orange-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfSessions}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={exerciseByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={exerciseByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -987,7 +989,7 @@ export default function AnalyticsPage() {
                           />
                           <Line type="monotone" dataKey="count" stroke="#F59E0B" strokeWidth={2} name={t.analytics.exerciseSessions} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}
@@ -1009,7 +1011,7 @@ export default function AnalyticsPage() {
                         <strong className="text-pink-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} | 
                         <strong className="text-pink-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMoodRecords}
                       </p>
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ScrollableChart height={300} minInnerWidth={moodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
                         <LineChart data={moodByDate}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                           <XAxis 
@@ -1041,7 +1043,7 @@ export default function AnalyticsPage() {
                           />
                           <Line type="monotone" dataKey="count" stroke="#EC4899" strokeWidth={2} name={t.analytics.moodRecords} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   </div>
                 )}

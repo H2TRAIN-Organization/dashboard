@@ -6,11 +6,16 @@ import {
   parseKubiosDate,
   type KubiosLatestResult,
 } from '@/lib/kubios-personal'
+import ScrollableChart from '@/components/analytics/ScrollableChart'
 import HrvLineChart, { type ChartRow } from './kubios/HrvLineChart'
 
 interface HRVChartsProps {
   results: KubiosLatestResult[]
 }
+
+/** Ancho interior por medición en los gráficos deslizables de la vista personal. */
+const INNER_WIDTH_PER_MEASUREMENT = 80
+const DEFAULT_CHART_HEIGHT = 340
 
 function numericMetric(
   metrics: Record<string, unknown>,
@@ -154,105 +159,115 @@ export default function HRVCharts({ results }: HRVChartsProps) {
         <h3 className="mb-3 text-lg font-bold text-slate-900">
           {t.kubios.charts.readinessEvolution}
         </h3>
-        <HrvLineChart
-          rows={rows}
-          yLabel={t.kubios.charts.readinessPercentage}
-          domain={[0, 100]}
-          lines={[
-            {
-              dataKey: 'readiness',
-              name: t.kubios.charts.averageReadiness,
-              color: '#10B981',
-            },
-          ]}
-        />
+        <ScrollableChart height={DEFAULT_CHART_HEIGHT} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
+          <HrvLineChart
+            rows={rows}
+            yLabel={t.kubios.charts.readinessPercentage}
+            domain={[0, 100]}
+            lines={[
+              {
+                dataKey: 'readiness',
+                name: t.kubios.charts.averageReadiness,
+                color: '#10B981',
+              },
+            ]}
+          />
+        </ScrollableChart>
       </div>
 
       <div>
         <h3 className="mb-3 text-lg font-bold text-slate-900">
           {t.kubios.charts.rmssdEvolution}
         </h3>
-        <HrvLineChart
-          rows={rows}
-          yLabel={t.kubios.charts.rmssdMs}
-          lines={[
-            {
-              dataKey: 'rmssd',
-              name: t.kubios.metrics.rmssd,
-              color: '#3B82F6',
-            },
-          ]}
-        />
+        <ScrollableChart height={DEFAULT_CHART_HEIGHT} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
+          <HrvLineChart
+            rows={rows}
+            yLabel={t.kubios.charts.rmssdMs}
+            lines={[
+              {
+                dataKey: 'rmssd',
+                name: t.kubios.metrics.rmssd,
+                color: '#3B82F6',
+              },
+            ]}
+          />
+        </ScrollableChart>
       </div>
 
       <div>
         <h3 className="mb-3 text-lg font-bold text-slate-900">
           {t.kubios.charts.pnsSnsIndices}
         </h3>
-        <HrvLineChart
-          rows={rows}
-          yLabel={t.kubios.charts.pnsSnsIndicesLabel}
-          lines={[
-            {
-              dataKey: 'pnsIndex',
-              name: t.kubios.charts.pnsIndex,
-              color: '#8B5CF6',
-              dashed: true,
-            },
-            {
-              dataKey: 'snsIndex',
-              name: t.kubios.charts.snsIndex,
-              color: '#F59E0B',
-            },
-          ]}
-        />
+        <ScrollableChart height={DEFAULT_CHART_HEIGHT} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
+          <HrvLineChart
+            rows={rows}
+            yLabel={t.kubios.charts.pnsSnsIndicesLabel}
+            lines={[
+              {
+                dataKey: 'pnsIndex',
+                name: t.kubios.charts.pnsIndex,
+                color: '#8B5CF6',
+                dashed: true,
+              },
+              {
+                dataKey: 'snsIndex',
+                name: t.kubios.charts.snsIndex,
+                color: '#F59E0B',
+              },
+            ]}
+          />
+        </ScrollableChart>
       </div>
 
       <div>
         <h3 className="mb-3 text-lg font-bold text-slate-900">
           {t.kubios.charts.heartRateRest}
         </h3>
-        <HrvLineChart
-          rows={rows}
-          yLabel={t.kubios.charts.heartRateBpm}
-          lines={[
-            {
-              dataKey: 'heartRate',
-              name: t.kubios.charts.heartRateRestLabel,
-              color: '#EF4444',
-            },
-          ]}
-        />
+        <ScrollableChart height={DEFAULT_CHART_HEIGHT} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
+          <HrvLineChart
+            rows={rows}
+            yLabel={t.kubios.charts.heartRateBpm}
+            lines={[
+              {
+                dataKey: 'heartRate',
+                name: t.kubios.charts.heartRateRestLabel,
+                color: '#EF4444',
+              },
+            ]}
+          />
+        </ScrollableChart>
       </div>
 
       <div>
         <h3 className="mb-3 text-lg font-bold text-slate-900">
           {t.kubios.charts.frequencyDomain}
         </h3>
-        <HrvLineChart
-          rows={rows}
-          yLabel={t.kubios.charts.spectralPower}
-          height={380}
-          lines={[
-            {
-              dataKey: 'hfPower',
-              name: t.kubios.charts.hfPower,
-              color: '#06B6D4',
-            },
-            {
-              dataKey: 'lfPower',
-              name: t.kubios.charts.lfPower,
-              color: '#8B5CF6',
-              dashed: true,
-            },
-            {
-              dataKey: 'vlfPower',
-              name: t.kubios.charts.vlfPower,
-              color: '#F97316',
-              dashed: true,
-            },
-          ]}
-        />
+        <ScrollableChart height={380} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
+          <HrvLineChart
+            rows={rows}
+            yLabel={t.kubios.charts.spectralPower}
+            height={380}
+            lines={[
+              {
+                dataKey: 'hfPower',
+                name: t.kubios.charts.hfPower,
+                color: '#06B6D4',
+              },
+              {
+                dataKey: 'lfPower',
+                name: t.kubios.charts.lfPower,
+                color: '#8B5CF6',
+                dashed: true,
+              },
+              {
+                dataKey: 'vlfPower',
+                name: t.kubios.charts.vlfPower,
+                color: '#F97316',
+                dashed: true,
+              },
+            ]}
+          />
+        </ScrollableChart>
       </div>
     </div>
   )
