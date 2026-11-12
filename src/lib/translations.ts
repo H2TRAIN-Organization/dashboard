@@ -429,6 +429,7 @@ export interface Translations {
     clearDates: string
     timeEvolutionTitle: string
     glucoseEventsExcluded: string
+    insulinRecordsExcluded: string
     // Textos específicos de gráficos
     average: string
     units: string
@@ -1201,6 +1202,8 @@ export const translations: Record<Language, Translations> = {
       timeEvolutionTitle: 'Evolución temporal',
       glucoseEventsExcluded:
         '{count} registros de eventos de glucemia (hipoglucemia/hiperglucemia) no son comidas y no se muestran en este gráfico.',
+      insulinRecordsExcluded:
+        '{count} registros de insulina escritos por la app móvil en la tabla de comidas no son comidas y no se muestran en este gráfico (T14).',
       // Textos específicos de gráficos
       average: 'Promedio',
       units: 'unidades',
@@ -1960,6 +1963,8 @@ export const translations: Record<Language, Translations> = {
       timeEvolutionTitle: 'Time Evolution',
       glucoseEventsExcluded:
         '{count} glucose event records (hypoglycemia/hyperglycemia) are not meals and are not shown in this chart.',
+      insulinRecordsExcluded:
+        '{count} insulin records written by the mobile app into the meals table are not meals and are not shown in this chart (T14).',
       // Textos específicos de gráficos
       average: 'Average',
       units: 'units',

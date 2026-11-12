@@ -138,6 +138,18 @@ feature branches) -> T08 -> T09.
 
 === T10 — Confirmar: ¿mezcla de tipos de comida e insulina en "Registered Meal Types"? ===
 Estado: confirmado por código (hallazgo: no mezcla en el pipeline del dashboard; ver T14)
+Hallazgo:
+  - El pipeline del dashboard no puede mezclar: /api/decrypted-data ->
+    SupabaseHealthDataRepository.fetchTable solo lee fooddata para
+    foodData (health-data-repository.ts, DATA_TYPE_TABLE y DATE_COLUMN) y
+    mapHealthRecord descifra food_type solo de la spec de fooddata
+    (health-record-mapper.ts, TABLE_SPECS).
+  - El gráfico agrupa countByField(mealData, row.food_type)
+    (analytics/page.tsx). insulinType vive en insulindata y nunca entra.
+  - Conclusión: si "Rápida"/"Lenta" aparecen como tipos de comida, es
+    porque la app móvil los escribió en la tabla fooddata (mismo patrón
+    de datos sucios que MT38 con los eventos de glucemia).
+  - Mitigación: T14 extiende meal-classification para excluirlos y avisar.
 Descripción:
   Verificar por código y datos si el gráfico "Tipos de Comida Registrados"
   (src/app/analytics/page.tsx, foodByType) mezcla tipos de comida con tipos
@@ -202,7 +214,7 @@ Criterios de aceptación:
 Dependencias: ninguna (T11 recomendado antes por el mismo archivo).
 
 === T14 — Defensa de datos: insulina/glucemia escritos en fooddata ===
-Estado: pendiente
+Estado: hecho (rama feature/analytics-meal-insulin-guard)
 Descripción:
   Extender src/lib/meal-classification.ts (patrón MT38): las entradas de
   fooddata cuyo food_type nombre insulina (Rápida, Lenta, corrección de

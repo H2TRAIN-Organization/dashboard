@@ -49,7 +49,7 @@ const SESSION = {
   privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' },
 };
 
-async function mockAnalytics(page: Page) {
+async function mockAnalytics(page: Page, foodData = FOOD) {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/auth/session') return route.fulfill({ json: SESSION });
@@ -59,7 +59,7 @@ async function mockAnalytics(page: Page) {
         users: [],
         total: 0,
         insulinData: [],
-        foodData: FOOD,
+        foodData,
         exerciseData: [],
         periodData: [],
         moodData: [],
@@ -96,4 +96,24 @@ test('a divider separates data charts from time-evolution charts', async ({ page
   // The evolution section comes after the separator.
   const evolutionHeading = page.getByRole('heading', { name: 'Evolución de Registros de Comidas' });
   await expect(evolutionHeading).toBeVisible();
+});
+
+test('insulin shots written into the food table are not meal types (T14)', async ({ page }) => {
+  const foodWithInsulin = [
+    ...mealRows('Desayuno', 30),
+    ...mealRows('Almuerzo', 20),
+    ...mealRows('Cena', 10),
+    ...mealRows('Rápida', 5),
+    ...mealRows('Lenta', 3),
+  ];
+  await mockAnalytics(page, foodWithInsulin);
+  await page.goto('/analytics');
+  await expect(page.getByRole('heading', { name: 'Tipos de Comida Registrados' })).toBeVisible();
+
+  // The chart card never presents insulin types as meals and announces the
+  // excluded records with the exact count.
+  const chartCard = page.locator('div').filter({ has: page.getByRole('heading', { name: 'Tipos de Comida Registrados' }) }).last();
+  await expect(chartCard.getByText('Rápida', { exact: true })).toHaveCount(0);
+  await expect(chartCard.getByText('Lenta', { exact: true })).toHaveCount(0);
+  await expect(chartCard.getByText(/8 registros de insulina/)).toBeVisible();
 });

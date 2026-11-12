@@ -77,10 +77,11 @@ export default function AnalyticsPage() {
   const currentUsername = session?.user.username ?? null
   const isIndividualUser = currentRole === 'user'
 
-  // MT38: la app móvil escribe eventos de glucemia (hipoglucemia/hiperglucemia)
-  // en la tabla de comidas. No son comidas: se excluyen de las métricas y de
-  // todos los gráficos de comidas y se avisa al usuario en el gráfico afectado.
-  const { meals: mealData, glucoseEvents } = splitFoodRecords(foodData)
+  // MT38/T14: la app móvil escribe eventos de glucemia (hipoglucemia/
+  // hiperglucemia) y registros de insulina en la tabla de comidas. No son
+  // comidas: se excluyen de las métricas y de todos los gráficos de comidas
+  // y se avisa al usuario en el gráfico afectado.
+  const { meals: mealData, glucoseEvents, insulinRecords } = splitFoodRecords(foodData)
 
   const fetchData = useCallback(async () => {
     try {
@@ -657,6 +658,11 @@ export default function AnalyticsPage() {
                       {glucoseEvents.length > 0 && (
                         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
                           {t.analytics.glucoseEventsExcluded.replace('{count}', String(glucoseEvents.length))}
+                        </p>
+                      )}
+                      {insulinRecords.length > 0 && (
+                        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                          {t.analytics.insulinRecordsExcluded.replace('{count}', String(insulinRecords.length))}
                         </p>
                       )}
                       <ScrollableChart height={300} minInnerWidth={foodByType.length * BAR_INNER_WIDTH_PER_ITEM}>
