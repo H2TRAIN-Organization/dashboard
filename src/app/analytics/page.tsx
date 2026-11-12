@@ -44,6 +44,13 @@ const INSULIN_TOP_TYPES = 5
 const BAR_INNER_WIDTH_PER_ITEM = 80
 /** Ancho interior por fecha en los gráficos de evolución temporal deslizables. */
 const LINE_INNER_WIDTH_PER_ITEM = 80
+/** Días que muestran las mini-barras de contexto de las tarjetas. */
+const SPARKLINE_LAST_DAYS = 7
+
+/** Últimos recuentos diarios de una serie, para el contexto de las tarjetas. */
+function recentCounts(series: ReadonlyArray<{ count: number }>): number[] {
+  return series.slice(-SPARKLINE_LAST_DAYS).map((entry) => entry.count)
+}
 
 export default function AnalyticsPage() {
   const { t, language } = useLanguage()
@@ -374,6 +381,8 @@ export default function AnalyticsPage() {
                 title={t.dashboard.insulin}
                 value={String(stats.totalInsulin)}
                 description={`${t.analytics.average}: ${stats.avgInsulinDose} ${t.analytics.units}`}
+                sparkData={recentCounts(insulinByDate)}
+                sparkColor="#3B82F6"
               />
             )}
 
@@ -385,6 +394,8 @@ export default function AnalyticsPage() {
                 title={t.dashboard.meals}
                 value={String(stats.totalFood)}
                 description={`${t.analytics.average}: ${stats.avgCarbs} ${t.analytics.carbohydrates}`}
+                sparkData={recentCounts(foodByDate)}
+                sparkColor="#10B981"
               />
             )}
 
@@ -396,6 +407,8 @@ export default function AnalyticsPage() {
                 title={t.dashboard.exercise}
                 value={String(stats.totalExercise)}
                 description={t.analytics.registeredSessions}
+                sparkData={recentCounts(exerciseByDate)}
+                sparkColor="#F59E0B"
               />
             )}
 
@@ -438,6 +451,8 @@ export default function AnalyticsPage() {
                 title={t.dashboard.mood}
                 value={String(stats.totalMood)}
                 description={`${t.analytics.average}: ${stats.avgMood}/10`}
+                sparkData={recentCounts(moodByDate)}
+                sparkColor="#EC4899"
               />
             )}
           </div>
