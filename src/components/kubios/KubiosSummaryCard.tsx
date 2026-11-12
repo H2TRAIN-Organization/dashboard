@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { AlertTriangle, ArrowUpRight, Clock, Heart, TrendingUp } from 'lucide-react'
 import { usePermissions } from '@/components/RoleGuard'
 import { useLanguage } from '@/contexts/LanguageContext'
+import ReadinessSparkline from '@/components/kubios/ReadinessSparkline'
 import {
   kubiosErrorTranslationKey,
   useKubiosPersonal,
@@ -11,7 +12,11 @@ import {
 import {
   formatKubiosDate,
   formatKubiosMetric,
+  parseKubiosDate,
 } from '@/lib/kubios-personal'
+
+/** Nº máximo de mediciones que muestra la mini-tendencia de readiness. */
+const SPARKLINE_MAX_MEASUREMENTS = 14
 
 /**
  * Resumen compacto de las mediciones Kubios propias. La tarjeta y la vista
@@ -36,6 +41,22 @@ export default function KubiosSummaryCard() {
   const readinessText = formatKubiosMetric(readiness, 1, notAvailable)
   const isStale = view.stale
   const hasError = view.error !== null
+  // Mini-tendencia de readiness: cronológica ascendente, solo mediciones con
+  // fecha válida, huecos conservados y limitada a las últimas mediciones.
+  const readinessSeries = view.results
+    .map((result) => {
+      const date = parseKubiosDate(result.measured_timestamp)
+      const readiness =
+        typeof result.result.readiness === 'number' &&
+        Number.isFinite(result.result.readiness)
+          ? result.result.readiness
+          : null
+      return { time: date?.getTime() ?? Number.NaN, readiness }
+    })
+    .filter((row) => Number.isFinite(row.time))
+    .sort((a, b) => a.time - b.time)
+    .slice(-SPARKLINE_MAX_MEASUREMENTS)
+    .map((row) => row.readiness)
 
   return (
     <Link href="/kubios" className="group block" aria-label={t.kubios.personal.viewDetails}>
@@ -80,6 +101,13 @@ export default function KubiosSummaryCard() {
               </dd>
             </div>
           </dl>
+
+          {readinessSeries.length > 1 && (
+            <ReadinessSparkline
+              values={readinessSeries}
+              ariaLabel={t.kubios.personal.readinessSparklineAria}
+            />
+          )}
 
           <div className="mb-4 flex items-center gap-1.5 text-xs font-medium text-slate-500">
             <Clock className="h-3.5 w-3.5" />

@@ -291,6 +291,7 @@ export interface Translations {
       onlyOwnData: string
       latestMeasurement: string
       latestReadiness: string
+      readinessSparklineAria: string
       syncedAt: string
       staleWarning: string
       viewDetails: string
@@ -1061,6 +1062,7 @@ export const translations: Record<Language, Translations> = {
         onlyOwnData: 'Solo se muestran los datos propios de Kubios.',
         latestMeasurement: 'Última medición',
         latestReadiness: 'Readiness reciente',
+        readinessSparklineAria: 'Tendencia de readiness de las últimas mediciones',
         syncedAt: 'Última sincronización',
         staleWarning: 'Los datos mostrados son la última copia sincronizada y podrían no estar actualizados.',
         viewDetails: 'Ver Kubios',
@@ -1815,6 +1817,7 @@ export const translations: Record<Language, Translations> = {
         onlyOwnData: 'Only own Kubios data is shown.',
         latestMeasurement: 'Latest measurement',
         latestReadiness: 'Recent readiness',
+        readinessSparklineAria: 'Readiness trend of the latest measurements',
         syncedAt: 'Last sync',
         staleWarning: 'The data shown is the last synchronized copy and may be out of date.',
         viewDetails: 'View Kubios',
