@@ -15,7 +15,7 @@ export async function readStudy(token: string | undefined, period: typeof STUDY_
   assertPrivacyAcknowledged(session)
   const actor = toActiveActor(session)
   if (actor.role !== 'admin' && actor.role !== 'doctor') throw new ForbiddenError()
-  const health = await app.useCases.data.getDecryptedData(actor, { selectedUser: 'all', selectedDataType: 'all', timeRange: period, dateFilter: null })
+  const health = await app.useCases.data.getDecryptedData(actor, { selectedUser: 'all', selectedDataType: 'all', timeRange: period, dateFilter: null, dateFrom: null, dateTo: null })
   const kubios: StudyRecord[] = []
   let kubiosSource: StudyResponse['sources']['kubios'] = 'restricted'
   if (actor.role === 'admin') {

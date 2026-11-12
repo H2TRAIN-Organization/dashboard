@@ -133,6 +133,8 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
       from: "2026-01-01T00:00:00.000Z",
       to: "2026-01-31T23:59:59.999Z",
     });
@@ -204,6 +206,8 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
       from: null,
       to: "2026-01-31T23:59:59.999Z",
     });
@@ -219,6 +223,8 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
       from: "2026-01-15T10:00:00.000Z",
       to: "2026-01-15T10:00:00.000Z",
     });
@@ -241,6 +247,8 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
       from: null,
       to: "2026-12-31T23:59:59.999Z",
     });
@@ -269,6 +277,8 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
       from: null,
       to: "2026-12-31T23:59:59.999Z",
     } as const;
@@ -330,6 +340,8 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
       from: null,
       to: "2026-12-31T23:59:59.999Z",
     });
@@ -364,6 +376,8 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
       from: null,
       to: "2026-12-31T23:59:59.999Z",
     });
@@ -409,6 +423,8 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
         timeRange: "all",
         selectedDataType: "insulin",
         dateFilter: null,
+      dateFrom: null,
+      dateTo: null,
         from: null,
         to: "2026-12-31T23:59:59.999Z",
       });

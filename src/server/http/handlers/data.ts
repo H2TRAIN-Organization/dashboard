@@ -45,6 +45,8 @@ export function createDataHttpHandlers(
           timeRange: query.timeRange,
           selectedDataType: query.selectedDataType,
           dateFilter: query.dateFilter ?? null,
+          dateFrom: query.dateFrom ?? null,
+          dateTo: query.dateTo ?? null,
         });
 
         return jsonResult(200, {

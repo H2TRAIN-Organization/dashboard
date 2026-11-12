@@ -58,6 +58,30 @@ function resolveDataQuery(
     days === null ? null : new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const rangeTo = now;
 
+  // T13: an explicit from-to range is the authoritative window; timeRange
+  // no longer clips it (a range older than timeRange would otherwise resolve
+  // to an empty window with no way to reach that data).
+  if (query.dateFrom !== null || query.dateTo !== null) {
+    if (
+      query.dateFrom !== null &&
+      query.dateTo !== null &&
+      query.dateFrom > query.dateTo
+    ) {
+      throw new ValidationError("dateFrom debe ser anterior o igual a dateTo");
+    }
+
+    return {
+      ...query,
+      selectedUser,
+      dateFilter: query.dateFilter,
+      from: query.dateFrom === null ? null : parseUtcDay(query.dateFrom).toISOString(),
+      to:
+        query.dateTo === null
+          ? rangeTo.toISOString()
+          : new Date(parseUtcDay(query.dateTo).getTime() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+  }
+
   let from = rangeFrom;
   let to = rangeTo;
 

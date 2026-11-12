@@ -186,7 +186,7 @@ Criterios de aceptación:
 Dependencias: T11 (para no chocar en el mismo bloque del page.tsx).
 
 === T13 — Filtro de fechas "desde - hasta" en Advanced Analytics ===
-Estado: pendiente
+Estado: hecho (rama feature/analytics-date-range)
 Descripción:
   Backend: aceptar dateFrom/dateTo (YYYY-MM-DD) en /api/decrypted-data
   (schemas/data.ts + data-use-cases.ts: ventana autoritativa cuando hay

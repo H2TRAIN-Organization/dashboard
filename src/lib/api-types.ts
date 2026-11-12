@@ -177,6 +177,10 @@ export interface DecryptedDataQuery {
   timeRange?: '7d' | '30d' | '90d' | '365d' | 'all'
   selectedDataType?: 'all' | 'insulin' | 'food' | 'exercise' | 'period' | 'mood'
   dateFilter?: string
+  /** Día inicial (YYYY-MM-DD, UTC); si hay rango, define la ventana consultada. */
+  dateFrom?: string
+  /** Día final (YYYY-MM-DD, UTC, incluido); si hay rango, define la ventana consultada. */
+  dateTo?: string
 }
 
 export interface AdminTableInfo {

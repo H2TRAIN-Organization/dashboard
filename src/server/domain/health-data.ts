@@ -50,6 +50,10 @@ export interface DataQuery {
   readonly timeRange: TimeRange;
   readonly selectedDataType: DataType;
   readonly dateFilter: string | null;
+  /** Explicit from day (YYYY-MM-DD, UTC, inclusive). Non-null overrides timeRange. */
+  readonly dateFrom: string | null;
+  /** Explicit to day (YYYY-MM-DD, UTC, inclusive end). Non-null overrides timeRange. */
+  readonly dateTo: string | null;
 }
 
 export interface ResolvedDataQuery extends Omit<DataQuery, "selectedUser"> {
