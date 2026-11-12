@@ -50,7 +50,7 @@ suite('Administration, Study and Privacy: real backend / synthetic dependency', 
     assert.equal(next.body.user.gdprConsent, (await request('/api/auth/session', { cookie: next.cookie })).body.user.gdprConsent)
   })
 
-  test('rejection revokes the session without changing external consent or the user ack', async () => {
+  test('rejection revokes the session and the next login is asked again', async () => {
     const login = await rawAdmin()
     assert.equal(login.body.privacy.state, 'complete')
     const rejection = await decide(login, 'login', 'reject')
@@ -59,9 +59,15 @@ suite('Administration, Study and Privacy: real backend / synthetic dependency', 
     assert.match(rejection.headers.get('set-cookie'), /Max-Age=0/i)
     assert.equal((await request('/api/auth/session', { cookie: login.cookie })).status, 401)
     assert.equal((await request('/api/decrypted-data', { cookie: login.cookie })).status, 401)
+    // The rejection removed the per-user acknowledgement (MT49): the fresh
+    // session starts at the notice instead of skipping it.
     const next = await rawAdmin()
-    assert.equal(next.body.privacy.state, 'complete')
-    assert.equal((await request('/api/auth/session', { cookie: next.cookie })).status, 200)
+    assert.equal(next.body.privacy.state, 'initial')
+    assert.equal((await request('/api/users', { cookie: next.cookie })).status, 403)
+    assert.equal((await request('/api/users', { cookie: next.cookie })).body.error.code, 'PRIVACY_ACTION_REQUIRED')
+    // Accepting again restores the per-user acknowledgement and the access.
+    assert.equal((await decide(next, 'login')).body.state, 'complete')
+    assert.equal((await request('/api/users', { cookie: next.cookie })).status, 200)
     await logout(next.cookie)
   })
 

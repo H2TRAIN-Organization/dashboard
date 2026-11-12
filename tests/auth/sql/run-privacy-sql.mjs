@@ -90,6 +90,8 @@ try {
   assert.match(accepted.stderr, /revoked/)
   assert.equal(sql(`select revoked_at is not null from public.auth_sessions where sid_hash='${sid}'`), 't')
   assert.equal(sql(rpc('login', 'reject', ids[3])), '0|t')
+  // The rejection removes the per-user ack: the next sign-in must be asked again (MT49).
+  assert.equal(sql(`select count(*) from public.user_privacy_acks where user_id=42`), '0')
   expectSqlError(rpc('login', 'accept', ids[0]), 'revoked')
   expectSqlError(rpc('login', 'accept', ids[6]), 'revoked')
   assert.equal(sql(`select revoked_at is null and privacy_stage=0 from public.auth_sessions where sid_hash='other-session'`), 't')
@@ -98,7 +100,7 @@ try {
   assert.equal(sql(`select has_function_privilege('anon','public.auth_privacy_decide(text,integer,text,text,text,text,text,uuid)','execute')`), 'f')
   assert.equal(sql(`select has_table_privilege('authenticated','public.auth_privacy_decisions','select')`), 'f')
   assert.equal(sql(`select has_table_privilege('authenticated','public.user_privacy_acks','select')`), 'f')
-  console.log('PASS: migration twice; single-stage acceptance; per-user ack; idempotency; key conflict; stale version; rollback; concurrent terminal reject; consent unchanged; private grants.')
+  console.log('PASS: migration twice; single-stage acceptance; per-user ack; idempotency; key conflict; stale version; rollback; concurrent terminal reject removes ack; consent unchanged; private grants.')
 } finally {
   if (created) command(['rm', '--force', container])
 }
