@@ -243,18 +243,19 @@ Criterios de aceptación:
 Dependencias: T11-T13 (los merges deben estar hechos).
 
 === T16 — Tests de integración del lote ===
-Estado: pendiente
-Descripción:
-  - Unit: dailyChartRows, meal-classification extendido, resolución
-    dateFrom/dateTo (data-use-cases.test.ts), esquema HTTP.
-  - E2E Playwright (mock de APIs, igual que analytics-meals.spec.ts):
-    evolución renderiza serie, filtro desde-hasta filtra, scroll activo
-    con muchas fechas, aviso de registros no-comida.
-  - npm run check en verde (typecheck + lint + capas + test).
-Dependencias: T11-T15.
+Estado: hecho (tests distribuidos en cada feature branch + verificación
+completa sobre codex/release/0.2.0: npm run check verde 519 tests y
+13 e2e de analytics en verde)
 
 === T17 — Gitflow + push codex/release/0.2.0 (preview Vercel) ===
-Estado: pendiente
+Estado: hecha
+Descripción:
+  Feature branch por microtarea (feature/analytics-*), merges a
+  codex/release/0.2.0 con historial limpio, verificación completa y push
+  final. Vercel despliega preview (NO production) para la rama.
+Criterios de aceptación:
+  - Sin commits directos en la rama de release (solo merges --no-ff).
+  - Push final -> preview de Vercel en codex/release/0.2.0.
 Descripción:
   Feature branch por microtarea (feature/analytics-*), merges a
   codex/release/0.2.0 con historial limpio, verificación completa y push
