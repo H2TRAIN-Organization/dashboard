@@ -489,7 +489,10 @@ export default function AnalyticsPage() {
                     </div>
                     {t.analytics.generalActivityByDate}
                   </h3>
-                  <ResponsiveContainer width="100%" height={400}>
+                  {/* T12: con muchas fechas el interior crece y el contenedor
+                      se desliza (ScrollableChart ya soporta ambos ejes); el
+                      scroll horizontal es el que aplica a una serie diaria. */}
+                  <ScrollableChart height={400} minInnerWidth={activityData.length * LINE_INNER_WIDTH_PER_ITEM}>
                     <AreaChart data={activityData}>
                       <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                       <XAxis dataKey="date" stroke={CHART_AXIS_LINE_STYLE.stroke} />
@@ -507,7 +510,7 @@ export default function AnalyticsPage() {
                         </linearGradient>
                       </defs>
                     </AreaChart>
-                  </ResponsiveContainer>
+                  </ScrollableChart>
                 </div>
               </div>
 
