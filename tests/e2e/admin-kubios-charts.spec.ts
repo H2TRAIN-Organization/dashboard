@@ -83,3 +83,24 @@ test('a selected participant shows scrollable charts; "all" keeps them hidden', 
   const scrollWrapper = page.locator('.overflow-auto').first();
   await expect(scrollWrapper).toBeVisible();
 });
+
+test('MT53: the table renders before the charts when a participant is selected', async ({ page }) => {
+  await mockAdminKubios(page);
+  await page.goto('/admin/kubios');
+
+  const input = page.getByRole('combobox', { name: 'Filtrar por participante' });
+  await input.click();
+  await input.fill('participant-one');
+  await page.getByRole('option', { name: 'participant-one' }).click();
+
+  const chartsHeading = page.getByText('Gráficos del participante');
+  const firstRow = page.getByTestId('admin-kubios-row').first();
+  await expect(firstRow).toBeVisible();
+  await expect(chartsHeading).toBeVisible();
+
+  // MT53 layout contract: the measurement table comes first and the charts
+  // below it.
+  const rowBox = await firstRow.boundingBox();
+  const chartsBox = await chartsHeading.boundingBox();
+  expect(rowBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(chartsBox?.y ?? Number.NEGATIVE_INFINITY);
+});

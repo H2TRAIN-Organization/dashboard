@@ -335,12 +335,12 @@ function AdminKubiosContent() {
             </div>
           ) : hasMeasurements ? (
             <>
+              <AdminKubiosTable measurements={visibleMeasurements} />
               {selectedUserId !== null && (
-                <div className="mb-6">
+                <div className="mt-6">
                   <AdminKubiosCharts measurements={visibleMeasurements} />
                 </div>
               )}
-              <AdminKubiosTable measurements={visibleMeasurements} />
             </>
           ) : visibleUnavailableCount > 0 ? null : (
             <StatusPanel
