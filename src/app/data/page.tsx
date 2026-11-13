@@ -548,19 +548,19 @@ export default function DataPage() {
 
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8 xl:py-12 relative z-10">
           {/* Header con estad├¡sticas */}
-          <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-10 mb-6 sm:mb-12 overflow-hidden shadow-2xl">
+          <div className="relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 mb-6 sm:mb-10 overflow-hidden shadow-xl">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5"></div>
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 sm:mb-8 space-y-4 lg:space-y-0">
               <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
                 <div className="flex items-center space-x-4 sm:space-x-6">
-                  <div className="p-3 sm:p-5 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl sm:rounded-2xl shadow-lg">
-                    <Database className="h-8 w-8 sm:h-12 sm:w-12 text-white" />
+                  <div className="p-3 sm:p-4 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl sm:rounded-2xl shadow-lg">
+                    <Database className="h-7 w-7 sm:h-9 sm:w-9 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900">
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
                       {t.dashboard.healthData}
                     </h2>
-                    <p className="text-gray-600 text-sm sm:text-base lg:text-xl font-light max-w-xl lg:pr-6">{t.dashboard.healthDataDescription}</p>
+                    <p className="text-gray-600 text-sm sm:text-base lg:text-lg font-light max-w-xl lg:pr-6">{t.dashboard.healthDataDescription}</p>
                   </div>
                 </div>
               </div>

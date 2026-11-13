@@ -150,12 +150,13 @@ export default function AdminNewPage() {
           </div>
 
           {/* Funcionalidades de administración */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+          {/* Funcionalidades de administración: 2 tarjetas, rejilla honesta */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
             {adminFeatures.map((feature, index) => (
               <Link
                 key={index}
                 href={feature.href}
-                className="group relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:-translate-y-2 hover:scale-105"
+                className="group relative bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-3xl p-8 overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5"></div>
                 <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -202,9 +203,10 @@ export default function AdminNewPage() {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full animate-pulse ${statsError ? 'bg-gray-400' : 'bg-green-500'}`}></div>
-                <span className={`font-semibold ${statsError ? 'text-gray-500' : 'text-green-600'}`}>
-                  {statsError ? notAvailable : t.admin.operational}
+                {/* Indicador honesto: verde solo con datos cargados; gris mientras. */}
+                <div className={`w-3 h-3 rounded-full ${statsError ? 'bg-gray-400' : stats.totalRecords !== null ? 'bg-green-500 animate-pulse' : 'bg-gray-300 animate-pulse'}`}></div>
+                <span className={`font-semibold ${statsError || stats.totalRecords === null ? 'text-gray-500' : 'text-green-600'}`}>
+                  {statsError ? notAvailable : stats.totalRecords !== null ? t.admin.operational : '—'}
                 </span>
               </div>
             </div>
