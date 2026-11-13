@@ -109,19 +109,33 @@ begin
   return extensions.pgp_sym_decrypt(row_record.username_enc, key_secret);
 end $$;
 
--- Resolución para el login por username: HMAC → user_id → email confirmado de
--- GoTrue. Devuelve como máximo 2 filas para que el gateway falle cerrado ante
+-- Resolución para el login por username: el servidor normaliza, calcula el
+-- HMAC con la clave de Vault y localiza user_id → email confirmado de GoTrue.
+-- Devuelve como máximo 2 filas para que el gateway falle cerrado ante
 -- cualquier ambigüedad.
-create or replace function public.auth_username_resolve(p_lookup text)
+create or replace function public.auth_username_resolve(p_username text)
 returns table(user_id integer, email text)
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  hmac_secret text;
+  lookup text;
 begin
-  if p_lookup is null or length(p_lookup) <> 64 then
+  if p_username is null or length(trim(p_username)) = 0 then
     return;
   end if;
+  select decrypted_secret into hmac_secret
+    from vault.decrypted_secrets
+   where name = 'dashboard-username-hmac-v1';
+  if hmac_secret is null then
+    raise sqlstate 'PT503' using message = 'VAULT_KEY_UNAVAILABLE';
+  end if;
+  lookup := extensions.encode(
+    extensions.hmac(lower(normalize(trim(p_username), NFC)), hmac_secret, 'sha256'),
+    'hex'
+  );
   return query
     select u."UserID", au.email
       from public.users u
@@ -129,8 +143,43 @@ begin
         on au.raw_app_meta_data->>'app_user_id' = u."UserID"::text
        and au.email_confirmed_at is not null
        and au.banned_until is null
-     where u.username_lookup = p_lookup
+     where u.username_lookup = lookup
      limit 2;
+end $$;
+
+-- Descifrado por lotes para listados (una consulta por página, sin N+1).
+create or replace function public.auth_username_display_batch(p_user_ids integer[])
+returns table(user_id integer, username text)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  item record;
+  key_secret text;
+begin
+  if p_user_ids is null or cardinality(p_user_ids) = 0 then
+    return;
+  end if;
+  for item in
+    select u."UserID" as uid, u.username_enc, u.username_key_id, u."Username" as legacy
+      from public.users u
+     where u."UserID" = any (p_user_ids)
+  loop
+    if item.username_enc is null then
+      username := item.legacy;
+    else
+      select decrypted_secret into key_secret
+        from vault.decrypted_secrets
+       where id = item.username_key_id;
+      if key_secret is null then
+        raise sqlstate 'PT503' using message = 'VAULT_KEY_UNAVAILABLE';
+      end if;
+      username := extensions.pgp_sym_decrypt(item.username_enc, key_secret);
+    end if;
+    user_id := item.uid;
+    return next;
+  end loop;
 end $$;
 
 -- Escritura del username: cifra, calcula el lookup y mantiene el espejo legacy
@@ -176,9 +225,11 @@ end $$;
 revoke all on function public.auth_username_display(integer) from public, anon, authenticated;
 revoke all on function public.auth_username_resolve(text) from public, anon, authenticated;
 revoke all on function public.auth_username_set(integer, text) from public, anon, authenticated;
+revoke all on function public.auth_username_display_batch(integer[]) from public, anon, authenticated;
 grant execute on function public.auth_username_display(integer) to service_role;
 grant execute on function public.auth_username_resolve(text) to service_role;
 grant execute on function public.auth_username_set(integer, text) to service_role;
+grant execute on function public.auth_username_display_batch(integer[]) to service_role;
 
 -- El esquema vault completo queda reservado a service_role: ni anon ni
 -- authenticated pueden leer secretos ni descifrar nada.

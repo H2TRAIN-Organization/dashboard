@@ -2,6 +2,7 @@ import type {
   CreateUserRecord,
   UserRepository,
 } from "@/server/application/ports/user-repository";
+import type { UsernameVault } from "@/server/application/ports/username-vault";
 import {
   ConflictError,
   ValidationError,
@@ -83,9 +84,16 @@ function mapWriteError(error: unknown): never {
  * Email and createdAt are null because public.users has no such columns.
  */
 export class SupabaseUserRepository implements UserRepository {
+  /**
+   * `usernameVault` es opcional para el despliegue seguro: mientras la
+   * migración de MT46 no esté aplicada, el repositorio sigue leyendo la
+   * columna legacy "Username". Cuando esté presente, la resolución por
+   * username y el descifrado pasan por las RPCs de Vault.
+   */
   constructor(
     private readonly gateway: PersistenceGateway,
     private readonly passwordHasher: PasswordHasher,
+    private readonly usernameVault?: UsernameVault,
   ) {}
 
   async list(filter: UserListFilter): Promise<UserPage> {
@@ -112,7 +120,7 @@ export class SupabaseUserRepository implements UserRepository {
     });
 
     return {
-      users: result.rows.map(mapUserRow),
+      users: await this.fillUsernames(result.rows.map(mapUserRow)),
       total: result.count ?? 0,
     };
   }
@@ -129,6 +137,16 @@ export class SupabaseUserRepository implements UserRepository {
     const normalized = username.trim();
     if (normalized.length === 0) {
       return null;
+    }
+    if (this.usernameVault !== undefined) {
+      const resolvedId = await this.usernameVault.resolveUserIdByUsername(
+        normalized,
+      );
+      if (resolvedId !== null) {
+        return this.findById(resolvedId);
+      }
+      // Sin resolución (migración pendiente o cuenta sin lookup): la columna
+      // legacy "Username" sigue siendo la fuente mientras exista.
     }
     return this.findSingle({ kind: "eq", column: "Username", value: normalized });
   }
@@ -178,7 +196,9 @@ export class SupabaseUserRepository implements UserRepository {
         { operation: "create", table: "users" },
       );
     }
-    return mapUserRow(inserted);
+    const user = mapUserRow(inserted);
+    await this.mirrorUsername(user.id, username);
+    return user;
   }
 
   async update(id: string, patch: UpdateUserPatch): Promise<User | null> {
@@ -217,7 +237,11 @@ export class SupabaseUserRepository implements UserRepository {
     if (rows.length === 0 || rows[0] === null || rows[0] === undefined) {
       return null;
     }
-    return mapUserRow(rows[0]);
+    const user = mapUserRow(rows[0]);
+    if (username !== null) {
+      await this.mirrorUsername(user.id, username);
+    }
+    return user;
   }
 
   async clearUuid(id: string): Promise<User | null> {
@@ -295,6 +319,46 @@ export class SupabaseUserRepository implements UserRepository {
       limit: 1,
     });
     const row = result.rows[0];
-    return row === undefined ? null : mapUserRow(row);
+    if (row === undefined) {
+      return null;
+    }
+    const user = mapUserRow(row);
+    if (user.username.length > 0) {
+      return user;
+    }
+    const [filled] = await this.fillUsernames([user]);
+    return filled ?? user;
+  }
+
+  /**
+   * Cutover MT48: cuando la columna legacy "Username" ya no se selecciona,
+   * las filas llegan con username vacío y se completa cifrado vía Vault.
+   * Con la columna presente no hay llamada extra (degradación sin coste).
+   */
+  private async fillUsernames(users: readonly User[]): Promise<User[]> {
+    const missing = users.filter((user) => user.username.length === 0);
+    if (this.usernameVault === undefined || missing.length === 0) {
+      return [...users];
+    }
+    const names = await this.usernameVault.displayNames(
+      missing.map((user) => user.id),
+    );
+    return users.map((user) =>
+      user.username.length === 0
+        ? { ...user, username: names.get(user.id) ?? "" }
+        : user,
+    );
+  }
+
+  /**
+   * Mejor esfuerzo de transición: si la migración de MT46 no está aplicada,
+   * el espejo cifrado no existe y la columna legacy sigue siendo la fuente.
+   * Los demás errores (p. ej. lookup duplicado) se propagan y fallan cerrado.
+   */
+  private async mirrorUsername(userId: string, username: string): Promise<void> {
+    if (this.usernameVault === undefined) {
+      return;
+    }
+    await this.usernameVault.mirrorUsername(userId, username);
   }
 }

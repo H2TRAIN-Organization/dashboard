@@ -57,12 +57,20 @@ describe("MT46 username vault migration", () => {
 
   it("resuelve por HMAC sin descifrar y exige email confirmado sin ban", async () => {
     const sql = await migration();
-    expect(sql).toContain("create or replace function public.auth_username_resolve(p_lookup text)");
-    expect(sql).toContain("extensions.hmac(normalized_value, hmac_secret, 'sha256')");
+    expect(sql).toContain("create or replace function public.auth_username_resolve(p_username text)");
+    expect(sql).toContain("extensions.hmac(lower(normalize(trim(p_username), NFC)), hmac_secret, 'sha256')");
     expect(sql).toContain("au.raw_app_meta_data->>'app_user_id' = u.\"UserID\"::text");
     expect(sql).toContain("au.email_confirmed_at is not null");
     expect(sql).toContain("au.banned_until is null");
     expect(sql).toContain("limit 2");
+  });
+
+  it("descifra listados en una sola consulta sin exponer la clave", async () => {
+    const sql = await migration();
+    expect(sql).toContain("create or replace function public.auth_username_display_batch(p_user_ids integer[])");
+    expect(sql).toContain("extensions.pgp_sym_decrypt(item.username_enc, key_secret)");
+    expect(sql).toContain("revoke all on function public.auth_username_display_batch(integer[]) from public, anon, authenticated");
+    expect(sql).toContain("grant execute on function public.auth_username_display_batch(integer[]) to service_role");
   });
 
   it("auth_username_set cifra, calcula lookup y mantiene el espejo de transición", async () => {

@@ -21,6 +21,7 @@ import {
 import { SupabaseHealthDataRepository } from "./health/health-data-repository";
 import { createPostgrestGateway } from "./supabase/postgrest-gateway";
 import { createSupabaseAdminClient } from "./supabase/client";
+import { PostgrestUsernameVault } from "./user/postgrest-username-vault";
 import { SupabaseUserDataPresence } from "./user/user-data-presence";
 import {
   SupabaseUserCredentialsRepository,
@@ -69,14 +70,15 @@ export function createPersistenceWithClient(
 ): SupabasePersistence {
   const decryptor = new Aes256CbcDecryptor(options.encryption);
   const gateway = createPostgrestGateway(options.client);
+  const usernameVault = new PostgrestUsernameVault(gateway);
   return {
     client: options.client,
-    users: new SupabaseUserRepository(gateway, options.passwordHasher),
+    users: new SupabaseUserRepository(gateway, options.passwordHasher, usernameVault),
     userDataPresence: new SupabaseUserDataPresence(gateway),
     healthData: new SupabaseHealthDataRepository(gateway, decryptor, {
       pageSize: options.pageSize,
     }),
-    adminDatabase: new SupabaseAdminDatabaseRepository(gateway, decryptor),
+    adminDatabase: new SupabaseAdminDatabaseRepository(gateway, decryptor, usernameVault),
     credentials: new SupabaseUserCredentialsRepository(
       gateway,
       options.passwordHasher,

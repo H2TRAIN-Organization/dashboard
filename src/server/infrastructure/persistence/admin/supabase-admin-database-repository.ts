@@ -1,4 +1,5 @@
 import type { AdminDatabaseRepository } from "@/server/application/ports/admin-database-repository";
+import type { UsernameVault } from "@/server/application/ports/username-vault";
 import {
   assertTableLimit,
   assertTableOffset,
@@ -47,6 +48,7 @@ export class SupabaseAdminDatabaseRepository implements AdminDatabaseRepository 
   constructor(
     private readonly gateway: PersistenceGateway,
     private readonly decryptor: TextDecryptor,
+    private readonly usernameVault?: UsernameVault,
   ) {}
 
   async listTables(): Promise<DatabaseTablesResult> {
@@ -115,6 +117,10 @@ export class SupabaseAdminDatabaseRepository implements AdminDatabaseRepository 
       return mapHealthRecord(spec.table, row, this.decryptor);
     });
 
+    if (spec.kind === "users") {
+      await fillUsernames(data, this.usernameVault);
+    }
+
     return {
       tableName: spec.name,
       data,
@@ -132,4 +138,29 @@ function requireCount(count: number | null): number {
     throw new PersistenceError("MAPPING_FAILED", "No se pudo verificar el recuento completo.", { operation: "admin-table-count" });
   }
   return count;
+}
+
+/**
+ * Cutover MT48: en la tabla de usuarios el username llega cifrado (la columna
+ * legacy ya no se selecciona) y se completa vía Vault antes de exponerlo.
+ */
+async function fillUsernames(
+  data: HealthRecord[],
+  usernameVault: UsernameVault | undefined,
+): Promise<void> {
+  if (usernameVault === undefined || data.length === 0) {
+    return;
+  }
+  const missing = data.filter((row) => row.Username === undefined);
+  if (missing.length === 0) {
+    return;
+  }
+  const names = await usernameVault.displayNames(
+    missing.map((row) => String(row.UserID)),
+  );
+  for (const row of data) {
+    if (row.Username === undefined) {
+      row.Username = names.get(String(row.UserID)) ?? null;
+    }
+  }
 }

@@ -35,7 +35,14 @@ export function normalizeRole(value: unknown): UserRole {
 export function mapUserRow(value: unknown): User {
   const row = asRecord(value, "users");
   const id = toCanonicalUserId(row.UserID);
-  const username = requireString(row.Username, "Username", "users");
+  // Cutover MT48: la columna legacy "Username" desaparece del select; una fila
+  // sin la clave se considera "pendiente de descifrar" (string vacío) y el
+  // repositorio la completa con UsernameVault. Un Username null sigue siendo
+  // datos corruptos y falla cerrado.
+  const username =
+    row.Username === undefined
+      ? ""
+      : requireString(row.Username, "Username", "users");
   const gdprConsent = asBoolean(row.GDPRConsent);
   const uuid = nullableString(row.UUID, "UUID", "users");
   const gdprConsentAt = gdprConsent
@@ -64,7 +71,9 @@ export function mapUserAdminRow(value: unknown): Record<string, unknown> {
   const row = asRecord(value, "users");
   return {
     UserID: row.UserID,
-    Username: row.Username,
+    // Cutover MT48: la columna legacy puede no estar en el select; el
+    // repositorio admin completa el username cifrado vía UsernameVault.
+    Username: row.Username === undefined ? undefined : row.Username,
     UUID: row.UUID ?? null,
     GDPRConsent: asBoolean(row.GDPRConsent),
     GDPRConsentDate: normalizeTimestamp(row.GDPRConsentDate),

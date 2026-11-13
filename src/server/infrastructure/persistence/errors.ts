@@ -12,6 +12,7 @@ export type PersistenceErrorCode =
   | "UNSUPPORTED_FIELD"
   | "PASSWORD_HASH_INVALID"
   | "USERID_DEFAULT_MISSING"
+  | "USERNAME_AMBIGUOUS"
   | "NOT_FOUND";
 
 export interface PersistenceErrorOptions {
