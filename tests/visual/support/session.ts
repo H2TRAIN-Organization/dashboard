@@ -21,7 +21,7 @@ export const PAGE_DEFINITIONS: PageDefinition[] = [
   { id: 'app-login', label: 'Login (app username)', path: '/app-login', auth: 'none', ready: 'form', rendered: true },
   { id: 'home', label: 'Home dashboard', path: '/', auth: 'both', ready: 'h1', rendered: true },
   { id: 'users', label: 'Users', path: '/users', auth: 'both', ready: 'h1', rendered: true },
-  { id: 'data', label: 'Data', path: '/data', auth: 'both', ready: 'input[placeholder="Buscar en datos..."]', rendered: true },
+  { id: 'data', label: 'Data', path: '/data', auth: 'both', ready: 'select', rendered: true },
   { id: 'analytics', label: 'Analytics', path: '/analytics', auth: 'both', ready: '.recharts-responsive-container', rendered: true },
   { id: 'overview', label: 'Overview', path: '/overview', auth: 'both', ready: '.recharts-responsive-container', rendered: true },
   { id: 'admin', label: 'Admin', path: '/admin', auth: 'both', ready: 'h1', rendered: true },

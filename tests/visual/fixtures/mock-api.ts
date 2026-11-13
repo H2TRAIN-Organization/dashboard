@@ -86,6 +86,10 @@ function apiFixture(
     case '/api/kubios/hrv-results':
     case '/api/kubios/hrv-results-fallback':
       return { body: kubiosHrvResults };
+    case '/api/kubios/me':
+      // Kubios personal queda fuera del alcance visual (misma decisión que
+      // team-users/hrv-results); la navegación oculta la sección en error.
+      return { body: { error: { code: 'KUBIOS_OUT_OF_SCOPE', message: 'Kubios no participa en la evidencia visual' } }, status: 501 };
     case '/api/admin/database/tables':
       return { body: databaseTables };
     case '/api/admin/database/table-data':
