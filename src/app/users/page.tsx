@@ -26,6 +26,12 @@ import {
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -49,6 +55,13 @@ export default function UsersPage() {
   })
   const [saving, setSaving] = useState(false)
   const [clearingUUID, setClearingUUID] = useState(false)
+  // MT63: confirmación destructiva con AlertDialog en lugar de confirm().
+  const [confirmState, setConfirmState] = useState<{
+    title: string
+    body: string
+    confirmLabel: string
+    onConfirm: () => Promise<void>
+  } | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createForm, setCreateForm] = useState<{ password: string; role: UserRole; username: string }>({
     password: '',
@@ -155,21 +168,25 @@ export default function UsersPage() {
   }, [loading, syncHorizontalScrollbar])
 
   const deleteUser = async (user: User) => {
-    if (!confirm(t.users.confirmDelete)) {
-      return
-    }
-    try {
-      await usersApi.remove(user.UserID)
-      setMessage({ type: 'success', text: t.dashboard.userDeleted })
-      setUsers((current) => current.filter((entry) => entry.UserID !== user.UserID))
-      setTotal((current) => Math.max(0, current - 1))
-      const nextPage = pageAfterDeletion(page, total, pageSize)
-      if (nextPage !== page) setPage(nextPage)
-      else await loadUsers()
-    } catch (error) {
-      console.error('Error deleting user:', error)
-      setMessage({ type: 'error', text: errorMessage(error) })
-    }
+    setConfirmState({
+      title: t.users.delete,
+      body: t.users.confirmDelete,
+      confirmLabel: t.users.delete,
+      onConfirm: async () => {
+        try {
+          await usersApi.remove(user.UserID)
+          setMessage({ type: 'success', text: t.dashboard.userDeleted })
+          setUsers((current) => current.filter((entry) => entry.UserID !== user.UserID))
+          setTotal((current) => Math.max(0, current - 1))
+          const nextPage = pageAfterDeletion(page, total, pageSize)
+          if (nextPage !== page) setPage(nextPage)
+          else await loadUsers()
+        } catch (error) {
+          console.error('Error deleting user:', error)
+          setMessage({ type: 'error', text: errorMessage(error) })
+        }
+      },
+    })
   }
 
   const startEditing = (user: User) => {
@@ -221,21 +238,24 @@ export default function UsersPage() {
   }
 
   const clearUUID = async (userId: string) => {
-    if (!confirm(t.dashboard.confirmClearUUID)) {
-      return
-    }
-
-    try {
-      setClearingUUID(true)
-      const updated = await usersApi.clearUuid(userId)
-      replaceUser(updated)
-      setMessage({ type: 'success', text: t.dashboard.uuidCleared })
-    } catch (error) {
-      console.error('Error clearing UUID:', error)
-      setMessage({ type: 'error', text: errorMessage(error) })
-    } finally {
-      setClearingUUID(false)
-    }
+    setConfirmState({
+      title: t.dashboard.confirmClearUUID,
+      body: '',
+      confirmLabel: t.users.delete,
+      onConfirm: async () => {
+        try {
+          setClearingUUID(true)
+          const updated = await usersApi.clearUuid(userId)
+          replaceUser(updated)
+          setMessage({ type: 'success', text: t.dashboard.uuidCleared })
+        } catch (error) {
+          console.error('Error clearing UUID:', error)
+          setMessage({ type: 'error', text: errorMessage(error) })
+        } finally {
+          setClearingUUID(false)
+        }
+      },
+    })
   }
 
   const updateUserRole = async (userId: string, newRole: string) => {
@@ -952,6 +972,45 @@ export default function UsersPage() {
                 </form>
               </DialogContent>
             </Dialog>
+          )}
+
+          {/* Confirmación destructiva compartida (MT63): sustituye confirm(). */}
+          {confirmState && (
+            <AlertDialog
+              open
+              onOpenChange={(open) => {
+                if (!open) setConfirmState(null)
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogTitle>{confirmState.title}</AlertDialogTitle>
+                {confirmState.body.length > 0 && (
+                  <AlertDialogDescription>{confirmState.body}</AlertDialogDescription>
+                )}
+                <div className="mt-6 flex flex-col justify-end gap-3 sm:flex-row">
+                  <Button
+                    type="button"
+                    onClick={() => setConfirmState(null)}
+                    variant="outline"
+                    size="lg"
+                  >
+                    {t.users.cancel}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const { onConfirm } = confirmState
+                      setConfirmState(null)
+                      void onConfirm()
+                    }}
+                    variant="destructive"
+                    size="lg"
+                  >
+                    {confirmState.confirmLabel}
+                  </Button>
+                </div>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>
