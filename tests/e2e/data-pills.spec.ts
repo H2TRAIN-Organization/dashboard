@@ -28,7 +28,16 @@ const SESSION = {
   privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' },
 };
 
-async function mockDataPage(page: Page) {
+async function mockDataPage(
+  page: Page,
+  overrides: Partial<{
+    insulinData: unknown[];
+    foodData: unknown[];
+    exerciseData: unknown[];
+    periodData: unknown[];
+    moodData: unknown[];
+  }> = {},
+) {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/auth/session') return route.fulfill({ json: SESSION });
@@ -42,6 +51,7 @@ async function mockDataPage(page: Page) {
         exerciseData: [],
         periodData: [],
         moodData: [],
+        ...overrides,
       } });
     }
     return route.fulfill({ json: {} });
@@ -92,4 +102,35 @@ test('records render as pills paginated to 10 with a 10/25/50 selector', async (
   await pageSize.selectOption('25');
   await expect(page.getByText('1-12 / 12')).toHaveCount(0);
   await expect(page.getByText(/Dosis:/)).toHaveCount(12);
+});
+
+test('a long description wraps and stays inside the pill borders (MT52)', async ({ page }) => {
+  const longDescription = [
+    'Comienzo el entrenamiento con la glucosa 113. En el momento de comenzar pongo el objetivo temporal 3 horas.',
+    'Entrenamiento por intervalo de alta intensidad combinado con trabajo aerobico. Carrera 10 minutos.',
+    'Termino el ejercicio con la glucosa 175. Faltaban 45 min. Cancelo el objetivo temporal por que aumenta la glucosa a 210 para que la bomba me haga la correccion 2.5 und.',
+  ].join(' ');
+  const exercise = [{
+    username: 'synthetic-participant',
+    exercise_type: 'HIT',
+    intensity: '8',
+    exercise_description: longDescription,
+    startDate: '2026-11-01T08:00:00.000Z',
+    rowKey: 'exercise-long',
+  }];
+
+  await mockDataPage(page, { exerciseData: exercise });
+  await page.goto('/data');
+
+  await page.getByRole('button', { name: 'Ver todos' }).click();
+
+  // The exercise pill renders with the full description visible.
+  const pill = page.locator('div.rounded-full', { hasText: /Descripci/ }).first();
+  await expect(pill).toBeVisible();
+  await expect(pill.getByText(/Comienzo el entrenamiento/)).toBeVisible();
+
+  // MT52 containment: the wrapped text must stay inside the rounded border,
+  // so the pill never scrolls horizontally.
+  const overflow = await pill.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });

@@ -178,7 +178,7 @@ export function RecordPill({
 
   return (
     <div
-      className={`inline-flex max-w-full items-center gap-2.5 rounded-full border ${meta.borderClass} bg-white/85 py-1.5 pl-1.5 pr-3.5 shadow-sm backdrop-blur-sm`}
+      className={`inline-flex max-w-full items-center gap-2.5 overflow-hidden rounded-full border ${meta.borderClass} bg-white/85 py-1.5 pl-1.5 pr-3.5 shadow-sm backdrop-blur-sm`}
     >
       <span
         className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r ${meta.iconClass} px-2.5 py-1 text-[11px] font-semibold text-white sm:text-xs`}
@@ -194,7 +194,7 @@ export function RecordPill({
       )}
       <span className="min-w-0 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-700 sm:text-xs">
         {details.map((detail) => (
-          <span key={detail.label} className="min-w-0 whitespace-nowrap">
+          <span key={detail.label} className="min-w-0 break-words">
             <span className="font-semibold text-gray-900">{detail.label}:</span>{' '}
             {detail.value}
           </span>
