@@ -3,6 +3,8 @@
  * Dates are fixed around the frozen browser clock (2026-10-20 12:00 Europe/Madrid).
  */
 
+import { PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
+
 const users = [
   {
     UserID: 9001,
@@ -265,6 +267,13 @@ export const syntheticClientSession = {
   user: syntheticSessionUser,
   method: 'email' as const,
   expiresAt: '2099-01-01T00:00:00.000Z',
+  // La vista debe capturar la aplicación, no el aviso: la decisión de
+  // privacidad ya está registrada para este usuario sintético.
+  privacy: {
+    policyVersion: PRIVACY_POLICY_VERSION,
+    policyHash: PRIVACY_POLICY_HASH,
+    state: 'complete' as const,
+  },
 };
 
 export const unauthorizedProblem = {
