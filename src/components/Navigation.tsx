@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from '@/contexts/SessionContext'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, LogOut, User, Sparkles, Shield, Stethoscope, Menu, X } from 'lucide-react'
+import { ArrowLeft, LogOut, User, Sparkles, Shield, Stethoscope, Menu, X, Home as HomeIcon, Users as UsersIcon, Database, HeartPulse, Heart, TrendingUp, LayoutDashboard, Settings, Lock, type LucideIcon } from 'lucide-react'
 import { usePermissions } from '@/components/RoleGuard'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useKubiosMe } from '@/hooks/useKubiosPersonal'
@@ -41,32 +41,32 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
       kubiosView.data.measurement_count,
     )
 
-  // Rutas de navegación
+  // Rutas de navegación: iconos lucide coherentes con las tarjetas del inicio.
   const allRoutes: Array<{
     path: string
     label: string
-    icon: string
+    icon: LucideIcon
     requiresPermission?: string
     requiresRole?: UserRole
   }> = [
-    { path: '/', label: t.navigation.dashboard, icon: '🏠' },
-    { path: '/users', label: t.navigation.users, icon: '👥', requiresPermission: 'view_users' },
-    { path: '/data', label: t.navigation.data, icon: '📊', requiresPermission: 'view_data' },
-    { path: '/admin/kubios', label: t.navigation.adminKubios, icon: '❤️', requiresPermission: 'view_admin' },
+    { path: '/', label: t.navigation.dashboard, icon: HomeIcon },
+    { path: '/users', label: t.navigation.users, icon: UsersIcon, requiresPermission: 'view_users' },
+    { path: '/data', label: t.navigation.data, icon: Database, requiresPermission: 'view_data' },
+    { path: '/admin/kubios', label: t.navigation.adminKubios, icon: HeartPulse, requiresPermission: 'view_admin' },
     ...(showPersonalKubios
       ? [
           {
             path: '/kubios',
             label: t.navigation.kubios,
-            icon: '❤️',
+            icon: Heart,
             requiresPermission: 'view_own_kubios',
           },
         ]
       : []),
-    { path: '/analytics', label: t.navigation.analytics, icon: '📈', requiresPermission: 'view_analytics' },
-    { path: '/overview', label: t.dashboard.generalSummary, icon: '🗂️', requiresRole: 'doctor' },
-    { path: '/admin', label: t.navigation.admin, icon: '⚙️', requiresPermission: 'view_admin' },
-    { path: '/privacy', label: t.navigation.privacy, icon: '🔒' },
+    { path: '/analytics', label: t.navigation.analytics, icon: TrendingUp, requiresPermission: 'view_analytics' },
+    { path: '/overview', label: t.dashboard.generalSummary, icon: LayoutDashboard, requiresRole: 'doctor' },
+    { path: '/admin', label: t.navigation.admin, icon: Settings, requiresPermission: 'view_admin' },
+    { path: '/privacy', label: t.navigation.privacy, icon: Lock },
   ]
 
   const navigationRoutes = allRoutes.filter(
@@ -166,7 +166,7 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center space-x-3 px-3 py-3 text-gray-700 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:scale-105"
                   >
-                    <span className="text-xl">{route.icon}</span>
+                    <route.icon className="h-5 w-5 text-blue-600" aria-hidden="true" />
                     <span className="font-medium">{route.label}</span>
                   </Link>
                 ))}

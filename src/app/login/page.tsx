@@ -73,7 +73,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 max-w-md">
-          <div className="mb-12">
+          <div className="mb-10">
             <div className="mb-6 flex items-center justify-center">
               <div className="rounded-3xl bg-white/20 p-4 backdrop-blur-sm">
                 <Image
@@ -81,12 +81,12 @@ export default function LoginPage() {
                   alt="H2TRAIN Logo"
                   width={700}
                   height={250}
-                  className="h-32 w-auto rounded-2xl"
+                  className="h-24 w-auto rounded-2xl"
                   priority
                 />
               </div>
             </div>
-            <h1 className="mb-4 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-center text-5xl font-bold text-transparent">
+            <h1 className="mb-4 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-center text-4xl font-bold text-transparent">
               Diabetes Tracker Dashboard
             </h1>
           </div>

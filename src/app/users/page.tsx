@@ -21,6 +21,11 @@ import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { LoadingState } from '@/components/ui/loading-state'
 import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -739,12 +744,17 @@ export default function UsersPage() {
             )}
           </div>
 
-          {/* Modal de edición */}
+          {/* Modal de edición (primitiva Dialog, MT58) */}
           {editingUser && (
-            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="relative bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            <Dialog
+              open={Boolean(editingUser)}
+              onOpenChange={(open) => {
+                if (!open) cancelEditing()
+              }}
+            >
+              <DialogContent showClose={false} className="p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">{t.users.editUser}</h3>
+                  <DialogTitle className="text-lg sm:text-xl">{t.users.editUser}</DialogTitle>
                   <Button
                     onClick={cancelEditing}
                     variant="outline"
@@ -822,16 +832,19 @@ export default function UsersPage() {
                     )}
                   </Button>
                 </div>
-              </div>
-            </div>
+              </DialogContent>
+            </Dialog>
           )}
 
-          {/* Modal de creación de usuario */}
+          {/* Modal de creación de usuario (primitiva Dialog, MT58) */}
           {showCreateForm && (
-            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="relative bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            <Dialog
+              open={showCreateForm}
+              onOpenChange={setShowCreateForm}
+            >
+              <DialogContent showClose={false} className="p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">{t.users.createNewUser}</h3>
+                  <DialogTitle className="text-lg sm:text-xl">{t.users.createNewUser}</DialogTitle>
                   <Button
                     onClick={() => setShowCreateForm(false)}
                     variant="outline"
@@ -937,8 +950,8 @@ export default function UsersPage() {
                     </Button>
                   </div>
                 </form>
-              </div>
-            </div>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </div>

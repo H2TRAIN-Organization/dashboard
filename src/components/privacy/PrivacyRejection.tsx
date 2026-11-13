@@ -15,6 +15,12 @@ import { AlertTriangle, ShieldAlert } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useSession } from '@/contexts/SessionContext'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
 import {
   classifyPrivacyDecisionFailure,
@@ -99,28 +105,22 @@ export default function PrivacyRejection() {
       </Button>
 
       {confirmOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          role="presentation"
+        <Dialog
+          open={confirmOpen}
+          onOpenChange={(open) => {
+            if (busy) return
+            setFailure(null)
+            setConfirmOpen(open)
+          }}
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="privacy-rejection-title"
-            className="relative w-full max-w-lg rounded-2xl border border-gray-200/50 bg-white/95 p-6 shadow-2xl backdrop-blur-xl sm:rounded-3xl sm:p-8"
-          >
+          <DialogContent showClose={false}>
             <div className="mb-4 flex items-start gap-4">
               <div className="rounded-2xl bg-gradient-to-br from-red-600 to-red-700 p-3 shadow-lg">
                 <AlertTriangle className="h-6 w-6 text-white" aria-hidden="true" />
               </div>
-              <h3
-                id="privacy-rejection-title"
-                className="pt-1 text-xl font-bold text-gray-900 sm:text-2xl"
-              >
-                {text.modalTitle}
-              </h3>
+              <DialogTitle className="pt-1">{text.modalTitle}</DialogTitle>
             </div>
-            <p className="text-sm text-gray-700 sm:text-base">{text.modalBody}</p>
+            <DialogDescription>{text.modalBody}</DialogDescription>
 
             {failure !== null && (
               <div
@@ -152,8 +152,8 @@ export default function PrivacyRejection() {
                 {text.cancel}
               </Button>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   )

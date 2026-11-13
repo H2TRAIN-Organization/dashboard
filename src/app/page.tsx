@@ -253,22 +253,22 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="mb-20 text-center">
-            <div className="mb-8 inline-flex items-center space-x-3 rounded-full border border-blue-200/50 bg-white/80 px-8 py-4 shadow-lg backdrop-blur-sm">
-              <Sparkles className="h-6 w-6 text-blue-600 animate-pulse" />
-              <span className="text-lg font-semibold text-blue-800">
+          <div className="mb-12 text-center">
+            <div className="mb-6 inline-flex items-center space-x-2.5 rounded-full border border-blue-200/50 bg-white/80 px-5 py-2.5 shadow-lg backdrop-blur-sm">
+              <Sparkles className="h-5 w-5 text-blue-600 animate-pulse" />
+              <span className="text-base font-semibold text-blue-800">
                 {role === 'user' ? t.dashboard.healthMonitoring : t.dashboard.advancedControl}
               </span>
             </div>
-            <h1 className="mb-8 bg-gradient-to-r from-blue-800 via-blue-600 to-blue-400 bg-clip-text text-6xl font-bold leading-tight text-transparent md:text-8xl">
+            <h1 className="mb-4 bg-gradient-to-r from-blue-800 via-blue-600 to-blue-400 bg-clip-text text-4xl font-bold leading-tight text-transparent md:text-6xl">
               {t.dashboard.title}
             </h1>
-            <p className="mx-auto max-w-4xl text-2xl font-light leading-relaxed text-gray-700">
+            <p className="mx-auto max-w-3xl text-lg font-light leading-relaxed text-gray-700">
               {role === 'user' ? t.dashboard.analyzeData : t.dashboard.manageUsers}
             </p>
           </div>
 
-          <div className="mb-12 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
             {options.map((option) => (
               <HomeOptionCard
                 key={option.href}
@@ -303,19 +303,19 @@ function HomeOptionCard({
   return (
     <Link href={option.href} className="group block">
       <div
-        className={`relative h-full transform rounded-3xl border border-gray-200/50 bg-white/90 p-8 shadow-sm backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/10 ${option.accentClass}`}
+        className={`relative h-full transform rounded-3xl border border-gray-200/50 bg-white/90 p-6 shadow-sm backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-500/10 ${option.accentClass}`}
       >
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-500/5 to-blue-600/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
         <div className="relative z-10">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <div
-              className={`rounded-2xl bg-gradient-to-br p-4 shadow-lg transition-all duration-300 ${option.iconClass}`}
+              className={`rounded-2xl bg-gradient-to-br p-3.5 shadow-lg transition-all duration-300 ${option.iconClass}`}
             >
-              <Icon className="h-8 w-8 text-white" />
+              <Icon className="h-7 w-7 text-white" />
             </div>
             {showMetric && (loading || hasValue) && (
               <div className="text-right">
-                <div className="text-2xl font-bold text-blue-800 transition-colors group-hover:text-blue-600">
+                <div className="text-xl font-bold text-blue-800 transition-colors group-hover:text-blue-600">
                   {loading ? <LoadingDots /> : formattedMetric}
                 </div>
                 <div className="text-xs text-blue-600/70">
@@ -324,7 +324,7 @@ function HomeOptionCard({
               </div>
             )}
           </div>
-          <h2 className="mb-3 text-xl font-bold text-gray-900 transition-colors group-hover:text-blue-700">
+          <h2 className="mb-2.5 text-lg font-bold text-gray-900 transition-colors group-hover:text-blue-700">
             {option.title}
           </h2>
           <p className="mb-4 text-sm leading-relaxed text-gray-600">

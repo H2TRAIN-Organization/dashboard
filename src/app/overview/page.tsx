@@ -558,8 +558,8 @@ export default function OverviewPage() {
             </div>
 
             {/* Actividad por día */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-medium text-black mb-4 flex items-center">
+            <div className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-lg">
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                 <LineChartIcon className="h-5 w-5 text-green-600 mr-2" />
                 {t.overview.activityLast7Days}
               </h3>
@@ -588,8 +588,8 @@ export default function OverviewPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Usuarios más activos */}
             {mostActiveUsers.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-medium text-black mb-4 flex items-center">
+            <div className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-lg">
+              <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                 <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
                 {t.overview.mostActiveUsers}
               </h2>
@@ -606,7 +606,7 @@ export default function OverviewPage() {
                           <span className="text-sm font-medium text-blue-600">{index + 1}</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-black">{getDisplayUsername(user)}</p>
+                          <p className="text-sm font-medium text-gray-900">{getDisplayUsername(user)}</p>
                           <p className="text-xs text-gray-600">
                             {user.recordCount} {t.dashboard.records}
                           </p>
@@ -617,7 +617,7 @@ export default function OverviewPage() {
                           {user.isActive && (
                             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           )}
-                          <span className="text-sm text-black">{user.recordCount}</span>
+                          <span className="text-sm text-gray-900">{user.recordCount}</span>
                         </div>
                         {user.lastActivity && (
                           <p className="text-xs text-gray-600">
@@ -633,8 +633,8 @@ export default function OverviewPage() {
             )}
 
             {/* Datos recientes */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-medium text-black mb-4 flex items-center">
+            <div className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-lg">
+              <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                 <Clock className="h-5 w-5 text-orange-600 mr-2" />
                 {t.overview.recentActivity}
               </h2>
@@ -649,7 +649,7 @@ export default function OverviewPage() {
                       <div className="flex items-center">
                         {getTypeIcon(item.type)}
                         <div className="ml-3">
-                          <p className="text-sm font-medium text-black">
+                          <p className="text-sm font-medium text-gray-900">
                             {getTypeLabel(item.type)} - {item.username}
                           </p>
                           <p className="text-xs text-gray-600">
@@ -676,8 +676,8 @@ export default function OverviewPage() {
           </div>
 
           {/* Métricas adicionales */}
-          <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-medium text-black mb-4 flex items-center">
+          <div className="mt-8 rounded-2xl border border-gray-200/50 bg-white p-6 shadow-lg">
+            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
               <BarChart3 className="h-5 w-5 text-indigo-600 mr-2" />
               {t.overview.additionalSystemMetrics}
             </h2>

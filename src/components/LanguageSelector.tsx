@@ -2,7 +2,8 @@
 
 import { useLanguage } from '@/contexts/LanguageContext'
 import { Globe, Check } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { Menu as MenuPrimitive } from '@base-ui/react/menu'
+import { cn } from 'cn'
 
 interface LanguageSelectorProps {
   compact?: boolean
@@ -10,123 +11,89 @@ interface LanguageSelectorProps {
   openUp?: boolean
 }
 
+/**
+ * Selector de idioma del dashboard (MT61) sobre el menú accesible de base-ui:
+ * navegación por teclado, cierre con Esc/click fuera y `menuitemradio` de
+ * fábrica. Las banderas emoji se sustituyen por las iniciales ES/EN.
+ */
 export default function LanguageSelector({
   compact = false,
   openUp = false,
 }: LanguageSelectorProps) {
   const { language, setLanguage, t } = useLanguage()
-  const [isOpen, setIsOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const languages = [
-    { code: 'es' as const, name: 'Español', flag: '🇪🇸' },
-    { code: 'en' as const, name: 'English', flag: '🇺🇸' }
+    { code: 'es' as const, name: 'Español' },
+    { code: 'en' as const, name: 'English' },
   ]
 
-  const currentLanguage = languages.find(lang => lang.code === language)
+  const currentLanguage = languages.find((lang) => lang.code === language)
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [])
-
-  if (compact) {
-    return (
-      <div className="relative" ref={dropdownRef}>
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label={t.common.language || 'Language'}
-          aria-expanded={isOpen}
-          aria-haspopup="menu"
-          className="flex items-center justify-center w-9 h-9 text-blue-700 bg-white backdrop-blur-sm border border-blue-200 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:scale-105"
-          title={t.common.language || 'Language'}
-        >
-          <Globe className="h-4 w-4" aria-hidden="true" />
-        </button>
-
-        {isOpen && (
-          <div role="menu" className={`absolute right-0 ${openUp ? 'bottom-full mb-2' : 'mt-2'} w-40 bg-white/95 backdrop-blur-xl rounded-xl shadow-xl border border-gray-200/50 py-2 z-[99999]`}>
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                type="button"
-                role="menuitemradio"
-                aria-checked={language === lang.code}
-                onClick={() => {
-                  setLanguage(lang.code)
-                  setIsOpen(false)
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-blue-50 transition-all duration-200 rounded-lg mx-1 ${
-                  language === lang.code ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:text-blue-600'
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <span className="text-base">{lang.flag}</span>
-                  <span className="font-medium text-xs">{lang.name}</span>
-                </div>
-                {language === lang.code && (
-                  <Check className="h-3 w-3 text-blue-600" />
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
+  const triggerClassName = cn(
+    'flex items-center border shadow-sm outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-blue-100/70',
+    compact
+      ? 'h-9 w-9 justify-center rounded-lg border-blue-200 bg-white text-blue-700 hover:bg-blue-50'
+      : 'gap-2 rounded-xl border-gray-200/50 bg-white/90 px-4 py-3 text-gray-700 backdrop-blur-sm hover:bg-blue-50',
+  )
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
+    <MenuPrimitive.Root>
+      <MenuPrimitive.Trigger
         aria-label={t.common.language || 'Language'}
-        aria-expanded={isOpen}
-        aria-haspopup="menu"
-        className="flex items-center space-x-2 px-4 py-3 text-gray-700 bg-white/90 backdrop-blur-sm border border-gray-200/50 hover:bg-blue-50 rounded-xl transition-all duration-200 hover:scale-105 shadow-sm hover:shadow-md"
         title={t.common.language || 'Language'}
+        className={triggerClassName}
       >
-        <Globe className="h-5 w-5 text-blue-600" />
-        <span className="text-lg">{currentLanguage?.flag}</span>
-        <span className="text-sm font-semibold text-gray-800">{currentLanguage?.name}</span>
-      </button>
+        <Globe
+          className={cn('text-blue-600', compact ? 'h-4 w-4' : 'h-5 w-5')}
+          aria-hidden="true"
+        />
+        {!compact && (
+          <>
+            <span className="text-xs font-bold tracking-wide text-blue-700">
+              {currentLanguage?.code.toUpperCase()}
+            </span>
+            <span className="text-sm font-semibold text-gray-800">
+              {currentLanguage?.name}
+            </span>
+          </>
+        )}
+      </MenuPrimitive.Trigger>
 
-      {isOpen && (
-        <div role="menu" className={`absolute right-0 ${openUp ? 'bottom-full mb-2' : 'mt-2'} w-52 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200/50 py-2 z-[99999]`}>
-          {languages.map((lang) => (
-            <button
-              key={lang.code}
-              type="button"
-              role="menuitemradio"
-              aria-checked={language === lang.code}
-              onClick={() => {
-                setLanguage(lang.code)
-                setIsOpen(false)
+      <MenuPrimitive.Portal>
+        <MenuPrimitive.Positioner
+          side={openUp ? 'top' : 'bottom'}
+          align="end"
+          sideOffset={8}
+          className="z-50 outline-none"
+        >
+          <MenuPrimitive.Popup className="min-w-40 rounded-xl border border-gray-200/50 bg-white/95 py-2 shadow-xl backdrop-blur-xl outline-none sm:min-w-52 sm:rounded-2xl">
+            <MenuPrimitive.RadioGroup
+              value={language}
+              onValueChange={(value) => {
+                if (value === 'es' || value === 'en') setLanguage(value)
               }}
-              className={`w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-blue-50 transition-all duration-200 rounded-xl mx-1 ${
-                language === lang.code ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:text-blue-600'
-              }`}
             >
-              <div className="flex items-center space-x-3">
-                <span className="text-xl">{lang.flag}</span>
-                <span className="font-medium">{lang.name}</span>
-              </div>
-              {language === lang.code && (
-                <Check className="h-4 w-4 text-blue-600" />
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+              {languages.map((lang) => (
+                <MenuPrimitive.RadioItem
+                  key={lang.code}
+                  value={lang.code}
+                  className="mx-1 flex w-[calc(100%-0.5rem)] items-center justify-between rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-150 data-[highlighted]:bg-blue-50 data-[checked]:bg-blue-100 data-[checked]:font-semibold data-[checked]:text-blue-700"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs font-bold tracking-wide text-blue-700">
+                      {lang.code.toUpperCase()}
+                    </span>
+                    <span className="font-medium">{lang.name}</span>
+                  </span>
+                  <MenuPrimitive.RadioItemIndicator>
+                    <Check className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" />
+                  </MenuPrimitive.RadioItemIndicator>
+                </MenuPrimitive.RadioItem>
+              ))}
+            </MenuPrimitive.RadioGroup>
+          </MenuPrimitive.Popup>
+        </MenuPrimitive.Positioner>
+      </MenuPrimitive.Portal>
+    </MenuPrimitive.Root>
   )
 }
