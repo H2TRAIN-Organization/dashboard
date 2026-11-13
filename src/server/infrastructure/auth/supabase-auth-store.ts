@@ -6,6 +6,7 @@ import type {
   AuthUserStore,
   LoginRateLimiter,
   RateLimitDecision,
+  UsernameIdentity,
 } from "./contracts";
 import { AuthConfigurationError, AuthInfrastructureError } from "./errors";
 import { normalizeIdentity } from "./rate-limit";
@@ -358,6 +359,51 @@ export class SupabaseAuthStore
     return rows
       .map(mapUserRow)
       .filter((user) => normalizeIdentity(user.username) === normalized);
+  }
+
+  /**
+   * MT48: username → (UserID, email confirmado de GoTrue) con la RPC de Vault.
+   * La RPC no existe hasta aplicar la migración MT46: PostgREST responde 404
+   * (PGRST202) y aquí se degrada a "unavailable" para que el gateway use el
+   * camino legacy hasta el cutover. El cliente nunca calcula el HMAC: la
+   * normalización y el HMAC ocurren dentro de la base de datos.
+   */
+  async resolveUsernameIdentity(
+    username: string,
+  ): Promise<readonly UsernameIdentity[] | "unavailable"> {
+    const value = username.trim();
+    if (value.length === 0) {
+      return [];
+    }
+    const response = await this.rest("rpc/auth_username_resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ p_username: value }),
+    });
+    if (response.status === 404) {
+      return "unavailable";
+    }
+    await this.requireOk(response, "username.resolve");
+    const body = await this.readJson(response);
+    if (!Array.isArray(body)) {
+      throw new AuthInfrastructureError(
+        "Supabase devolvió una resolución de username inválida.",
+      );
+    }
+    const identities: UsernameIdentity[] = [];
+    for (const row of body) {
+      if (!isRecord(row)) {
+        throw new AuthInfrastructureError();
+      }
+      if (typeof row.email !== "string" || row.email.length === 0) {
+        throw new AuthInfrastructureError();
+      }
+      identities.push({
+        userId: readUserId(row.user_id),
+        email: row.email,
+      });
+    }
+    return identities;
   }
 
   async findByUserId(id: string): Promise<User | null> {

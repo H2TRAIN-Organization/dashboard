@@ -30,6 +30,15 @@ export interface VerifiedEmailUser {
   readonly appMetadata: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * MT48: identidad resuelta por username desde la RPC de Vault. El email es el
+ * confirmado en GoTrue y el userId es el UserID canónico de public.users.
+ */
+export interface UsernameIdentity {
+  readonly userId: string;
+  readonly email: string;
+}
+
 export interface EmailPasswordSession {
   readonly accessToken: string;
   readonly expiresAt: string;
@@ -65,6 +74,15 @@ export interface AuthUserStore {
   findByNormalizedUsername(username: string): Promise<readonly User[]>;
   findByUserId(id: string): Promise<User | null>;
   findByUuid(uuid: string): Promise<User | null>;
+  /**
+   * MT48: resuelve el username al par (UserID, email confirmado de GoTrue)
+   * con la RPC de Vault sin descifrar nada. "unavailable" significa que la
+   * migración MT46 no está aplicada y el gateway cae al camino legacy hasta el
+   * cutover. Más de una identidad es ambigüedad y se rechaza cerrado.
+   */
+  resolveUsernameIdentity(
+    username: string,
+  ): Promise<readonly UsernameIdentity[] | "unavailable">;
 }
 
 export interface AuthSessionRecord {

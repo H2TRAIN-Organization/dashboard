@@ -10,6 +10,7 @@ import type {
   PasswordVerification,
   PasswordVerifier,
   RateLimitDecision,
+  UsernameIdentity,
   VerifiedEmailUser,
 } from "@/server/infrastructure/auth/contracts";
 import type { BcryptLibrary } from "@/server/infrastructure/auth/bcrypt-password-verifier";
@@ -51,8 +52,13 @@ export class FakeUserStore implements AuthUserStore {
   private users = new Map<string, User>();
   private usernames = new Map<string, string>();
   private hashes = new Map<string, string>();
+  private usernameEmails = new Map<string, string>();
+  /** MT48: por defecto la RPC de Vault no está aplicada (camino legacy). */
+  vaultAvailable = false;
+  resolveAmbiguous = false;
   readonly findByIdCalls: string[] = [];
   readonly findByUsernameCalls: string[] = [];
+  readonly resolveCalls: string[] = [];
 
   constructor(seed: readonly User[], credentials: ReadonlyMap<string, string>) {
     for (const user of seed) {
@@ -65,6 +71,11 @@ export class FakeUserStore implements AuthUserStore {
         this.hashes.set(user.id, hash);
       }
     }
+  }
+
+  /** MT48: publica la identidad (UserID, email) que resolvería la RPC. */
+  publishUsernameEmail(username: string, email: string): void {
+    this.usernameEmails.set(username, email);
   }
 
   setRole(id: string, role: User["role"]): void {
@@ -118,6 +129,27 @@ export class FakeUserStore implements AuthUserStore {
       }
     }
     return null;
+  }
+
+  async resolveUsernameIdentity(
+    username: string,
+  ): Promise<readonly UsernameIdentity[] | "unavailable"> {
+    this.resolveCalls.push(username);
+    if (!this.vaultAvailable) {
+      return "unavailable";
+    }
+    if (this.resolveAmbiguous) {
+      return [
+        { userId: "42", email: "uno@example.com" },
+        { userId: "43", email: "dos@example.com" },
+      ];
+    }
+    const email = this.usernameEmails.get(username);
+    if (email === undefined) {
+      return [];
+    }
+    const userId = this.usernames.get(username) ?? "42";
+    return [{ userId, email }];
   }
 }
 

@@ -12,6 +12,7 @@ import type {
   PasswordVerifier,
   VerifiedEmailLinkResolver,
   VerifiedEmailUser,
+  UsernameIdentity,
   AuthSessionStore,
   PrivacyStore,
 } from "./contracts";
@@ -24,6 +25,12 @@ import {
 import type { SessionTokenCodec } from "./session-token";
 
 const DEFAULT_SESSION_TTL_SECONDS = 8 * 60 * 60;
+/** Equalizes failed username routes so timing does not leak existence. */
+const TIMING_EQUALIZATION_MS = 100;
+
+function equalizeTiming(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, TIMING_EQUALIZATION_MS));
+}
 
 export interface EmailLinkOptions {
   /**
@@ -314,6 +321,46 @@ export function createAuthGateway(
     );
   }
 
+  /**
+   * CUTOVER MT55: verificador bcrypt legacy. Solo se alcanza mientras la
+   * migración MT46 no esté aplicada (la RPC de Vault no existe). Se elimina
+   * junto con bcryptjs cuando la migración esté confirmada en producción.
+   */
+  async function authenticateByUsernameLegacy(
+    normalized: string,
+    password: string,
+    limitKey: string,
+  ): Promise<Session | null> {
+    let credential: Awaited<ReturnType<AuthUserStore["findByUsername"]>>;
+    try {
+      credential = await users.findByUsername(normalized);
+    } catch (error) {
+      failInfrastructure(error);
+    }
+    if (credential === null) {
+      await passwords.verifyDummy(password);
+      return null;
+    }
+
+    let verification: Awaited<ReturnType<PasswordVerifier["verify"]>>;
+    try {
+      verification = await passwords.verify(password, credential.passwordHash);
+    } catch (error) {
+      failInfrastructure(error);
+    }
+    if (!verification.ok) {
+      if (verification.reason !== "mismatch") {
+        // Equalize timing for malformed/unsupported legacy hashes.
+        await passwords.verifyDummy(password);
+      }
+      return null;
+    }
+
+    const session = await issueSession(credential.user, "username");
+    await resetLimit(limitKey);
+    return session;
+  }
+
   return {
     async decidePrivacy(token, decision) {
       if (decision.policyVersion !== PRIVACY_POLICY_VERSION) throw new ConflictError('CONFLICT', 'Versión del aviso obsoleta');
@@ -392,32 +439,62 @@ export function createAuthGateway(
         return null;
       }
 
-      let credential: Awaited<ReturnType<AuthUserStore["findByUsername"]>>;
+      let identities: readonly UsernameIdentity[] | "unavailable";
       try {
-        credential = await users.findByUsername(normalized);
+        identities = await users.resolveUsernameIdentity(normalized);
       } catch (error) {
         failInfrastructure(error);
-      }
-      if (credential === null) {
-        await passwords.verifyDummy(password);
-        return null;
       }
 
-      let verification: Awaited<ReturnType<PasswordVerifier["verify"]>>;
+      if (identities === "unavailable") {
+        // Despliegue seguro: la migración MT46 (Vault) aún no está aplicada y
+        // el login por username sigue el verificador legacy hasta el cutover.
+        return authenticateByUsernameLegacy(normalized, password, limitKey);
+      }
+      if (identities.length !== 1) {
+        // Cero identidades (desconocido) o varias (ambiguo): fallar cerrado.
+        await equalizeTiming();
+        return null;
+      }
+      // GoTrue, re-verificación getUser, email confirmado y vínculo único con
+      // app_metadata; el rol real siempre sale de public.users.
+      const resolvedEmail = normalizeEmail(identities[0]!.email);
+      let signed: Awaited<ReturnType<EmailAuthTransport["signInWithPassword"]>>;
       try {
-        verification = await passwords.verify(password, credential.passwordHash);
+        signed = await email.signInWithPassword(resolvedEmail, password);
       } catch (error) {
         failInfrastructure(error);
       }
-      if (!verification.ok) {
-        if (verification.reason !== "mismatch") {
-          // Equalize timing for malformed/unsupported legacy hashes.
-          await passwords.verifyDummy(password);
+      if (!signed.ok) {
+        if (signed.reason === "unavailable") {
+          throw new AuthInfrastructureError(
+            "No se pudo verificar la identidad de username.",
+          );
         }
         return null;
       }
 
-      const session = await issueSession(credential.user, "username");
+      let verified: VerifiedEmailUser | null;
+      try {
+        verified = await email.getUser(signed.session.accessToken);
+      } catch (error) {
+        failInfrastructure(error);
+      }
+      if (
+        verified === null ||
+        verified.authUserId !== signed.session.user.authUserId ||
+        normalizeEmail(verified.email) !== resolvedEmail ||
+        verified.emailConfirmedAt === null
+      ) {
+        return null;
+      }
+
+      const user = await resolveEmailUser(verified);
+      const session = await issueSession(
+        user,
+        "username",
+        signed.session.accessToken,
+      );
       await resetLimit(limitKey);
       return session;
     },

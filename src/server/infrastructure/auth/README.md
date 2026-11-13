@@ -88,15 +88,21 @@ La cuenta operativa actual (`jiahao.yang@ulpgc.es`) puede no tener
 cubre ese caso sin crear metadatos ni inventar un rol. La unicidad real de
 `public.users.Username` debe verificarse antes de sembrar la cuenta.
 
-## Username / bcrypt
+## Username / GoTrue (MT48)
 
-- Solo servidor, tabla `public.users`, `PasswordHash`, roles reales.
-- Se observaron 17/21 hashes `$2b$` coste 10 (longitud 60) y 4 valores de
-  longitud 64 no-bcrypt. Los no-bcrypt fallan cerrado.
-- No hay rehash silencioso: solo se compara; el coste/versión almacenados se
-  conservan. Costes > 14 se rechazan para evitar CPU abusiva.
-- Username inexistente ejecuta una comparación dummy para reducir diferencias
-  de tiempo.
+- El login por username ya NO compara bcrypt como fuente primaria: resuelve el
+  username a un email confirmado de GoTrue mediante la RPC de Vault
+  `auth_username_resolve` (el HMAC se calcula dentro de la BD; el cliente no
+  toca la clave) y delega en `signInWithPassword` con los mismos invariantes
+  que el login por email (getUser re-verificación, vínculo `app_user_id`,
+  rol real de `public.users`).
+- Camino legacy (CUTOVER MT55): mientras la migración MT46 no esté aplicada,
+  la RPC no existe y el gateway usa el verificador bcrypt contra
+  `public.users.PasswordHash` (sin rehash silencioso, coste máx 14,
+  comparación dummy anti timing-attack). Se elimina junto con bcryptjs cuando
+  la migración esté confirmada en producción.
+- Igualación de tiempo: username desconocido o ambiguo espera 100 ms antes de
+  responder para no filtrar existencia por timing.
 
 ## Sesiones y rate limiting
 
