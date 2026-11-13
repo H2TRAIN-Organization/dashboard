@@ -87,9 +87,14 @@ test('applyResetPlan aplica contraseña y vínculo; el informe no contiene la co
     newPassword: 'nueva-larga-2026',
   })
   const calls = []
+  const syncCalls = []
   const admin = {
     updateUserById: async (id, attributes) => {
       calls.push({ id, attributes })
+      return { error: null }
+    },
+    syncPasswordToApp: async ({ userId, password }) => {
+      syncCalls.push({ userId, password })
       return { error: null }
     },
   }
@@ -102,9 +107,33 @@ test('applyResetPlan aplica contraseña y vínculo; el informe no contiene la co
       app_metadata: { app_user_id: 17, role: 'user' },
     },
   }])
+  // Opción 2: el hash se espeja en public.users para la app móvil.
+  assert.deepEqual(syncCalls, [{ userId: '17', password: 'nueva-larga-2026' }])
   assert.equal(outcome.report.action, 'reset')
   assert.equal(outcome.report.linkFixed, true)
+  assert.equal(outcome.report.appSync, 'updated')
   assert.equal(JSON.stringify(outcome).includes('nueva-larga-2026'), false)
+})
+
+test('applyResetPlan reporta el espejo omitido o fallido sin romper el reset', async () => {
+  const plan = buildResetPlan({
+    appUsers: APP_USERS,
+    authUsers: [{ id: 'uuid-link', app_metadata: { app_user_id: 13, role: 'user' } }],
+    targetUserId: 13,
+    newPassword: 'larga-suficiente',
+  })
+  const withoutSync = await applyResetPlan(plan, {
+    updateUserById: async () => ({ error: null }),
+  })
+  assert.equal(withoutSync.report.appSync, 'skipped')
+
+  const failingSync = await applyResetPlan(plan, {
+    updateUserById: async () => ({ error: null }),
+    syncPasswordToApp: async () => ({ error: { message: 'update rejected' } }),
+  })
+  assert.equal(failingSync.report.appSync, 'failed')
+  assert.match(failingSync.report.syncReason, /update rejected/)
+  assert.equal(failingSync.counts.reset, 1)
 })
 
 test('applyResetPlan con vínculo correcto no toca app_metadata', async () => {

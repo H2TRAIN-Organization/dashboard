@@ -12,6 +12,11 @@
  * la registra; siempre repara el vínculo app_metadata en la misma llamada
  * (el login por username lo necesita).
  *
+ * Opción 2 (móvil): tras fijar la contraseña en GoTrue, el script espeja el
+ * hash bcrypt en public.users.PasswordHash para que las credenciales
+ * compartidas con la app móvil externa sigan siendo válidas. El espejo es
+ * best-effort y se reporta; el reset en GoTrue manda.
+ *
  * Uso:
  *   node --env-file=.env.local scripts/reset-auth-password.mjs <UserID> --password <nueva> [--apply]
  * Sin --apply es dry-run (muestra a quién afectaría, no escribe).
@@ -108,8 +113,9 @@ export function buildResetPlan({
 
 /**
  * Aplica el plan con un cliente admin inyectado. Una única llamada fija la
- * contraseña nueva y repara el vínculo app_metadata. El informe nunca
- * contiene la contraseña.
+ * contraseña nueva y repara el vínculo app_metadata; después espeja el hash
+ * en public.users (opción 2, credenciales compartidas con la app móvil).
+ * El informe nunca contiene la contraseña.
  */
 export async function applyResetPlan(plan, admin) {
   if (plan.action === 'error') {
@@ -135,16 +141,30 @@ export async function applyResetPlan(plan, admin) {
       counts: { failed: 1 },
     }
   }
-  return {
-    report: {
-      action: 'reset',
-      userId: plan.targetUserId,
-      email: plan.email,
-      role: plan.role,
-      linkFixed: plan.needsLink,
-    },
-    counts: { reset: 1 },
+
+  const report = {
+    action: 'reset',
+    userId: plan.targetUserId,
+    email: plan.email,
+    role: plan.role,
+    linkFixed: plan.needsLink,
   }
+  if (typeof admin.syncPasswordToApp === 'function') {
+    const sync = await admin.syncPasswordToApp({
+      userId: plan.targetUserId,
+      password: plan.newPassword,
+    })
+    if (sync && sync.error) {
+      report.appSync = 'failed'
+      report.syncReason = sync.error.message ?? String(sync.error)
+    } else {
+      report.appSync = 'updated'
+    }
+  } else {
+    report.appSync = 'skipped'
+  }
+
+  return { report, counts: { reset: 1 } }
 }
 
 async function main() {
@@ -215,6 +235,17 @@ async function main() {
   const admin = {
     updateUserById: (userId, attributes) =>
       client.auth.admin.updateUserById(userId, attributes),
+    // Opción 2 (móvil): espejo del hash bcrypt en public.users para que las
+    // credenciales compartidas con la app móvil externa sigan siendo válidas.
+    syncPasswordToApp: async ({ userId, password }) => {
+      const bcrypt = (await import('bcryptjs')).default
+      const passwordHash = await bcrypt.hash(password, 12)
+      const { error } = await client
+        .from('users')
+        .update({ PasswordHash: passwordHash })
+        .eq('UserID', Number(userId))
+      return { error }
+    },
   }
   const outcome = await applyResetPlan(plan, admin)
   console.log(`Resultado: ${JSON.stringify(outcome)}`)
