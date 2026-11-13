@@ -2,7 +2,9 @@ import type {
   CreateUserRecord,
   UserRepository,
 } from "@/server/application/ports/user-repository";
+import type { AuthIdentityAdmin } from "@/server/application/ports/auth-identity-admin";
 import type { UsernameVault } from "@/server/application/ports/username-vault";
+import { deriveEmailFromUsername } from "@/server/domain/username-email";
 import {
   ConflictError,
   ValidationError,
@@ -89,11 +91,15 @@ export class SupabaseUserRepository implements UserRepository {
    * migración de MT46 no esté aplicada, el repositorio sigue leyendo la
    * columna legacy "Username". Cuando esté presente, la resolución por
    * username y el descifrado pasan por las RPCs de Vault.
+   *
+   * `identityAdmin` (MT49) crea la identidad GoTrue del alta admin; si está
+   * presente, el alta es dos pasos (identidad + fila) con compensación.
    */
   constructor(
     private readonly gateway: PersistenceGateway,
     private readonly passwordHasher: PasswordHasher,
     private readonly usernameVault?: UsernameVault,
+    private readonly identityAdmin?: AuthIdentityAdmin,
   ) {}
 
   async list(filter: UserListFilter): Promise<UserPage> {
@@ -197,6 +203,28 @@ export class SupabaseUserRepository implements UserRepository {
       );
     }
     const user = mapUserRow(inserted);
+    if (this.identityAdmin !== undefined) {
+      // MT49: identidad GoTrue con el vínculo app_metadata. Si falla, la fila
+      // recién creada se elimina (un usuario sin identidad no puede iniciar
+      // sesión y sería una cuenta fantasma).
+      try {
+        await this.identityAdmin.createIdentity({
+          email: deriveEmailFromUsername(username),
+          password: record.password,
+          appUserId: Number(user.id),
+          role,
+        });
+      } catch (error) {
+        try {
+          await this.gateway.rpc("t009_delete_user", {
+            p_user_id: Number(user.id),
+          });
+        } catch {
+          // La compensación es best-effort; el error original manda.
+        }
+        throw error;
+      }
+    }
     await this.mirrorUsername(user.id, username);
     return user;
   }
