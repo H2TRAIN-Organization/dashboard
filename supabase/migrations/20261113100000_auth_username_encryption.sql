@@ -47,11 +47,11 @@ do $$
 begin
   if not exists (select 1 from private.mt46_keys where id = 'enc') then
     insert into private.mt46_keys (id, value)
-      values ('enc', extensions.encode(extensions.gen_random_bytes(32), 'hex'));
+      values ('enc', encode(extensions.gen_random_bytes(32), 'hex'));
   end if;
   if not exists (select 1 from private.mt46_keys where id = 'hmac') then
     insert into private.mt46_keys (id, value)
-      values ('hmac', extensions.encode(extensions.gen_random_bytes(32), 'hex'));
+      values ('hmac', encode(extensions.gen_random_bytes(32), 'hex'));
   end if;
 end $$;
 
@@ -70,7 +70,7 @@ with keys as (
 )
 update public.users as u
 set username_enc = extensions.pgp_sym_encrypt(trim(u."Username"), keys.enc_secret),
-    username_lookup = extensions.encode(
+    username_lookup = encode(
       extensions.hmac(lower(normalize(trim(u."Username"), NFC)), keys.hmac_secret, 'sha256'),
       'hex'
     )
@@ -136,7 +136,7 @@ begin
   if hmac_secret is null then
     raise sqlstate 'PT503' using message = 'KEY_UNAVAILABLE';
   end if;
-  lookup := extensions.encode(
+  lookup := encode(
     extensions.hmac(lower(normalize(trim(p_username), NFC)), hmac_secret, 'sha256'),
     'hex'
   );
@@ -210,7 +210,7 @@ begin
   normalized_value := lower(normalize(display_value, NFC));
   update public.users
      set username_enc = extensions.pgp_sym_encrypt(display_value, enc_secret),
-         username_lookup = extensions.encode(extensions.hmac(normalized_value, hmac_secret, 'sha256'), 'hex'),
+         username_lookup = encode(extensions.hmac(normalized_value, hmac_secret, 'sha256'), 'hex'),
          "Username" = display_value
    where "UserID" = p_user_id;
   if not found then

@@ -35,7 +35,7 @@ describe("MT46 username encryption migration (sin Vault)", () => {
     expect(sql).toContain("create schema if not exists private");
     expect(sql).toContain("create table if not exists private.mt46_keys");
     expect(sql).toContain("check (id in ('enc', 'hmac'))");
-    expect(sql).toContain("extensions.encode(extensions.gen_random_bytes(32), 'hex')");
+    expect(sql).toContain("encode(extensions.gen_random_bytes(32), 'hex')");
     // Las claves se generan en la BD; jamás hay material de clave en el fichero.
     expect(sql).not.toMatch(/[0-9a-f]{32,}/i);
   });
