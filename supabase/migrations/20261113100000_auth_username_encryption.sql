@@ -141,7 +141,7 @@ begin
     'hex'
   );
   return query
-    select u."UserID", au.email
+    select u."UserID", au.email::text
       from public.users u
       join auth.users au
         on au.raw_app_meta_data->>'app_user_id' = u."UserID"::text

@@ -83,6 +83,7 @@ describe("MT46 username encryption migration (sin Vault)", () => {
       "extensions.hmac(lower(normalize(trim(p_username), NFC)), hmac_secret, 'sha256')",
     );
     expect(sql).toContain('au.raw_app_meta_data->>\'app_user_id\' = u."UserID"::text');
+    expect(sql).toContain("au.email::text");
     expect(sql).toContain("au.email_confirmed_at is not null");
     expect(sql).toContain("au.banned_until is null");
     expect(sql).toContain("limit 2");
