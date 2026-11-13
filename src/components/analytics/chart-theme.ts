@@ -22,11 +22,27 @@ export const CHART_SERIES_COLORS = [
   '#8B5CF6', // violet-500
   '#EC4899', // pink-500
   '#06B6D4', // cyan-500
-  '#84CC16', // lime-500
+  '#6366F1', // indigo-500
 ] as const
 
 /** Color reservado para la cola agregada ("Otros") de un pie chart. */
 export const CHART_OTHERS_COLOR = '#94A3B8' // slate-400
+
+/**
+ * Colores semánticos por métrica HRV, compartidos por la vista personal
+ * (HRVCharts) y la vista admin (AdminKubiosCharts). Único lugar donde se
+ * decide qué color recibe cada métrica.
+ */
+export const HRV_METRIC_COLORS = {
+  readiness: '#10B981', // emerald-500
+  heartRate: '#EF4444', // red-500
+  rmssd: CHART_PRIMARY_COLOR,
+  pns: '#8B5CF6', // violet-500
+  sns: '#F59E0B', // amber-500
+  hf: '#06B6D4', // cyan-500
+  lf: '#8B5CF6', // violet-500
+  vlf: '#F97316', // orange-500
+} as const
 
 /** Color de la línea de referencia (media/objetivo) sobre la serie. */
 export const CHART_REFERENCE_COLOR = '#334155' // slate-700

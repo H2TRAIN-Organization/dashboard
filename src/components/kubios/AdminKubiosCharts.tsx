@@ -12,6 +12,7 @@
 import { TrendingUp } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
+import { HRV_METRIC_COLORS } from '@/components/analytics/chart-theme'
 import HrvLineChart, { type ChartLine, type ChartRow } from './HrvLineChart'
 import { parseKubiosDate } from '@/lib/kubios-personal'
 import { buildHrvChartRows, type HrvMeasurementInput } from '@/lib/hrv-chart-rows'
@@ -95,28 +96,28 @@ export default function AdminKubiosCharts({
           title={t.kubios.charts.readinessEvolution}
           yLabel={t.kubios.charts.readinessPercentage}
           rows={rows}
-          lines={[{ dataKey: 'readiness', name: t.kubios.charts.averageReadiness, color: '#10B981', unit: '%' }]}
+          lines={[{ dataKey: 'readiness', name: t.kubios.charts.averageReadiness, color: HRV_METRIC_COLORS.readiness, unit: '%' }]}
           domain={[0, 100]}
         />
         <ChartCard
           title={t.kubios.charts.heartRateRest}
           yLabel={t.kubios.charts.heartRateBpm}
           rows={rows}
-          lines={[{ dataKey: 'heartRate', name: t.kubios.charts.heartRateRestLabel, color: '#EF4444', unit: 'bpm' }]}
+          lines={[{ dataKey: 'heartRate', name: t.kubios.charts.heartRateRestLabel, color: HRV_METRIC_COLORS.heartRate, unit: 'bpm' }]}
         />
         <ChartCard
           title={t.kubios.charts.rmssdEvolution}
           yLabel={t.kubios.charts.rmssdMs}
           rows={rows}
-          lines={[{ dataKey: 'rmssd', name: t.kubios.metrics.rmssd, color: '#3B82F6', unit: 'ms' }]}
+          lines={[{ dataKey: 'rmssd', name: t.kubios.metrics.rmssd, color: HRV_METRIC_COLORS.rmssd, unit: 'ms' }]}
         />
         <ChartCard
           title={t.kubios.charts.pnsSnsIndices}
           yLabel={t.kubios.charts.pnsSnsIndicesLabel}
           rows={rows}
           lines={[
-            { dataKey: 'pnsIndex', name: t.kubios.charts.pnsIndex, color: '#8B5CF6', dashed: true },
-            { dataKey: 'snsIndex', name: t.kubios.charts.snsIndex, color: '#F59E0B' },
+            { dataKey: 'pnsIndex', name: t.kubios.charts.pnsIndex, color: HRV_METRIC_COLORS.pns, dashed: true },
+            { dataKey: 'snsIndex', name: t.kubios.charts.snsIndex, color: HRV_METRIC_COLORS.sns },
           ]}
         />
         <ChartCard
@@ -124,9 +125,9 @@ export default function AdminKubiosCharts({
           yLabel={t.kubios.charts.spectralPower}
           rows={rows}
           lines={[
-            { dataKey: 'hfPower', name: t.kubios.charts.hfPower, color: '#06B6D4', unit: 'ms²' },
-            { dataKey: 'lfPower', name: t.kubios.charts.lfPower, color: '#8B5CF6', dashed: true, unit: 'ms²' },
-            { dataKey: 'vlfPower', name: t.kubios.charts.vlfPower, color: '#F97316', dashed: true, unit: 'ms²' },
+            { dataKey: 'hfPower', name: t.kubios.charts.hfPower, color: HRV_METRIC_COLORS.hf, unit: 'ms²' },
+            { dataKey: 'lfPower', name: t.kubios.charts.lfPower, color: HRV_METRIC_COLORS.lf, dashed: true, unit: 'ms²' },
+            { dataKey: 'vlfPower', name: t.kubios.charts.vlfPower, color: HRV_METRIC_COLORS.vlf, dashed: true, unit: 'ms²' },
           ]}
         />
       </div>

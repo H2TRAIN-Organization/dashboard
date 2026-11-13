@@ -1,6 +1,7 @@
 'use client'
 
 import type { LucideIcon } from 'lucide-react'
+import { CHART_PRIMARY_COLOR } from '@/components/analytics/chart-theme'
 
 interface StatCardProps {
   icon: LucideIcon
@@ -66,7 +67,7 @@ function StatSparkline({ data, color }: { data: readonly number[]; color: string
  * padding, radios, tipografía y tamaños para todas las tarjetas, con el
  * ancho pensado para filas de 3 (escritorio) o 2 (tablet) centradas.
  */
-export default function StatCard({ icon: Icon, iconGradient, accent, title, value, description, sparkData, sparkColor = '#3B82F6' }: StatCardProps) {
+export default function StatCard({ icon: Icon, iconGradient, accent, title, value, description, sparkData, sparkColor = CHART_PRIMARY_COLOR }: StatCardProps) {
   return (
     <div className="relative w-full bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)]">
       <div className="flex items-center">

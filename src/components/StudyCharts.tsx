@@ -16,6 +16,8 @@ import {
   CHART_AXIS_LINE_STYLE,
   CHART_GRID_DASH,
   CHART_GRID_STROKE,
+  CHART_PRIMARY_COLOR,
+  CHART_SERIES_COLORS,
   CHART_TICK_STYLE,
   CHART_TOOLTIP_CONTENT_STYLE,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -96,7 +98,7 @@ export default function StudyCharts({ days }: { days: readonly StudyDay[] }) {
                 dataKey="exerciseDuration"
                 name={text.exercise}
                 yLabel={text.exercise}
-                color="#2563eb"
+                color={CHART_PRIMARY_COLOR}
                 ariaLabel={`${text.exercise} · ${text.participant} ${index + 1}`}
               />
               <ParticipantMetricChart
@@ -104,7 +106,7 @@ export default function StudyCharts({ days }: { days: readonly StudyDay[] }) {
                 dataKey="moodValue"
                 name={text.mood}
                 yLabel={text.mood}
-                color="#059669"
+                color={CHART_SERIES_COLORS[1]}
                 ariaLabel={`${text.mood} · ${text.participant} ${index + 1}`}
               />
             </div>

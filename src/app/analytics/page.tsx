@@ -19,6 +19,7 @@ import {
   CHART_GRID_DASH,
   CHART_GRID_STROKE,
   CHART_OTHERS_COLOR,
+  CHART_SERIES_COLORS,
   CHART_TICK_STYLE,
   CHART_TOOLTIP_CONTENT_STYLE,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -428,7 +429,7 @@ export default function AnalyticsPage() {
                 value={String(stats.totalInsulin)}
                 description={`${t.analytics.average}: ${stats.avgInsulinDose} ${t.analytics.units}`}
                 sparkData={recentCounts(insulinByDate)}
-                sparkColor="#3B82F6"
+                sparkColor={CHART_SERIES_COLORS[0]}
               />
             )}
 
@@ -441,7 +442,7 @@ export default function AnalyticsPage() {
                 value={String(stats.totalFood)}
                 description={`${t.analytics.average}: ${stats.avgCarbs} ${t.analytics.carbohydrates}`}
                 sparkData={recentCounts(foodByDate)}
-                sparkColor="#10B981"
+                sparkColor={CHART_SERIES_COLORS[1]}
               />
             )}
 
@@ -454,7 +455,7 @@ export default function AnalyticsPage() {
                 value={String(stats.totalExercise)}
                 description={t.analytics.registeredSessions}
                 sparkData={recentCounts(exerciseByDate)}
-                sparkColor="#F59E0B"
+                sparkColor={CHART_SERIES_COLORS[2]}
               />
             )}
 
@@ -498,7 +499,7 @@ export default function AnalyticsPage() {
                 value={String(stats.totalMood)}
                 description={`${t.analytics.average}: ${stats.avgMood}/10`}
                 sparkData={recentCounts(moodByDate)}
-                sparkColor="#EC4899"
+                sparkColor={CHART_SERIES_COLORS[5]}
               />
             )}
           </div>
@@ -577,7 +578,7 @@ export default function AnalyticsPage() {
                             labelLine={false}
                             label={<PieSliceLabel />}
                             outerRadius={80}
-                            fill="#8884d8"
+                            fill={CHART_OTHERS_COLOR}
                             dataKey="value"
                           >
                             {insulinPieData.map((entry, index) => (
@@ -678,7 +679,7 @@ export default function AnalyticsPage() {
                             ]}
                             labelFormatter={(label) => `${t.analytics.type}: ${label}`}
                           />
-                          <Bar dataKey="value" fill="#10B981" name={t.analytics.registeredMeals} radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="value" fill={CHART_SERIES_COLORS[1]} name={t.analytics.registeredMeals} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
                 </ChartCard>
@@ -722,7 +723,7 @@ export default function AnalyticsPage() {
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Bar dataKey="count" fill="#3B82F6" name={t.analytics.insulinInjections} radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="count" fill={CHART_SERIES_COLORS[0]} name={t.analytics.insulinInjections} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
                 </ChartCard>
@@ -766,7 +767,7 @@ export default function AnalyticsPage() {
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Bar dataKey="averageDose" fill="#6366F1" name={t.analytics.averageDose} radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="averageDose" fill={CHART_SERIES_COLORS[7]} name={t.analytics.averageDose} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
                 </ChartCard>
@@ -814,7 +815,7 @@ export default function AnalyticsPage() {
                             ]}
                             labelFormatter={(label) => `${t.analytics.level}: ${label}/10`}
                           />
-                          <Bar dataKey="count" fill="#EC4899" name={t.analytics.moodRecords} radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="count" fill={CHART_SERIES_COLORS[5]} name={t.analytics.moodRecords} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
                 </ChartCard>
@@ -878,7 +879,7 @@ export default function AnalyticsPage() {
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} name={t.analytics.insulinInjections} />
+                          <Line type="monotone" dataKey="count" stroke={CHART_SERIES_COLORS[0]} strokeWidth={2} name={t.analytics.insulinInjections} />
                         </LineChart>
                       </ScrollableChart>
                 </ChartCard>
@@ -922,7 +923,7 @@ export default function AnalyticsPage() {
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Line type="monotone" dataKey="count" stroke="#10B981" strokeWidth={2} name={t.analytics.registeredMeals} />
+                          <Line type="monotone" dataKey="count" stroke={CHART_SERIES_COLORS[1]} strokeWidth={2} name={t.analytics.registeredMeals} />
                         </LineChart>
                       </ScrollableChart>
                 </ChartCard>
@@ -966,7 +967,7 @@ export default function AnalyticsPage() {
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Line type="monotone" dataKey="count" stroke="#F59E0B" strokeWidth={2} name={t.analytics.exerciseSessions} />
+                          <Line type="monotone" dataKey="count" stroke={CHART_SERIES_COLORS[2]} strokeWidth={2} name={t.analytics.exerciseSessions} />
                         </LineChart>
                       </ScrollableChart>
                 </ChartCard>
@@ -1010,7 +1011,7 @@ export default function AnalyticsPage() {
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
                           />
-                          <Line type="monotone" dataKey="count" stroke="#EC4899" strokeWidth={2} name={t.analytics.moodRecords} />
+                          <Line type="monotone" dataKey="count" stroke={CHART_SERIES_COLORS[5]} strokeWidth={2} name={t.analytics.moodRecords} />
                         </LineChart>
                       </ScrollableChart>
                 </ChartCard>

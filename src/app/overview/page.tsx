@@ -7,6 +7,18 @@ import { getDisplayUsername } from '@/lib/user-mapper'
 import { Users, Activity, TrendingUp, AlertTriangle, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Database, Target } from 'lucide-react'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
+import {
+  CHART_AXIS_LINE_STYLE,
+  CHART_GRID_DASH,
+  CHART_GRID_STROKE,
+  CHART_PRIMARY_COLOR,
+  CHART_TICK_LINE_STYLE,
+  CHART_TICK_STYLE,
+  CHART_TOOLTIP_CONTENT_STYLE,
+  CHART_TOOLTIP_ITEM_STYLE,
+  CHART_TOOLTIP_LABEL_STYLE,
+  seriesColor,
+} from '@/components/analytics/chart-theme'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridNavigation from '@/components/HybridNavigation'
 import { useSession } from '@/contexts/SessionContext'
@@ -222,13 +234,13 @@ export default function OverviewPage() {
     })
   }
 
-  // Datos para gráficos
+  // Datos para gráficos: colores de la paleta compartida (chart-theme), no hex sueltos.
   const dataByType = [
-    { name: t.overview.insulin, value: systemStats.totalInsulin, color: '#3B82F6' },
-    { name: t.overview.meals, value: systemStats.totalFood, color: '#10B981' },
-    { name: t.overview.exercise, value: systemStats.totalExercise, color: '#F59E0B' },
-    { name: t.overview.periods, value: systemStats.totalPeriods, color: '#8B5CF6' },
-    { name: t.overview.mood, value: systemStats.totalMood, color: '#EC4899' }
+    { name: t.overview.insulin, value: systemStats.totalInsulin, color: seriesColor(0) },
+    { name: t.overview.meals, value: systemStats.totalFood, color: seriesColor(1) },
+    { name: t.overview.exercise, value: systemStats.totalExercise, color: seriesColor(2) },
+    { name: t.overview.periods, value: systemStats.totalPeriods, color: seriesColor(4) },
+    { name: t.overview.mood, value: systemStats.totalMood, color: seriesColor(5) }
   ].filter((entry) => entry.value > 0)
 
   // Actividad por día (últimos 7 días)
@@ -534,22 +546,17 @@ export default function OverviewPage() {
                         labelLine={false}
                         label={<PieSliceLabel />}
                         outerRadius={80}
-                        fill="#8884d8"
+                        fill={CHART_PRIMARY_COLOR}
                         dataKey="value"
                       >
                         {dataByType.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
-                          borderRadius: '12px',
-                          color: 'white'
-                        }}
-                        itemStyle={{ color: 'white' }}
-                        labelStyle={{ color: 'white' }}
+                      <Tooltip
+                        contentStyle={{ ...CHART_TOOLTIP_CONTENT_STYLE }}
+                        itemStyle={{ ...CHART_TOOLTIP_ITEM_STYLE }}
+                        labelStyle={{ ...CHART_TOOLTIP_LABEL_STYLE }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -570,20 +577,15 @@ export default function OverviewPage() {
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={activityByDay}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        borderRadius: '12px',
-                        color: 'white'
-                      }}
-                      itemStyle={{ color: 'white' }}
-                      labelStyle={{ color: 'white' }}
+                    <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                    <XAxis dataKey="date" tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} />
+                    <YAxis tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{ ...CHART_TOOLTIP_CONTENT_STYLE }}
+                      itemStyle={{ ...CHART_TOOLTIP_ITEM_STYLE }}
+                      labelStyle={{ ...CHART_TOOLTIP_LABEL_STYLE }}
                     />
-                    <Area type="monotone" dataKey="total" name={t.overview.totalRecordsOverview} stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} />
+                    <Area type="monotone" dataKey="total" name={t.overview.totalRecordsOverview} stroke={CHART_PRIMARY_COLOR} fill={CHART_PRIMARY_COLOR} fillOpacity={0.3} />
                   </AreaChart>
                 </ResponsiveContainer>
               )}

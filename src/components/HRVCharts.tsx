@@ -8,6 +8,7 @@ import {
 } from '@/lib/kubios-personal'
 import { buildHrvChartRows, averageOfChartKey, type HrvMeasurementInput } from '@/lib/hrv-chart-rows'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
+import { HRV_METRIC_COLORS } from '@/components/analytics/chart-theme'
 import HrvLineChart from './kubios/HrvLineChart'
 
 interface HRVChartsProps {
@@ -138,7 +139,7 @@ export default function HRVCharts({ results }: HRVChartsProps) {
               {
                 dataKey: 'readiness',
                 name: t.kubios.charts.averageReadiness,
-                color: '#10B981',
+                color: HRV_METRIC_COLORS.readiness,
                 unit: '%',
               },
             ]}
@@ -158,7 +159,7 @@ export default function HRVCharts({ results }: HRVChartsProps) {
               {
                 dataKey: 'rmssd',
                 name: t.kubios.metrics.rmssd,
-                color: '#3B82F6',
+                color: HRV_METRIC_COLORS.rmssd,
                 unit: 'ms',
               },
             ]}
@@ -178,13 +179,13 @@ export default function HRVCharts({ results }: HRVChartsProps) {
               {
                 dataKey: 'pnsIndex',
                 name: t.kubios.charts.pnsIndex,
-                color: '#8B5CF6',
+                color: HRV_METRIC_COLORS.pns,
                 dashed: true,
               },
               {
                 dataKey: 'snsIndex',
                 name: t.kubios.charts.snsIndex,
-                color: '#F59E0B',
+                color: HRV_METRIC_COLORS.sns,
               },
             ]}
           />
@@ -203,7 +204,7 @@ export default function HRVCharts({ results }: HRVChartsProps) {
               {
                 dataKey: 'heartRate',
                 name: t.kubios.charts.heartRateRestLabel,
-                color: '#EF4444',
+                color: HRV_METRIC_COLORS.heartRate,
                 unit: 'bpm',
               },
             ]}
@@ -223,20 +224,20 @@ export default function HRVCharts({ results }: HRVChartsProps) {
               {
                 dataKey: 'hfPower',
                 name: t.kubios.charts.hfPower,
-                color: '#06B6D4',
+                color: HRV_METRIC_COLORS.hf,
                 unit: 'ms²',
               },
               {
                 dataKey: 'lfPower',
                 name: t.kubios.charts.lfPower,
-                color: '#8B5CF6',
+                color: HRV_METRIC_COLORS.lf,
                 dashed: true,
                 unit: 'ms²',
               },
               {
                 dataKey: 'vlfPower',
                 name: t.kubios.charts.vlfPower,
-                color: '#F97316',
+                color: HRV_METRIC_COLORS.vlf,
                 dashed: true,
                 unit: 'ms²',
               },
