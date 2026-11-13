@@ -129,10 +129,15 @@ test('applySeedPlan crea con password_hash solo lo importable y reporta el resto
   })
 
   const created = []
+  const updates = []
   const admin = {
     createUser: async (attributes) => {
       created.push(attributes)
       return { data: { user: { id: `uuid-${created.length}` } }, error: null }
+    },
+    updateUserById: async (id, attributes) => {
+      updates.push({ id, attributes })
+      return { error: null }
     },
   }
 
@@ -143,7 +148,14 @@ test('applySeedPlan crea con password_hash solo lo importable y reporta el resto
   assert.ok(created.every((attributes) => attributes.email_confirm === true))
   assert.deepEqual(created[0].app_metadata, { app_user_id: 1, role: 'user' })
 
-  assert.deepEqual(outcome.counts, { created: 2, 'already-linked': 1 })
+  // La cuenta vinculada carecía de app_metadata.role: la reconciliación lo
+  // publica (MT45/MT56) además de respetar las creaciones.
+  assert.equal(outcome.counts.created, 2)
+  assert.equal(outcome.counts['linked-metadata'], 1)
+  assert.deepEqual(updates[0]?.attributes, {
+    app_metadata: { app_user_id: 3, role: 'user' },
+  })
+
   assert.ok(outcome.report.find((item) => item.userId === '2').resetRequired === true)
 })
 

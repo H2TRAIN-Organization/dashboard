@@ -119,8 +119,21 @@ export function buildSeedPlan({ appUsers, authUsers = [] }) {
       (/@/.test(username) ? byEmail.get(normalizeIdentity(username)) : undefined)
 
     if (linked !== undefined) {
-      entries.push({ ...base, action: 'already-linked', authUserId: linked.id })
-      continue
+      // MT45/MT56: reconciliación. Una cuenta vinculada por email puede carecer
+      // del vínculo explícito app_metadata que el login por username exige.
+      const linkedMetadata =
+        linked.app_metadata !== null && typeof linked.app_metadata === 'object'
+          ? linked.app_metadata
+          : {};
+      const linkedId = String(linkedMetadata.app_user_id ?? '');
+      entries.push({
+        ...base,
+        action: 'already-linked',
+        authUserId: linked.id,
+        needsLink:
+          linkedId !== String(Number(userId)) || linkedMetadata.role !== role,
+      });
+      continue;
     }
 
     const { email, synthetic } = deriveEmail({ username })
@@ -128,11 +141,21 @@ export function buildSeedPlan({ appUsers, authUsers = [] }) {
     // con ese email (con o sin app_user_id), no se vuelve a crear.
     const existingWithEmail = byEmail.get(email)
     if (existingWithEmail !== undefined || seenEmails.has(email)) {
+      const linkedMetadata =
+        existingWithEmail !== undefined &&
+        existingWithEmail.app_metadata !== null &&
+        typeof existingWithEmail.app_metadata === 'object'
+          ? existingWithEmail.app_metadata
+          : {};
+      const linkedId = String(linkedMetadata.app_user_id ?? '');
       entries.push({
         ...base,
         action: 'already-linked',
         email,
         authUserId: existingWithEmail?.id ?? null,
+        needsLink:
+          existingWithEmail !== undefined &&
+          (linkedId !== String(Number(userId)) || linkedMetadata.role !== role),
       })
       continue
     }
@@ -154,6 +177,9 @@ export function buildSeedPlan({ appUsers, authUsers = [] }) {
     importable: entries.filter((entry) => entry.action === 'create' && entry.importable).length,
     resetRequired: entries.filter((entry) => entry.action === 'create' && entry.resetRequired).length,
     alreadyLinked: entries.filter((entry) => entry.action === 'already-linked').length,
+    linkFixes: entries.filter(
+      (entry) => entry.action === 'already-linked' && entry.needsLink === true,
+    ).length,
     errors: entries.filter((entry) => entry.action === 'error').length,
   }
   return { entries, summary }
@@ -170,6 +196,23 @@ export async function applySeedPlan(plan, admin) {
 
   for (const entry of plan.entries) {
     if (entry.action === 'already-linked') {
+      if (entry.needsLink === true && entry.authUserId) {
+        // Reconciliación: publica el vínculo explícito app_metadata que el
+        // login por username y la resolución de rol exigen. Idempotente.
+        const linked = await admin.updateUserById(entry.authUserId, {
+          app_metadata: { app_user_id: Number(entry.userId), role: entry.role },
+        })
+        if (linked && linked.error) {
+          report.push({
+            userId: entry.userId,
+            action: 'link-failed',
+            reason: linked.error.message ?? String(linked.error),
+          })
+          continue
+        }
+        report.push({ userId: entry.userId, action: 'linked-metadata' })
+        continue
+      }
       report.push({ userId: entry.userId, action: 'already-linked' })
       continue
     }
@@ -286,6 +329,8 @@ async function main() {
   const admin = {
     listUsers: (args) => client.auth.admin.listUsers(args),
     createUser: (attributes) => client.auth.admin.createUser(attributes),
+    updateUserById: (userId, attributes) =>
+      client.auth.admin.updateUserById(userId, attributes),
   }
   const outcome = await applySeedPlan(plan, admin)
   console.log(`Aplicado: ${JSON.stringify(outcome.counts)}`)
