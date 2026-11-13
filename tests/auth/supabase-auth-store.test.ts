@@ -32,8 +32,7 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-describe("service role key validation", () => {
-  it("accepts only a real service_role/secret key", () => {
+describe("service role key validation", () => {  it("accepts only a real service_role/secret key", () => {
     expect(() => assertServiceRoleKey(SERVICE_KEY)).not.toThrow();
     expect(() => assertServiceRoleKey("sb_secret_abc")).not.toThrow();
     expect(() => assertServiceRoleKey(ANON_KEY)).toThrow(AuthConfigurationError);
@@ -270,5 +269,65 @@ describe("SupabaseAuthStore", () => {
     await expect(store.consume("a".repeat(64))).rejects.toThrow(
       /HTTP 404/,
     );
+  });
+});
+
+describe("SupabaseAuthStore · username pintable (MT51)", () => {
+  function userRowWithoutUsername(): Record<string, unknown> {
+    return {
+      UserID: 42,
+      UUID: null,
+      role: "user",
+      GDPRConsent: false,
+      GDPRConsentDate: null,
+    };
+  }
+
+  it("descifra el username server-side cuando la columna legacy ya no existe", async () => {
+    const bodies: unknown[] = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      const url = String(input);
+      if (url.includes("/rest/v1/rpc/auth_username_display_batch")) {
+        bodies.push(JSON.parse(String(init?.body)));
+        return jsonResponse([{ user_id: 42, username: "alice-descifrada" }]);
+      }
+      return jsonResponse([userRowWithoutUsername()]);
+    };
+    const store = storeWith(fetchImpl);
+
+    const user = await store.findByUserId("42");
+    expect(user?.username).toBe("alice-descifrada");
+    expect(bodies).toEqual([{ p_user_ids: [42] }]);
+  });
+
+  it("degrada sin la migración de Vault (404) y deja el username vacío", async () => {
+    const fetchImpl: FetchLike = async (input) => {
+      const url = String(input);
+      if (url.includes("/rest/v1/rpc/auth_username_display_batch")) {
+        return jsonResponse({ message: "PGRST202" }, 404);
+      }
+      return jsonResponse([userRowWithoutUsername()]);
+    };
+    const store = storeWith(fetchImpl);
+
+    const user = await store.findByUserId("42");
+    expect(user?.username).toBe("");
+  });
+
+  it("no llama a la RPC de descifrado cuando la columna legacy está presente", async () => {
+    const rpcCalls: string[] = [];
+    const fetchImpl: FetchLike = async (input) => {
+      const url = String(input);
+      if (url.includes("auth_username_display_batch")) {
+        rpcCalls.push(url);
+      }
+      return jsonResponse([
+        { UserID: 42, Username: "alice", UUID: null, role: "user", GDPRConsent: false, GDPRConsentDate: null },
+      ]);
+    };
+    const store = storeWith(fetchImpl);
+
+    await store.findByUserId("42");
+    expect(rpcCalls).toHaveLength(0);
   });
 });

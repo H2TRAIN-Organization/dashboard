@@ -163,7 +163,14 @@ function mapUserRow(row: Record<string, unknown>): User {
   const gdprConsent = row.GDPRConsent === true;
   return {
     id: readUserId(row.UserID),
-    username: readUsername(row.Username),
+    // MT51: tras el cutover la columna legacy "Username" ya no se selecciona;
+    // el username descifrado llega después vía auth_username_display_batch
+    // (fillDecryptedUsernames). Mientras exista la columna, este valor es el
+    // espejo legacy y no hay llamada extra.
+    username:
+      row.Username === undefined
+        ? ""
+        : readUsername(row.Username),
     // This legacy table has no email column. Email sessions use the verified
     // Supabase Auth identity; username sessions expose null.
     email: null,
@@ -316,7 +323,63 @@ export class SupabaseAuthStore
         "Supabase devolvió una lista de usuarios inválida.",
       );
     }
-    return data.filter(isRecord);
+    const rows = data.filter(isRecord);
+    return this.fillDecryptedUsernames(rows);
+  }
+
+  /**
+   * MT51: condición del cambio — el username se pinta en pantalla aunque viva
+   * cifrado en disco. Tras el cutover, las filas llegan sin la columna legacy
+   * y el username se descifra server-side en un único lote por página. Si la
+   * migración MT46 no está aplicada (404), se deja el valor como esté: el
+   * frontend mostrará el email de sesión.
+   */
+  private async fillDecryptedUsernames(
+    rows: Record<string, unknown>[],
+  ): Promise<Record<string, unknown>[]> {
+    const missing = rows.filter((row) => row.Username === undefined);
+    if (missing.length === 0) {
+      return rows;
+    }
+    const userIds = missing
+      .map((row) => row.UserID)
+      .filter((value): value is number => typeof value === "number");
+    if (userIds.length === 0) {
+      return rows;
+    }
+    const response = await this.rest("rpc/auth_username_display_batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ p_user_ids: userIds }),
+    });
+    if (response.status === 404) {
+      return rows;
+    }
+    await this.requireOk(response, "username.display");
+    const decrypted = await this.readJson(response);
+    if (!Array.isArray(decrypted)) {
+      throw new AuthInfrastructureError();
+    }
+    const names = new Map<number, string>();
+    for (const entry of decrypted) {
+      if (
+        isRecord(entry) &&
+        typeof entry.user_id === "number" &&
+        typeof entry.username === "string" &&
+        entry.username.length > 0
+      ) {
+        names.set(entry.user_id, entry.username);
+      }
+    }
+    for (const row of rows) {
+      if (row.Username === undefined && typeof row.UserID === "number") {
+        const name = names.get(row.UserID);
+        if (name !== undefined) {
+          row.Username = name;
+        }
+      }
+    }
+    return rows;
   }
 
   async findByUsername(
