@@ -18,6 +18,9 @@ import { Edit, Trash2, Search, Save, X, RefreshCw, User as UserIcon, Key, Shield
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
+import { LoadingState } from '@/components/ui/loading-state'
+import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -292,12 +295,8 @@ export default function UsersPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden">
-        {/* Elementos decorativos de fondo */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-1000"></div>
-          <div className="absolute top-40 left-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-500"></div>
-        </div>
+        {/* Elementos decorativos de fondo (componente compartido) */}
+        <AmbientBackdrop />
         
         <Navigation title={t.dashboard.userManagement} showBackButton={true} />
         
@@ -390,11 +389,8 @@ export default function UsersPage() {
 
             <div className="relative z-10">
               {loading ? (
-                <div className="flex items-center justify-center py-10 sm:py-14">
-                  <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-sm border border-gray-200/50 px-5 sm:px-7 py-3 sm:py-4 rounded-2xl shadow-lg">
-                    <div className="animate-spin rounded-full h-6 w-6 sm:h-7 sm:w-7 border-b-2 border-blue-600"></div>
-                    <span className="text-gray-800 font-semibold text-sm sm:text-base">{t.dashboard.loadingUsers}</span>
-                  </div>
+                <div className="py-10 sm:py-14">
+                  <LoadingState label={t.dashboard.loadingUsers} className="max-w-sm mx-auto" />
                 </div>
               ) : (
                 <>
@@ -419,16 +415,16 @@ export default function UsersPage() {
                           <div className="flex flex-col items-end gap-1.5">
                             {/* Rol */}
                             {canWrite ? (
-                              <select
+                              <Select
                                 value={user.role || 'user'}
                                 onChange={(e) => updateUserRole(user.UserID, e.target.value)}
                                 aria-label={t.users.roleLabel}
-                                className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-900 focus:ring-2 focus:ring-blue-500"
+                                className="w-auto px-2 py-1 text-xs"
                               >
                                 <option value="admin">{t.dashboard.admin}</option>
                                 <option value="doctor">{t.dashboard.doctor}</option>
                                 <option value="user">{t.dashboard.user}</option>
-                              </select>
+                              </Select>
                             ) : (
                               <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 capitalize">
                                 {user.role}
@@ -612,16 +608,16 @@ export default function UsersPage() {
                             </td>
                             <td className="px-3 py-2.5">
                               {canWrite ? (
-                                <select
+                                <Select
                                   value={user.role || 'user'}
                                   onChange={(e) => updateUserRole(user.UserID, e.target.value)}
                                   aria-label={t.users.roleLabel}
-                                  className="w-full max-w-[10rem] rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs font-medium text-gray-900 focus:ring-2 focus:ring-blue-500"
+                                  className="w-full max-w-[10rem] py-1.5 px-2 text-xs"
                                 >
                                   <option value="admin">{t.dashboard.admin}</option>
                                   <option value="doctor">{t.dashboard.doctor}</option>
                                   <option value="user">{t.dashboard.user}</option>
-                                </select>
+                                </Select>
                               ) : (
                                 <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 capitalize">
                                   {user.role}
@@ -681,7 +677,7 @@ export default function UsersPage() {
                         <label htmlFor="users-page-size" className="text-sm text-gray-700">
                           {t.dashboard.rowsPerPage}
                         </label>
-                        <select
+                        <Select
                           id="users-page-size"
                           value={pageSize}
                           onChange={(event) => {
@@ -691,14 +687,14 @@ export default function UsersPage() {
                               setPage(1)
                             }
                           }}
-                          className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          className="w-auto py-1.5 pl-2 pr-8 text-sm"
                         >
                           {USERS_PAGE_SIZES.map((size) => (
                             <option key={size} value={size}>
                               {size}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                         <Button
                           type="button"
                           onClick={() => setPage(Math.max(1, currentPage - 1))}
@@ -884,7 +880,7 @@ export default function UsersPage() {
                       <Shield className="h-4 w-4 sm:h-5 sm:w-5 inline mr-2" />
                       {t.users.roleLabel} *
                     </label>
-                    <select
+                    <Select
                       value={createForm.role}
                       onChange={(e) => {
                         const role = e.target.value
@@ -892,12 +888,12 @@ export default function UsersPage() {
                           setCreateForm({ ...createForm, role })
                         }
                       }}
-                      className="w-full bg-white/50 border border-gray-200 rounded-xl px-3 sm:px-4 py-3 sm:py-4 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-white/70 text-sm sm:text-base"
+                      className="w-full bg-white/50 border-gray-200 rounded-xl px-3 sm:px-4 py-3 sm:py-4 text-sm sm:text-base hover:bg-white/70"
                     >
                       <option value="user">{t.dashboard.user}</option>
                       <option value="doctor">{t.dashboard.doctor}</option>
                       <option value="admin">{t.dashboard.admin}</option>
-                    </select>
+                    </Select>
                   </div>
 
                   <div className="bg-white/50 border border-gray-200 p-4 sm:p-6 rounded-xl">

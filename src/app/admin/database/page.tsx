@@ -11,6 +11,7 @@ import { databaseDictionary } from '@/lib/admin-database-dictionary'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 
 const input = 'min-w-0 rounded-lg border border-slate-300 bg-white p-3 text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-700'
 const panel = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7'
@@ -98,8 +99,8 @@ export default function AdminDatabasePage() {
         <section id="explorer" className={panel} aria-busy={pageLoading}>
           <h2 className="text-2xl font-bold">{text.explorer}</h2>
           <form className="my-5 flex flex-wrap items-end gap-4" onSubmit={event => { event.preventDefault(); void browse() }}>
-            <label className="grid gap-2">{text.table}<select className={input} value={table} disabled={pageLoading || action !== null} onChange={event => { setTable(event.target.value); setPage(null) }}>{(stats?.tables ?? [{ name: 'users', accessible: true }]).map(item => <option key={item.name} value={item.name} disabled={!item.accessible}>{item.name}</option>)}</select></label>
-            <label className="grid gap-2">{text.pageSize}<select className={input} value={pageSize} disabled={pageLoading} onChange={event => { setPageSize(Number(event.target.value)); setPage(null) }}>{[25, 50, 100, 250].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+            <label className="grid gap-2">{text.table}<Select value={table} disabled={pageLoading || action !== null} onChange={event => { setTable(event.target.value); setPage(null) }}>{(stats?.tables ?? [{ name: 'users', accessible: true }]).map(item => <option key={item.name} value={item.name} disabled={!item.accessible}>{item.name}</option>)}</Select></label>
+            <label className="grid gap-2">{text.pageSize}<Select value={pageSize} disabled={pageLoading} onChange={event => { setPageSize(Number(event.target.value)); setPage(null) }}>{[25, 50, 100, 250].map(size => <option key={size} value={size}>{size}</option>)}</Select></label>
             <Button variant="default" size="lg" className="font-semibold" disabled={pageLoading} type="submit">{pageLoading ? text.loading : text.browse}</Button>
           </form>
           {page && <>

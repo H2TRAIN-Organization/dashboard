@@ -18,6 +18,8 @@ import Navigation from '@/components/Navigation'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import RoleGuard from '@/components/RoleGuard'
 import { Button } from '@/components/ui/button'
+import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
+import { LoadingState } from '@/components/ui/loading-state'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useSession } from '@/contexts/SessionContext'
 import {
@@ -325,11 +327,8 @@ function KubiosPersonalContent() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-white px-6 py-4 shadow-sm">
-              <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
-              <span className="text-sm font-medium text-slate-700">{t.data.loading}</span>
-            </div>
+          <div className="py-12">
+            <LoadingState label={t.data.loading} className="max-w-sm mx-auto" />
           </div>
         ) : resultsError !== null ? (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-red-700">
@@ -578,11 +577,7 @@ export default function KubiosPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-blue-400 opacity-10 mix-blend-multiply blur-xl animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-indigo-400 opacity-10 mix-blend-multiply blur-xl animate-pulse"></div>
-          <div className="absolute left-1/2 top-40 h-80 w-80 rounded-full bg-purple-400 opacity-10 mix-blend-multiply blur-xl animate-pulse"></div>
-        </div>
+        <AmbientBackdrop />
 
         <Navigation title={t.kubios.title} showBackButton={true} />
 

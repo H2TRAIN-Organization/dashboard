@@ -6,6 +6,7 @@ import type { UserRole } from '@/lib/api-types'
 import { ROLE_PERMISSIONS, hasPermission, hasRoleAtLeast } from '@/lib/permissions'
 import { Shield, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
+import { LoadingState } from '@/components/ui/loading-state'
 
 interface RoleGuardProps {
   children: ReactNode
@@ -65,8 +66,8 @@ export default function RoleGuard({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex min-h-[400px] items-center justify-center">
+        <LoadingState className="w-full max-w-sm" />
       </div>
     )
   }

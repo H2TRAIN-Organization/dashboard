@@ -16,6 +16,7 @@ import HybridNavigation from '@/components/HybridNavigation'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
 import { Button } from '@/components/ui/button'
+import { LoadingState } from '@/components/ui/loading-state'
 import AdminKubiosCharts from '@/components/kubios/AdminKubiosCharts'
 import UserAutocomplete, {
   type UserAutocompleteItem,
@@ -338,13 +339,8 @@ function AdminKubiosContent() {
               </Button>
             </div>
           ) : loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-white px-6 py-4 shadow-sm">
-                <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
-                <span className="text-sm font-medium text-slate-700">
-                  {t.common.loading}
-                </span>
-              </div>
+            <div className="py-12">
+              <LoadingState label={t.common.loading} className="max-w-sm mx-auto" />
             </div>
           ) : hasMeasurements ? (
             <>

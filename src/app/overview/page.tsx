@@ -19,6 +19,8 @@ import {
   CHART_TOOLTIP_LABEL_STYLE,
   seriesColor,
 } from '@/components/analytics/chart-theme'
+import { LoadingState } from '@/components/ui/loading-state'
+import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridNavigation from '@/components/HybridNavigation'
 import { useSession } from '@/contexts/SessionContext'
@@ -307,12 +309,8 @@ export default function OverviewPage() {
   return (
     <HybridProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden" style={{ colorScheme: 'light' }}>
-        {/* Elementos decorativos de fondo */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute top-40 right-10 w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-          <div className="absolute bottom-20 left-1/4 w-80 h-80 bg-purple-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }}></div>
-        </div>
+        {/* Elementos decorativos de fondo (componente compartido) */}
+        <AmbientBackdrop />
 
         <HybridNavigation title={t.dashboard.generalSummary} showBackButton={true} />
 
@@ -346,12 +344,7 @@ export default function OverviewPage() {
             </div>
           </div>
 
-          {loading && (
-            <div className="mb-8 flex items-center justify-center rounded-2xl border border-blue-200 bg-white px-6 py-12 shadow-sm">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-sm font-medium text-gray-700">{t.common.loading}</span>
-            </div>
-          )}
+          {loading && <LoadingState label={t.common.loading} className="mb-8 max-w-md mx-auto" />}
 
           {showEmpty && (
             <div className="mb-8 rounded-2xl border border-slate-200 bg-white px-6 py-12 text-center shadow-sm">

@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
 import Navigation from '@/components/Navigation'
 import KubiosSummaryCard from '@/components/kubios/KubiosSummaryCard'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
@@ -238,11 +239,7 @@ export default function DashboardPage() {
         className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50"
         style={{ colorScheme: 'light' }}
       >
-        <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-          <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-blue-400 opacity-10 mix-blend-multiply blur-xl animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-indigo-400 opacity-10 mix-blend-multiply blur-xl animate-pulse delay-1000"></div>
-          <div className="absolute left-1/2 top-40 h-80 w-80 rounded-full bg-purple-400 opacity-10 mix-blend-multiply blur-xl animate-pulse delay-500"></div>
-        </div>
+        <AmbientBackdrop />
 
         <Navigation title={t.dashboard.title} showBackButton={false} />
 

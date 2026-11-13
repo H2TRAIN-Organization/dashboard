@@ -12,6 +12,9 @@ import StatCard from '@/components/analytics/StatCard'
 import ChartCard from '@/components/analytics/ChartCard'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
+import { Select } from '@/components/ui/select'
+import { LoadingState } from '@/components/ui/loading-state'
+import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
 import {
   CHART_AREA_FILL,
   CHART_AXIS_LABEL_STYLE,
@@ -240,12 +243,8 @@ export default function AnalyticsPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden">
-        {/* Elementos decorativos de fondo */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-1000"></div>
-          <div className="absolute top-40 left-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-500"></div>
-        </div>
+        {/* Elementos decorativos de fondo (componente compartido) */}
+        <AmbientBackdrop />
         
         <Navigation title={t.dashboard.advancedAnalytics} />
 
@@ -307,16 +306,11 @@ export default function AnalyticsPage() {
                       <UserIcon className="h-4 w-4 mr-2" />
                       {t.dashboard.user}
                     </label>
-                    <select
+                    <Select
                       value={selectedUser}
                       onChange={(e) => setSelectedUser(e.target.value)}
-                      className="w-full bg-white border-2 border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 shadow-lg hover:border-slate-400 transition-all duration-300 cursor-pointer appearance-none bg-gradient-to-r from-slate-50 to-blue-50"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                        backgroundPosition: 'right 12px center',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '16px'
-                      }}
+                      aria-label={t.dashboard.user}
+                      className="rounded-xl px-4 py-3 bg-gradient-to-r from-slate-50 to-blue-50 border-slate-300 text-slate-700 hover:border-slate-400"
                     >
                       <option value="all" className="bg-white text-slate-700 py-2">{t.dashboard.allUsers}</option>
                       {users.filter(user => user.Username.length > 0).map(user => (
@@ -324,7 +318,7 @@ export default function AnalyticsPage() {
                           {getDisplayUsername(user)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 )}
                 
@@ -333,16 +327,11 @@ export default function AnalyticsPage() {
                     <Activity className="h-4 w-4 mr-2" />
                     {t.dashboard.dataType}
                   </label>
-                  <select
+                  <Select
                     value={selectedDataType}
                     onChange={(e) => setSelectedDataType(e.target.value)}
-                    className="w-full bg-white border-2 border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 shadow-lg hover:border-slate-400 transition-all duration-300 cursor-pointer appearance-none bg-gradient-to-r from-slate-50 to-blue-50"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: 'right 12px center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '16px'
-                    }}
+                    aria-label={t.dashboard.dataType}
+                    className="rounded-xl px-4 py-3 bg-gradient-to-r from-slate-50 to-blue-50 border-slate-300 text-slate-700 hover:border-slate-400"
                   >
                     <option value="all" className="bg-white text-slate-700 py-2">{t.dashboard.allTypes}</option>
                     <option value="insulin" className="bg-white text-slate-700">{t.dashboard.insulin}</option>
@@ -350,7 +339,7 @@ export default function AnalyticsPage() {
                     <option value="exercise" className="bg-white text-slate-700">{t.dashboard.exercise}</option>
                     <option value="period" className="bg-white text-slate-700">{t.dashboard.periods}</option>
                     <option value="mood" className="bg-white text-slate-700">{t.dashboard.mood}</option>
-                  </select>
+                  </Select>
                 </div>
                 
                 <div>
@@ -358,22 +347,17 @@ export default function AnalyticsPage() {
                     <Clock className="h-4 w-4 mr-2" />
                     {t.dashboard.timeRange}
                   </label>
-                  <select
+                  <Select
                     value={timeRange}
                     onChange={(e) => setTimeRange(e.target.value)}
-                    className="w-full bg-white border-2 border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-700 shadow-lg hover:border-slate-400 transition-all duration-300 cursor-pointer appearance-none bg-gradient-to-r from-slate-50 to-blue-50"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: 'right 12px center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '16px'
-                    }}
+                    aria-label={t.dashboard.timeRange}
+                    className="rounded-xl px-4 py-3 bg-gradient-to-r from-slate-50 to-blue-50 border-slate-300 text-slate-700 hover:border-slate-400"
                   >
                     <option value="7d" className="bg-white text-slate-700 py-2">{t.data.last7Days}</option>
                     <option value="30d" className="bg-white text-slate-700">{t.data.last30Days}</option>
                     <option value="90d" className="bg-white text-slate-700">{t.data.last90Days}</option>
                     <option value="all" className="bg-white text-slate-700">{t.dashboard.allTime}</option>
-                  </select>
+                  </Select>
                 </div>
 
                 {/* T13: filtro de fechas "desde - hasta". Con rango explícito,
@@ -515,12 +499,7 @@ export default function AnalyticsPage() {
 
           {/* Gráficos */}
           {loading ? (
-            <div className="relative bg-white/90 backdrop-blur-xl border border-blue-200/50 rounded-3xl p-12 text-center shadow-xl">
-              <div className="flex items-center justify-center space-x-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <p className="text-slate-700 text-lg font-medium">{t.dashboard.loadingData}</p>
-              </div>
-            </div>
+            <LoadingState label={t.dashboard.loadingData} className="max-w-md mx-auto" />
           ) : showData ? (
             <div className="space-y-8">
               {/* Gráfico de actividad general */}

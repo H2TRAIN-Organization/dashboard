@@ -8,6 +8,8 @@ import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, 
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
+import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
 import CalendarDatePicker from '@/components/calendar/CalendarDatePicker'
 import { formatDateValue } from '@/components/calendar/calendar-utils'
 import { useSession } from '@/contexts/SessionContext'
@@ -464,20 +466,20 @@ export default function DataPage() {
               >
                 {t.dashboard.rowsPerPage}
               </label>
-              <select
+              <Select
                 id={`records-page-size-${pageKey}`}
                 value={recordsPageSize}
                 onChange={(event) =>
                   changeRecordsPageSize(Number(event.target.value))
                 }
-                className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+                className="w-auto py-1.5 pr-8 pl-2 text-sm"
               >
                 {RECORDS_PAGE_SIZES.map((size) => (
                   <option key={size} value={size}>
                     {size}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Button
                 type="button"
                 onClick={() => goToRecordPage(pageKey, 1)}
@@ -539,12 +541,8 @@ export default function DataPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden">
-        {/* Elementos decorativos de fondo */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-1000"></div>
-          <div className="absolute top-40 left-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-500"></div>
-        </div>
+        {/* Elementos decorativos de fondo (componente compartido) */}
+        <AmbientBackdrop />
         
         <Navigation title={t.dashboard.healthData} showBackButton={true} />
 
@@ -665,16 +663,11 @@ export default function DataPage() {
                     <Activity className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     {t.dashboard.dataType}
                   </label>
-                  <select
+                  <Select
+                    variant="accent"
                     value={selectedDataType}
                     onChange={(e) => setSelectedDataType(e.target.value)}
-                    className="w-full bg-white border-2 border-blue-200 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-blue-900 shadow-lg hover:border-blue-300 transition-all duration-300 cursor-pointer appearance-none bg-gradient-to-r from-blue-50 to-indigo-50 text-sm sm:text-base"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: 'right 8px center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '12px'
-                    }}
+                    aria-label={t.dashboard.dataType}
                   >
                     <option value="all" className="bg-white text-blue-900 py-2">{t.dashboard.allTypes}</option>
                     <option value="insulin" className="bg-white text-blue-900">{t.dashboard.insulin}</option>
@@ -682,7 +675,7 @@ export default function DataPage() {
                     <option value="exercise" className="bg-white text-blue-900">{t.dashboard.exercise}</option>
                     <option value="period" className="bg-white text-blue-900">{t.dashboard.periods}</option>
                     <option value="mood" className="bg-white text-blue-900">{t.dashboard.mood}</option>
-                  </select>
+                  </Select>
                 </div>
                 
                 <div>
@@ -690,22 +683,17 @@ export default function DataPage() {
                     <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     {t.dashboard.timeRange}
                   </label>
-                  <select
+                  <Select
+                    variant="accent"
                     value={timeRange}
                     onChange={(e) => setTimeRange(e.target.value)}
-                    className="w-full bg-white border-2 border-blue-200 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-blue-900 shadow-lg hover:border-blue-300 transition-all duration-300 cursor-pointer appearance-none bg-gradient-to-r from-blue-50 to-indigo-50 text-sm sm:text-base"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: 'right 8px center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '12px'
-                    }}
+                    aria-label={t.dashboard.timeRange}
                   >
                     <option value="all" className="bg-white text-blue-900 py-2">{t.dashboard.allTime}</option>
                     <option value="7d" className="bg-white text-blue-900">{t.data.last7Days}</option>
                     <option value="30d" className="bg-white text-blue-900">{t.data.last30Days}</option>
                     <option value="90d" className="bg-white text-blue-900">{t.data.last90Days}</option>
-                  </select>
+                  </Select>
                 </div>
                 
                 <div>

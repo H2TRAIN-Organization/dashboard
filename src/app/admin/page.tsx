@@ -5,6 +5,7 @@ import { Database, Shield, Users, TrendingUp, CheckCircle, HeartPulse } from 'lu
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
 import HybridNavigation from '@/components/HybridNavigation'
+import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
 import { adminApi, errorMessage, usersApi } from '@/lib/api-client'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
@@ -90,12 +91,8 @@ export default function AdminNewPage() {
     <HybridProtectedRoute>
       <HybridRoleGuard requiredRole="admin">
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden" style={{ colorScheme: 'light' }}>
-        {/* Elementos decorativos de fondo */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-1000"></div>
-          <div className="absolute top-40 left-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-pulse delay-500"></div>
-        </div>
+        {/* Elementos decorativos de fondo (componente compartido) */}
+        <AmbientBackdrop />
         
         <HybridNavigation title={t.dashboard.administration} showBackButton={true} />
 
