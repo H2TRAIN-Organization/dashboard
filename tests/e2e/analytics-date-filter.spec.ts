@@ -69,7 +69,7 @@ async function mockAnalyticsWithRangeFilter(page: Page, queries: { url: string }
 }
 
 async function exerciseEvolutionTickCount(page: Page): Promise<number> {
-  const card = page.locator('div', { has: page.getByRole('heading', { name: 'Evolución de Registros de Ejercicio' }) }).last();
+  const card = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Evolución de Registros de Ejercicio' }) }).last();
   await expect(card).toBeVisible();
   return card.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value').count();
 }

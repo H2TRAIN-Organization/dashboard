@@ -83,7 +83,7 @@ test('every time-evolution chart draws its line, not just the frame', async ({ p
   await page.goto('/analytics');
 
   for (const card of EVOLUTION_CARDS) {
-    const cardLocator = page.locator('div', { has: page.getByRole('heading', { name: card.heading }) }).last();
+    const cardLocator = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: card.heading }) }).last();
     await expect(cardLocator.getByRole('heading', { name: card.heading })).toBeVisible();
 
     // The series exists: the line path of the evolution chart is rendered
@@ -99,7 +99,7 @@ test('evolution charts keep the per-day axis with real date labels', async ({ pa
   await mockAnalytics(page);
   await page.goto('/analytics');
 
-  const insulinCard = page.locator('div', { has: page.getByRole('heading', { name: 'Evolución de Registros de Insulina' }) }).last();
+  const insulinCard = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Evolución de Registros de Insulina' }) }).last();
   const ticks = insulinCard.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value');
   await expect(ticks).toHaveCount(3);
   await expect(ticks.first()).toContainText(/1/);
@@ -113,7 +113,7 @@ test('daily injections bars are positioned on the date axis', async ({ page }) =
 
   // Same root cause as the evolution charts: the daily bar chart reads the
   // `date` axis key from rows that must provide it.
-  const injectionsCard = page.locator('div', { has: page.getByRole('heading', { name: 'Inyecciones por Día' }) }).last();
+  const injectionsCard = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Inyecciones por Día' }) }).last();
   const ticks = injectionsCard.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value');
   await expect(ticks).toHaveCount(3);
 

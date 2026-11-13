@@ -11,6 +11,8 @@ interface ChartCardProps {
   titleClassName?: string
   /** Texto introductorio bajo el título (acepta negritas); su ausencia aumenta el margen del título. */
   description?: React.ReactNode
+  /** Acciones alineadas a la derecha de la cabecera (p. ej. botón de expandir). */
+  actions?: React.ReactNode
   children: React.ReactNode
 }
 
@@ -26,6 +28,7 @@ export default function ChartCard({
   title,
   titleClassName = 'text-lg',
   description,
+  actions,
   children,
 }: ChartCardProps) {
   return (
@@ -33,12 +36,17 @@ export default function ChartCard({
       <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-3xl"></div>
 
       <div className="relative z-10">
-        <h3 className={`${titleClassName} font-bold text-slate-800 ${description ? 'mb-2' : 'mb-6'} flex items-center`}>
-          <div className={`p-2 bg-gradient-to-br ${iconGradient} rounded-lg mr-3`}>
-            <Icon className="h-5 w-5 text-white" />
-          </div>
-          {title}
-        </h3>
+        <div className={`flex items-center justify-between gap-3 ${description ? 'mb-2' : 'mb-6'}`}>
+          <h3 className={`${titleClassName} font-bold text-slate-800 flex items-center`}>
+            <div className={`p-2 bg-gradient-to-br ${iconGradient} rounded-lg mr-3`}>
+              <Icon className="h-5 w-5 text-white" />
+            </div>
+            {title}
+          </h3>
+          {actions !== undefined && (
+            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          )}
+        </div>
         {description && <p className="text-sm text-slate-600 mb-6">{description}</p>}
         {children}
       </div>

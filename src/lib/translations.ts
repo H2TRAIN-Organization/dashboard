@@ -463,7 +463,22 @@ export interface Translations {
     mealType: string
     exerciseType: string
   }
-  
+
+  // Expansión y filtros con alcance de un solo gráfico (MT69)
+  chart: {
+    expand: string
+    close: string
+    ownFilterLabel: string
+    ownFilterNone: string
+    ownFilterActive: string
+    clearOwnFilter: string
+    last14Days: string
+    lastNDays: string
+    top3Types: string
+    top5Types: string
+    allCategories: string
+  }
+
   // Overview
   overview: {
     title: string
@@ -1239,6 +1254,21 @@ export const translations: Record<Language, Translations> = {
       mealType: 'Tipo de Comida',
       exerciseType: 'Tipo de Ejercicio'
     },
+
+    // Expansión y filtros con alcance de un solo gráfico (MT69)
+    chart: {
+      expand: 'Expandir gráfico',
+      close: 'Cerrar vista expandida',
+      ownFilterLabel: 'Filtro propio del gráfico',
+      ownFilterNone: 'Sin filtro propio',
+      ownFilterActive: 'Filtro propio',
+      clearOwnFilter: 'Quitar filtro propio',
+      last14Days: 'Últimos 14 días',
+      lastNDays: 'Últimos {days} días',
+      top3Types: 'Top 3 tipos',
+      top5Types: 'Top 5 tipos',
+      allCategories: 'Todas las categorías'
+    },
     overview: {
       title: 'Resumen General del Sistema',
       subtitle: 'Vista general y métricas principales del sistema de seguimiento de salud',
@@ -1999,6 +2029,21 @@ export const translations: Record<Language, Translations> = {
       quantity: 'Quantity',
       mealType: 'Meal Type',
       exerciseType: 'Exercise Type'
+    },
+
+    // Chart expansion and per-chart scoped filters (MT69)
+    chart: {
+      expand: 'Expand chart',
+      close: 'Close expanded view',
+      ownFilterLabel: 'Chart-scoped filter',
+      ownFilterNone: 'No chart filter',
+      ownFilterActive: 'Chart filter',
+      clearOwnFilter: 'Clear chart filter',
+      last14Days: 'Last 14 days',
+      lastNDays: 'Last {days} days',
+      top3Types: 'Top 3 types',
+      top5Types: 'Top 5 types',
+      allCategories: 'All categories'
     },
     overview: {
       title: 'System Overview',

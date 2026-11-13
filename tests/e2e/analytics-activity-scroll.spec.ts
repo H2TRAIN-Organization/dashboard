@@ -57,7 +57,7 @@ async function mockActivity(page: Page, dayCount: number) {
 }
 
 async function scrollMetrics(page: Page): Promise<{ scrollWidth: number; clientWidth: number; maxScrollLeft: number }> {
-  const card = page.locator('div', { has: page.getByRole('heading', { name: 'Actividad General por Fecha' }) }).last();
+  const card = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Actividad General por Fecha' }) }).last();
   await expect(card).toBeVisible();
   const scrollable = card.locator('.overflow-auto');
   return scrollable.evaluate((element) => ({
@@ -76,7 +76,7 @@ test('the general activity chart scrolls horizontally with many dates', async ({
   expect(metrics.maxScrollLeft).toBeGreaterThan(0);
 
   // The viewport really slides over the inner chart.
-  const card = page.locator('div', { has: page.getByRole('heading', { name: 'Actividad General por Fecha' }) }).last();
+  const card = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Actividad General por Fecha' }) }).last();
   const scrollable = card.locator('.overflow-auto');
   await scrollable.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
   const scrolled = await scrollable.evaluate((element) => element.scrollLeft);

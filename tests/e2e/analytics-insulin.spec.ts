@@ -102,12 +102,12 @@ test('daily injections and the real average dose are two separate honest charts'
   await page.goto('/analytics');
 
   // Chart 1: injections per day (total records), axis in injections.
-  const injectionsCard = page.locator('div', { has: page.getByRole('heading', { name: 'Inyecciones por Día' }) }).last();
+  const injectionsCard = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Inyecciones por Día' }) }).last();
   await expect(injectionsCard.getByText('Número de inyecciones').first()).toBeVisible();
 
   // Chart 2: the actual average dose per day (774 units / 304 records = 2.5),
   // with its own axis in insulin units.
-  const doseCard = page.locator('div', { has: page.getByRole('heading', { name: 'Promedio de Dosis de Insulina por Día' }) }).last();
+  const doseCard = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Promedio de Dosis de Insulina por Día' }) }).last();
   await expect(doseCard.getByText('Dosis promedio (unidades)').first()).toBeVisible();
   await expect(doseCard.getByText('Muestra la cantidad promedio de insulina administrada cada día.')).toBeVisible();
 });
@@ -119,7 +119,7 @@ test('the mood distribution is an ordinal bar chart across the full 0-10 scale',
 
   // Since T04 the mood distribution is an ordinal bar chart, not a pie: the
   // axis shows every level 0..10 (zeros included) and each level is a bar.
-  const moodCard = page.locator('div', { has: page.getByRole('heading', { name: 'Distribución de Estado de Ánimo' }) }).last();
+  const moodCard = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Distribución de Estado de Ánimo' }) }).last();
   const ticks = moodCard.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value');
   await expect(ticks).toHaveCount(11);
   await expect(ticks.first()).toHaveText('0');

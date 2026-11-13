@@ -75,7 +75,7 @@ test('the meal types chart excludes glucose episodes and warns about them', asyn
   await expect(page.getByRole('heading', { name: 'Tipos de Comida Registrados' })).toBeVisible();
 
   // MT38: glucose events are not meals; the chart only draws real meal types.
-  const chartCard = page.locator('div').filter({ has: page.getByRole('heading', { name: 'Tipos de Comida Registrados' }) }).last();
+  const chartCard = page.locator('div.rounded-3xl').filter({ has: page.getByRole('heading', { name: 'Tipos de Comida Registrados' }) }).last();
   await expect(chartCard.getByText('Hipoglucemia', { exact: true })).toHaveCount(0);
   await expect(chartCard.getByText('Hiperglucemia', { exact: true })).toHaveCount(0);
   await expect(chartCard.getByText('Desayuno', { exact: true })).toBeVisible();
@@ -112,7 +112,7 @@ test('insulin shots written into the food table are not meal types (T14)', async
 
   // The chart card never presents insulin types as meals and announces the
   // excluded records with the exact count.
-  const chartCard = page.locator('div').filter({ has: page.getByRole('heading', { name: 'Tipos de Comida Registrados' }) }).last();
+  const chartCard = page.locator('div.rounded-3xl').filter({ has: page.getByRole('heading', { name: 'Tipos de Comida Registrados' }) }).last();
   await expect(chartCard.getByText('Rápida', { exact: true })).toHaveCount(0);
   await expect(chartCard.getByText('Lenta', { exact: true })).toHaveCount(0);
   await expect(chartCard.getByText(/8 registros de insulina/)).toBeVisible();

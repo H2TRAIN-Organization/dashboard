@@ -8,6 +8,12 @@ import { Users, Activity, TrendingUp, AlertTriangle, Pill, Utensils, Dumbbell, C
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
 import {
+  ChartExpandButton,
+  ChartExpandOverlay,
+  useChartExpand,
+} from '@/components/analytics/chart-expand'
+import { Select } from '@/components/ui/select'
+import {
   CHART_AXIS_LINE_STYLE,
   CHART_GRID_DASH,
   CHART_GRID_STROKE,
@@ -57,6 +63,12 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now] = useState(() => Date.now())
+  // MT69: filtros propios de los dos gráficos del resumen; nunca tocan el
+  // resto de la página y solo estrechan lo ya cargado.
+  const [distributionTop, setDistributionTop] = useState<number | 'all'>('all')
+  const [activityDays, setActivityDays] = useState<number | null>(null)
+  const { open: distributionOpen, expand: expandDistribution, collapse: collapseDistribution } = useChartExpand()
+  const { open: activityOpen, expand: expandActivity, collapse: collapseActivity } = useChartExpand()
   const locale = language === 'en' ? 'en-US' : 'es-ES'
 
   const currentRole = session?.user.role ?? null
@@ -245,8 +257,14 @@ export default function OverviewPage() {
     { name: t.overview.mood, value: systemStats.totalMood, color: seriesColor(5) }
   ].filter((entry) => entry.value > 0)
 
-  // Actividad por día (últimos 7 días)
-  const activityByDay = Array.from({ length: 7 }, (_, i) => {
+  /** Pie tras aplicar SU Top-N: al estrechar, las categorías se ordenan por valor. */
+  const distributionData =
+    distributionTop === 'all'
+      ? dataByType
+      : [...dataByType].sort((a, b) => b.value - a.value).slice(0, distributionTop)
+
+  // Actividad por día (últimos 7 días, o los que marque SU filtro propio).
+  const activityByDay = Array.from({ length: activityDays ?? 7 }, (_, i) => {
     const date = new Date()
     date.setDate(date.getDate() - i)
     const dateStr = date.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', { month: 'short', day: 'numeric' })
@@ -516,15 +534,25 @@ export default function OverviewPage() {
 
           {/* Gráficos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Distribución por tipo de dato */}
+            {/* Distribución por tipo de dato (MT69: expandible con Top-N propio) */}
             <div className="relative bg-white border border-gray-200 rounded-2xl p-8 shadow-lg">
               <div className="relative z-10">
-                <h3 className="text-xl font-bold text-blue-600 mb-6 flex items-center">
-                  <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg mr-3">
-                    <PieChartIcon className="h-5 w-5 text-white" />
+                <div className="flex items-center justify-between gap-3 mb-6">
+                  <h3 className="text-xl font-bold text-blue-600 flex items-center">
+                    <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg mr-3">
+                      <PieChartIcon className="h-5 w-5 text-white" />
+                    </div>
+                    {t.overview.dataDistributionByType}
+                  </h3>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {distributionTop !== 'all' && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                        {distributionTop === 3 ? t.chart.top3Types : t.chart.top5Types}
+                      </span>
+                    )}
+                    <ChartExpandButton onExpand={expandDistribution} />
                   </div>
-                  {t.overview.dataDistributionByType}
-                </h3>
+                </div>
                 {loading ? (
                   <div className="h-64 flex items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -533,7 +561,7 @@ export default function OverviewPage() {
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
-                        data={dataByType}
+                        data={distributionData}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
@@ -542,7 +570,7 @@ export default function OverviewPage() {
                         fill={CHART_PRIMARY_COLOR}
                         dataKey="value"
                       >
-                        {dataByType.map((entry, index) => (
+                        {distributionData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
@@ -556,19 +584,130 @@ export default function OverviewPage() {
                 )}
               </div>
             </div>
+            <ChartExpandOverlay
+              open={distributionOpen}
+              onClose={collapseDistribution}
+              title={t.overview.dataDistributionByType}
+              icon={PieChartIcon}
+              iconGradient="from-amber-500 to-orange-600"
+              scopedFilter={{
+                active: distributionTop !== 'all',
+                summary: distributionTop === 3 ? t.chart.top3Types : distributionTop === 5 ? t.chart.top5Types : undefined,
+                onClear: () => setDistributionTop('all'),
+                node: (
+                  <Select
+                    value={String(distributionTop)}
+                    onChange={(event) =>
+                      setDistributionTop(event.target.value === 'all' ? 'all' : Number(event.target.value))
+                    }
+                    aria-label={t.chart.ownFilterLabel}
+                    className="w-44"
+                  >
+                    <option value="3">{t.chart.top3Types}</option>
+                    <option value="5">{t.chart.top5Types}</option>
+                    <option value="all">{t.chart.allCategories}</option>
+                  </Select>
+                ),
+              }}
+              renderChart={() => (
+                <ResponsiveContainer width="100%" height={520}>
+                  <PieChart>
+                    <Pie
+                      data={distributionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={<PieSliceLabel />}
+                      outerRadius={150}
+                      fill={CHART_PRIMARY_COLOR}
+                      dataKey="value"
+                    >
+                      {distributionData.map((entry, index) => (
+                        <Cell key={`expanded-cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ ...CHART_TOOLTIP_CONTENT_STYLE }}
+                      itemStyle={{ ...CHART_TOOLTIP_ITEM_STYLE }}
+                      labelStyle={{ ...CHART_TOOLTIP_LABEL_STYLE }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            />
 
-            {/* Actividad por día */}
+            {/* Actividad por día (MT69: expandible con rango propio) */}
             <div className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                <LineChartIcon className="h-5 w-5 text-green-600 mr-2" />
-                {t.overview.activityLast7Days}
-              </h3>
-              {loading ? (
-                <div className="h-64 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                    <LineChartIcon className="h-5 w-5 text-green-600 mr-2" />
+                    {activityDays === null
+                      ? t.overview.activityLast7Days
+                      : t.chart.lastNDays.replace('{days}', String(activityDays))}
+                  </h3>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {activityDays !== null && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                        {t.chart.lastNDays.replace('{days}', String(activityDays))}
+                      </span>
+                    )}
+                    <ChartExpandButton onExpand={expandActivity} />
+                  </div>
                 </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={300}>
+                {loading ? (
+                  <div className="h-64 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={activityByDay}>
+                      <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                      <XAxis dataKey="date" tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} />
+                      <YAxis tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ ...CHART_TOOLTIP_CONTENT_STYLE }}
+                        itemStyle={{ ...CHART_TOOLTIP_ITEM_STYLE }}
+                        labelStyle={{ ...CHART_TOOLTIP_LABEL_STYLE }}
+                      />
+                      <Area type="monotone" dataKey="total" name={t.overview.totalRecordsOverview} stroke={CHART_PRIMARY_COLOR} fill={CHART_PRIMARY_COLOR} fillOpacity={0.3} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+            <ChartExpandOverlay
+              open={activityOpen}
+              onClose={collapseActivity}
+              title={
+                activityDays === null
+                  ? t.overview.activityLast7Days
+                  : t.chart.lastNDays.replace('{days}', String(activityDays))
+              }
+              icon={LineChartIcon}
+              iconGradient="from-green-500 to-emerald-600"
+              scopedFilter={{
+                active: activityDays !== null,
+                summary: activityDays !== null ? t.chart.lastNDays.replace('{days}', String(activityDays)) : undefined,
+                onClear: () => setActivityDays(null),
+                node: (
+                  <Select
+                    value={activityDays === null ? 'none' : String(activityDays)}
+                    onChange={(event) =>
+                      setActivityDays(event.target.value === 'none' ? null : Number(event.target.value))
+                    }
+                    aria-label={t.chart.ownFilterLabel}
+                    className="w-40"
+                  >
+                    <option value="none">{t.chart.ownFilterNone}</option>
+                    <option value="7">{t.data.last7Days}</option>
+                    <option value="14">{t.chart.last14Days}</option>
+                    <option value="30">{t.data.last30Days}</option>
+                  </Select>
+                ),
+              }}
+              renderChart={() => (
+                <ResponsiveContainer width="100%" height={520}>
                   <AreaChart data={activityByDay}>
                     <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                     <XAxis dataKey="date" tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} />
@@ -582,7 +721,7 @@ export default function OverviewPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               )}
-            </div>
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

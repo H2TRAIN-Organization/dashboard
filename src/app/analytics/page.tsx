@@ -9,9 +9,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import StatCard from '@/components/analytics/StatCard'
-import ChartCard from '@/components/analytics/ChartCard'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
+import { ExpandableChartCard, type ChartScopedFilter } from '@/components/analytics/chart-expand'
+import { healthRecordTimestamp, lastDaysRange, recordsWithinRange } from '@/lib/chart-scoped-filter'
 import { Select } from '@/components/ui/select'
 import { LoadingState } from '@/components/ui/loading-state'
 import { AmbientBackdrop } from '@/components/ui/ambient-backdrop'
@@ -77,6 +78,10 @@ export default function AnalyticsPage() {
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
   const [insulinOthersOpen, setInsulinOthersOpen] = useState(false)
+  // MT69: filtros con alcance de un solo gráfico. Solo pueden estrechar la
+  // ventana ya cargada; viven por gráfico y jamás tocan los filtros globales.
+  const [chartRangeDays, setChartRangeDays] = useState<Record<string, number | null>>({})
+  const [chartTopN, setChartTopN] = useState<Record<string, number | 'all'>>({})
 
   const currentRole = session?.user.role ?? null
   const currentUsername = session?.user.username ?? null
@@ -228,7 +233,13 @@ export default function AnalyticsPage() {
 
   // Pie chart de insulina: los tipos menos representativos se agrupan en
   // "Otros" con el porcentaje sumado, con desglose disponible en desplegable.
-  const insulinPie = aggregatePieTail(insulinByType, INSULIN_TOP_TYPES, t.analytics.others)
+  // MT69: el Top-N es el filtro propio de este gráfico (por defecto, el
+  // comportamiento histórico).
+  const insulinPieTop = chartTopN['insulin-types'] ?? INSULIN_TOP_TYPES
+  const insulinPie =
+    insulinPieTop === 'all'
+      ? { slices: insulinByType, others: null, othersBreakdown: [] as typeof insulinByType }
+      : aggregatePieTail(insulinByType, insulinPieTop, t.analytics.others)
   const insulinPieData = insulinPie.others !== null
     ? [...insulinPie.slices, insulinPie.others]
     : insulinPie.slices
@@ -236,8 +247,133 @@ export default function AnalyticsPage() {
 
   // Datos combinados para el gráfico de actividad general: la fusión agrupa y
   // ordena por milisegundo, nunca por etiqueta localizada.
-  const activityData = dailyChartRows(
-    mergeDailyCounts([insulinByDate, foodByDate, exerciseByDate, moodByDate]),
+  const activityMerged = mergeDailyCounts([insulinByDate, foodByDate, exerciseByDate, moodByDate])
+
+  // MT69: utilidades de los filtros con alcance de un solo gráfico.
+
+  /** Fecha de "ahora" por render; el filtro propio solo estrecha. */
+  const nowMs = new Date().getTime()
+
+  /** Filas crudas del gráfico `id` tras aplicar SU rango propio (si lo hay). */
+  function withinChartRange<T extends { readonly date_time?: unknown; readonly startDate?: unknown }>(
+    id: string,
+    records: readonly T[],
+  ): T[] {
+    const days = chartRangeDays[id] ?? null
+    return recordsWithinRange(
+      records,
+      days === null ? null : lastDaysRange(days, nowMs),
+      healthRecordTimestamp,
+    )
+  }
+
+  /** Definición del filtro propio de rango temporal de un gráfico. */
+  function rangeScopedFilter(id: string): ChartScopedFilter {
+    const days = chartRangeDays[id] ?? null
+    return {
+      active: days !== null,
+      summary:
+        days !== null
+          ? t.chart.lastNDays.replace('{days}', String(days))
+          : undefined,
+      onClear: () => setChartRangeDays((current) => ({ ...current, [id]: null })),
+      node: (
+        <Select
+          value={days === null ? 'none' : String(days)}
+          onChange={(event) =>
+            setChartRangeDays((current) => ({
+              ...current,
+              [id]: event.target.value === 'none' ? null : Number(event.target.value),
+            }))
+          }
+          aria-label={t.chart.ownFilterLabel}
+          className="w-36"
+        >
+          <option value="none">{t.chart.ownFilterNone}</option>
+          <option value="7">{t.data.last7Days}</option>
+          <option value="30">{t.data.last30Days}</option>
+        </Select>
+      ),
+    }
+  }
+
+  /** Top-N del pie de tipos de insulina; 'all' desactiva la cola "Otros". */
+  const pieTopFilter = (): ChartScopedFilter => {
+    const top = insulinPieTop
+    return {
+      active: top !== INSULIN_TOP_TYPES,
+      summary:
+        top === 3
+          ? t.chart.top3Types
+          : top === 'all'
+            ? t.chart.allCategories
+            : undefined,
+      onClear: () =>
+        setChartTopN((current) => ({ ...current, 'insulin-types': INSULIN_TOP_TYPES })),
+      node: (
+        <Select
+          value={String(top)}
+          onChange={(event) =>
+            setChartTopN((current) => ({
+              ...current,
+              'insulin-types':
+                event.target.value === 'all' ? 'all' : Number(event.target.value),
+            }))
+          }
+          aria-label={t.chart.ownFilterLabel}
+          className="w-44"
+        >
+          <option value="3">{t.chart.top3Types}</option>
+          <option value={String(INSULIN_TOP_TYPES)}>{t.chart.top5Types}</option>
+          <option value="all">{t.chart.allCategories}</option>
+        </Select>
+      ),
+    }
+  }
+
+  /** Rango propio aplicado a las filas ya fusionadas (serie con `ms`). */
+  function mergedRowsWithinRange<TRow extends { ms: number }>(
+    id: string,
+    rows: readonly TRow[],
+  ): TRow[] {
+    const days = chartRangeDays[id] ?? null
+    return recordsWithinRange(rows, days === null ? null : lastDaysRange(days, nowMs), (row) => row.ms)
+  }
+
+  /** Serie de actividad general tras aplicar SU filtro propio (MT69). */
+  const activityScopedRows = dailyChartRows(mergedRowsWithinRange('general-activity', activityMerged))
+
+  /** Datos de cada gráfico con SU filtro propio; el global no se toca. */
+  const mealTypesRows = sortByValueDescending(
+    countByField(withinChartRange('meal-types', mealData), (row) => row.food_type, t.common.noData),
+  )
+  const injectionsRows = dailyChartRows(
+    countByDate(withinChartRange('injections-per-day', insulinData), (row) => timeOf(row.date_time), dayLabelOf),
+  )
+  const dosesRows = summarizeDosesByDate(
+    withinChartRange('average-dose', insulinData),
+    (row) => dayLabelOf(timeOf(row.date_time)),
+    (row) => parseFiniteNumberOrZero(row.dose),
+  )
+  const moodLevelsRows = countByLevel(
+    withinChartRange('mood-distribution', moodData).flatMap((item) => {
+      const level = parseFiniteNumber(item.mood_value)
+      return level === null ? [] : [level]
+    }),
+    0,
+    10,
+  )
+  const insulinEvolutionRows = dailyChartRows(
+    countByDate(withinChartRange('insulin-evolution', insulinData), (row) => timeOf(row.date_time), dayLabelOf),
+  )
+  const mealsEvolutionRows = dailyChartRows(
+    countByDate(withinChartRange('meals-evolution', mealData), (row) => timeOf(row.date_time), dayLabelOf),
+  )
+  const exerciseEvolutionRows = dailyChartRows(
+    countByDate(withinChartRange('exercise-evolution', exerciseData), (row) => timeOf(row.date_time), dayLabelOf),
+  )
+  const moodEvolutionRows = dailyChartRows(
+    countByDate(withinChartRange('mood-evolution', moodData), (row) => timeOf(row.date_time), dayLabelOf),
   )
 
   return (
@@ -502,18 +638,17 @@ export default function AnalyticsPage() {
             <LoadingState label={t.dashboard.loadingData} className="max-w-md mx-auto" />
           ) : showData ? (
             <div className="space-y-8">
-              {/* Gráfico de actividad general */}
-              <ChartCard
+              {/* Gráfico de actividad general (MT69: expandible con filtro propio) */}
+              <ExpandableChartCard
                 icon={LineChartIcon}
                 iconGradient="from-blue-500 to-indigo-600"
                 title={t.analytics.generalActivityByDate}
                 titleClassName="text-xl"
+                scopedFilter={rangeScopedFilter('general-activity')}
               >
-                  {/* T12: con muchas fechas el interior crece y el contenedor
-                      se desliza (ScrollableChart ya soporta ambos ejes); el
-                      scroll horizontal es el que aplica a una serie diaria. */}
-                  <ScrollableChart height={400} minInnerWidth={activityData.length * LINE_INNER_WIDTH_PER_ITEM}>
-                    <AreaChart data={activityData}>
+                {({ expanded }) => (
+                  <ScrollableChart height={expanded ? 620 : 400} minInnerWidth={activityScopedRows.length * LINE_INNER_WIDTH_PER_ITEM}>
+                    <AreaChart data={activityScopedRows}>
                       <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                       <XAxis dataKey="date" stroke={CHART_AXIS_LINE_STYLE.stroke} />
                       <YAxis stroke={CHART_AXIS_LINE_STYLE.stroke} />
@@ -531,13 +666,14 @@ export default function AnalyticsPage() {
                       </defs>
                     </AreaChart>
                   </ScrollableChart>
-              </ChartCard>
+                )}
+              </ExpandableChartCard>
 
               {/* Gráficos por tipo de dato */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Insulina por tipo */}
+                {/* Insulina por tipo (MT69: expandible con Top-N propio) */}
                 {insulinByType.length > 0 && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={Pill}
                     iconGradient="from-blue-500 to-blue-600"
                     title={t.analytics.insulinTypesUsed}
@@ -547,16 +683,19 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.eachSector}:</strong> {t.analytics.percentageUsage}
                       </>
                     }
+                    scopedFilter={pieTopFilter()}
                   >
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
+                    {({ expanded }) => (
+                      <>
+                        <ResponsiveContainer width="100%" height={expanded ? 520 : 300}>
+                          <PieChart>
                           <Pie
                             data={insulinPieData}
                             cx="50%"
                             cy="50%"
                             labelLine={false}
                             label={<PieSliceLabel />}
-                            outerRadius={80}
+                            outerRadius={expanded ? 140 : 80}
                             fill={CHART_OTHERS_COLOR}
                             dataKey="value"
                           >
@@ -607,12 +746,14 @@ export default function AnalyticsPage() {
                           )}
                         </div>
                       )}
-                </ChartCard>
+                      </>
+                    )}
+                  </ExpandableChartCard>
                 )}
 
-                {/* Comidas por tipo */}
+                {/* Comidas por tipo (MT69: expandible con filtro propio) */}
                 {foodByType.length > 0 && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={Utensils}
                     iconGradient="from-green-500 to-green-600"
                     title={t.analytics.registeredMealTypes}
@@ -623,50 +764,55 @@ export default function AnalyticsPage() {
                         <strong className="text-green-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
                       </>
                     }
+                    scopedFilter={rangeScopedFilter('meal-types')}
                   >
-                      {glucoseEvents.length > 0 && (
-                        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                          {t.analytics.glucoseEventsExcluded.replace('{count}', String(glucoseEvents.length))}
-                        </p>
-                      )}
-                      {insulinRecords.length > 0 && (
-                        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                          {t.analytics.insulinRecordsExcluded.replace('{count}', String(insulinRecords.length))}
-                        </p>
-                      )}
-                      <ScrollableChart height={300} minInnerWidth={foodByType.length * BAR_INNER_WIDTH_PER_ITEM}>
-                        <BarChart data={foodByType}>
-                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
-                          <XAxis 
-                            dataKey="name" 
-                            stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
-                            label={{ value: t.analytics.mealTypes, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
-                          />
-                          <YAxis 
-                            stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
-                            label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
-                          />
-                          <Tooltip
-                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                          formatter={(value) => [
-                              `${value} ${t.analytics.records}`,
-                              t.analytics.mealType
-                            ]}
-                            labelFormatter={(label) => `${t.analytics.type}: ${label}`}
-                          />
-                          <Bar dataKey="value" fill={CHART_SERIES_COLORS[1]} name={t.analytics.registeredMeals} radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ScrollableChart>
-                </ChartCard>
+                    {({ expanded }) => (
+                      <>
+                        {glucoseEvents.length > 0 && (
+                          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                            {t.analytics.glucoseEventsExcluded.replace('{count}', String(glucoseEvents.length))}
+                          </p>
+                        )}
+                        {insulinRecords.length > 0 && (
+                          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                            {t.analytics.insulinRecordsExcluded.replace('{count}', String(insulinRecords.length))}
+                          </p>
+                        )}
+                        <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={mealTypesRows.length * BAR_INNER_WIDTH_PER_ITEM}>
+                          <BarChart data={mealTypesRows}>
+                            <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                            <XAxis
+                              dataKey="name"
+                              stroke={CHART_AXIS_LINE_STYLE.stroke}
+                              tick={CHART_TICK_STYLE}
+                              label={{ value: t.analytics.mealTypes, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
+                            />
+                            <YAxis
+                              stroke={CHART_AXIS_LINE_STYLE.stroke}
+                              tick={CHART_TICK_STYLE}
+                              label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
+                            />
+                            <Tooltip
+                              contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                              itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                              labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                              formatter={(value) => [
+                                `${value} ${t.analytics.records}`,
+                                t.analytics.mealType
+                              ]}
+                              labelFormatter={(label) => `${t.analytics.type}: ${label}`}
+                            />
+                            <Bar dataKey="value" fill={CHART_SERIES_COLORS[1]} name={t.analytics.registeredMeals} radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ScrollableChart>
+                      </>
+                    )}
+                  </ExpandableChartCard>
                 )}
 
-                {/* Inyecciones de insulina por día */}
+                {/* Inyecciones de insulina por día (MT69) */}
                 {insulinByDate.length > 0 && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={Pill}
                     iconGradient="from-blue-500 to-blue-600"
                     title={t.analytics.injectionsPerDay}
@@ -677,26 +823,28 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </>
                     }
+                    scopedFilter={rangeScopedFilter('injections-per-day')}
                   >
-                      <ScrollableChart height={300} minInnerWidth={insulinByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
-                        <BarChart data={dailyChartRows(insulinByDate)}>
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={injectionsRows.length * BAR_INNER_WIDTH_PER_ITEM}>
+                        <BarChart data={injectionsRows}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis
                             dataKey="date"
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <YAxis
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.numberOfInjections, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <Tooltip
-                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                          formatter={(value) => [
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                            formatter={(value) => [
                               `${value} ${t.analytics.injections}`,
                               t.analytics.quantity
                             ]}
@@ -705,12 +853,13 @@ export default function AnalyticsPage() {
                           <Bar dataKey="count" fill={CHART_SERIES_COLORS[0]} name={t.analytics.insulinInjections} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
-                </ChartCard>
+                    )}
+                  </ExpandableChartCard>
                 )}
 
-                {/* Promedio de dosis de insulina por día */}
+                {/* Promedio de dosis de insulina por día (MT69) */}
                 {insulinDosesByDate.length > 0 && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={Pill}
                     iconGradient="from-indigo-500 to-indigo-600"
                     title={t.analytics.averageInsulinDose}
@@ -721,26 +870,28 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.averageDoseUnits}
                       </>
                     }
+                    scopedFilter={rangeScopedFilter('average-dose')}
                   >
-                      <ScrollableChart height={300} minInnerWidth={insulinDosesByDate.length * BAR_INNER_WIDTH_PER_ITEM}>
-                        <BarChart data={insulinDosesByDate}>
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={dosesRows.length * BAR_INNER_WIDTH_PER_ITEM}>
+                        <BarChart data={dosesRows}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
-                          <XAxis 
-                            dataKey="date" 
+                          <XAxis
+                            dataKey="date"
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <YAxis 
+                          <YAxis
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.averageDoseUnits, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <Tooltip
-                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                          formatter={(value) => [
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                            formatter={(value) => [
                               `${value} ${t.analytics.units}`,
                               t.analytics.averageDose
                             ]}
@@ -749,7 +900,8 @@ export default function AnalyticsPage() {
                           <Bar dataKey="averageDose" fill={CHART_SERIES_COLORS[7]} name={t.analytics.averageDose} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
-                </ChartCard>
+                    )}
+                  </ExpandableChartCard>
                 )}
 
                 {/* Distribución de ánimo: barras ordinales 0..10 (anti-patrón
@@ -757,7 +909,7 @@ export default function AnalyticsPage() {
                     ni admite más de 5 sectores). Los niveles sin registros
                     cuentan 0 y siguen visibles en la escala. */}
                 {moodLevelsHaveData && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={Smile}
                     iconGradient="from-pink-500 to-pink-600"
                     title={t.analytics.moodDistribution}
@@ -768,9 +920,11 @@ export default function AnalyticsPage() {
                         <strong className="text-pink-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
                       </>
                     }
+                    scopedFilter={rangeScopedFilter('mood-distribution')}
                   >
-                      <ScrollableChart height={300} minInnerWidth={moodLevels.length * BAR_INNER_WIDTH_PER_ITEM}>
-                        <BarChart data={moodLevels}>
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={moodLevelsRows.length * BAR_INNER_WIDTH_PER_ITEM}>
+                        <BarChart data={moodLevelsRows}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
                           <XAxis
                             dataKey="level"
@@ -797,7 +951,8 @@ export default function AnalyticsPage() {
                           <Bar dataKey="count" fill={CHART_SERIES_COLORS[5]} name={t.analytics.moodRecords} radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ScrollableChart>
-                </ChartCard>
+                    )}
+                  </ExpandableChartCard>
                 )}
               </div>
 
@@ -820,9 +975,9 @@ export default function AnalyticsPage() {
 
               {/* Gráficos de evolución temporal */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Correlación Insulina vs Carbohidratos */}
+                {/* Correlación Insulina vs Carbohidratos (MT69) */}
                 {insulinData.length > 0 && foodData.length > 0 && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={TrendingUp}
                     iconGradient="from-blue-500 to-green-600"
                     title={t.analytics.insulinEvolution}
@@ -833,27 +988,29 @@ export default function AnalyticsPage() {
                         <strong className="text-blue-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfInjections}
                       </>
                     }
+                    scopedFilter={rangeScopedFilter('insulin-evolution')}
                   >
-                      <ScrollableChart height={300} minInnerWidth={insulinByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
-                        <LineChart data={dailyChartRows(insulinByDate)}>
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={insulinEvolutionRows.length * LINE_INNER_WIDTH_PER_ITEM}>
+                        <LineChart data={insulinEvolutionRows}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
-                          <XAxis 
-                            dataKey="date" 
+                          <XAxis
+                            dataKey="date"
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <YAxis 
+                          <YAxis
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.numberOfInjections, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <Tooltip
-                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                          formatter={(value) => [
-                              `${value} ${t.analytics.injections}`, 
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                            formatter={(value) => [
+                              `${value} ${t.analytics.injections}`,
                               t.analytics.insulin
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
@@ -861,12 +1018,13 @@ export default function AnalyticsPage() {
                           <Line type="monotone" dataKey="count" stroke={CHART_SERIES_COLORS[0]} strokeWidth={2} name={t.analytics.insulinInjections} />
                         </LineChart>
                       </ScrollableChart>
-                </ChartCard>
+                    )}
+                  </ExpandableChartCard>
                 )}
 
-                {/* Patrones de Actividad Diaria */}
+                {/* Patrones de Actividad Diaria (MT69) */}
                 {foodByDate.length > 0 && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={Activity}
                     iconGradient="from-green-500 to-emerald-600"
                     title={t.analytics.mealEvolution}
@@ -877,27 +1035,29 @@ export default function AnalyticsPage() {
                         <strong className="text-green-400"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMeals}
                       </>
                     }
+                    scopedFilter={rangeScopedFilter('meals-evolution')}
                   >
-                      <ScrollableChart height={300} minInnerWidth={foodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
-                        <LineChart data={dailyChartRows(foodByDate)}>
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={mealsEvolutionRows.length * LINE_INNER_WIDTH_PER_ITEM}>
+                        <LineChart data={mealsEvolutionRows}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
-                          <XAxis 
-                            dataKey="date" 
+                          <XAxis
+                            dataKey="date"
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <YAxis 
+                          <YAxis
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.numberOfMeals, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <Tooltip
-                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                          formatter={(value) => [
-                              `${value} ${t.analytics.meals}`, 
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                            formatter={(value) => [
+                              `${value} ${t.analytics.meals}`,
                               t.analytics.records
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
@@ -905,12 +1065,13 @@ export default function AnalyticsPage() {
                           <Line type="monotone" dataKey="count" stroke={CHART_SERIES_COLORS[1]} strokeWidth={2} name={t.analytics.registeredMeals} />
                         </LineChart>
                       </ScrollableChart>
-                </ChartCard>
+                    )}
+                  </ExpandableChartCard>
                 )}
 
-                {/* Tendencias de Ejercicio */}
+                {/* Tendencias de Ejercicio (MT69) */}
                 {exerciseByDate.length > 0 && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={Dumbbell}
                     iconGradient="from-orange-500 to-orange-600"
                     title={t.analytics.exerciseEvolution}
@@ -921,27 +1082,29 @@ export default function AnalyticsPage() {
                         <strong className="text-orange-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfSessions}
                       </>
                     }
+                    scopedFilter={rangeScopedFilter('exercise-evolution')}
                   >
-                      <ScrollableChart height={300} minInnerWidth={exerciseByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
-                        <LineChart data={dailyChartRows(exerciseByDate)}>
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={exerciseEvolutionRows.length * LINE_INNER_WIDTH_PER_ITEM}>
+                        <LineChart data={exerciseEvolutionRows}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
-                          <XAxis 
-                            dataKey="date" 
+                          <XAxis
+                            dataKey="date"
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <YAxis 
+                          <YAxis
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.numberOfSessions, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <Tooltip
-                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                          formatter={(value) => [
-                              `${value} ${t.analytics.sessions}`, 
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                            formatter={(value) => [
+                              `${value} ${t.analytics.sessions}`,
                               t.analytics.exercise
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
@@ -949,12 +1112,13 @@ export default function AnalyticsPage() {
                           <Line type="monotone" dataKey="count" stroke={CHART_SERIES_COLORS[2]} strokeWidth={2} name={t.analytics.exerciseSessions} />
                         </LineChart>
                       </ScrollableChart>
-                </ChartCard>
+                    )}
+                  </ExpandableChartCard>
                 )}
 
-                {/* Bienestar Emocional */}
+                {/* Bienestar Emocional (MT69) */}
                 {moodByDate.length > 0 && (
-                  <ChartCard
+                  <ExpandableChartCard
                     icon={Heart}
                     iconGradient="from-pink-500 to-pink-600"
                     title={t.analytics.moodEvolution}
@@ -965,27 +1129,29 @@ export default function AnalyticsPage() {
                         <strong className="text-pink-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfMoodRecords}
                       </>
                     }
+                    scopedFilter={rangeScopedFilter('mood-evolution')}
                   >
-                      <ScrollableChart height={300} minInnerWidth={moodByDate.length * LINE_INNER_WIDTH_PER_ITEM}>
-                        <LineChart data={dailyChartRows(moodByDate)}>
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={moodEvolutionRows.length * LINE_INNER_WIDTH_PER_ITEM}>
+                        <LineChart data={moodEvolutionRows}>
                           <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
-                          <XAxis 
-                            dataKey="date" 
+                          <XAxis
+                            dataKey="date"
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
-                          <YAxis 
+                          <YAxis
                             stroke={CHART_AXIS_LINE_STYLE.stroke}
-                          tick={CHART_TICK_STYLE}
+                            tick={CHART_TICK_STYLE}
                             label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
                           />
                           <Tooltip
-                          contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                          itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                          labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                          formatter={(value) => [
-                              `${value} ${t.analytics.records}`, 
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                            formatter={(value) => [
+                              `${value} ${t.analytics.records}`,
                               t.analytics.mood
                             ]}
                             labelFormatter={(label) => `${t.analytics.date}: ${label}`}
@@ -993,7 +1159,8 @@ export default function AnalyticsPage() {
                           <Line type="monotone" dataKey="count" stroke={CHART_SERIES_COLORS[5]} strokeWidth={2} name={t.analytics.moodRecords} />
                         </LineChart>
                       </ScrollableChart>
-                </ChartCard>
+                    )}
+                  </ExpandableChartCard>
                 )}
               </div>
             </div>

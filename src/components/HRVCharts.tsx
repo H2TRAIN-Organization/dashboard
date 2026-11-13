@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Activity, Heart, TrendingUp } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import {
@@ -9,7 +10,14 @@ import {
 import { buildHrvChartRows, averageOfChartKey, type HrvMeasurementInput } from '@/lib/hrv-chart-rows'
 import ScrollableChart from '@/components/analytics/ScrollableChart'
 import { HRV_METRIC_COLORS } from '@/components/analytics/chart-theme'
-import HrvLineChart from './kubios/HrvLineChart'
+import {
+  ChartExpandButton,
+  ChartExpandOverlay,
+  useChartExpand,
+} from '@/components/analytics/chart-expand'
+import { Select } from '@/components/ui/select'
+import { lastDaysRange, recordsWithinRange } from '@/lib/chart-scoped-filter'
+import HrvLineChart, { type ChartLine } from './kubios/HrvLineChart'
 
 interface HRVChartsProps {
   results: KubiosLatestResult[]
@@ -18,6 +26,8 @@ interface HRVChartsProps {
 /** Ancho interior por medición en los gráficos deslizables de la vista personal. */
 const INNER_WIDTH_PER_MEASUREMENT = 80
 const DEFAULT_CHART_HEIGHT = 340
+/** Altura del gráfico dentro del overlay expandido (MT69). */
+const EXPANDED_CHART_HEIGHT = 520
 
 function frequencyMetrics(result: unknown): Record<string, unknown> {
   if (typeof result !== 'object' || result === null) return {}
@@ -26,16 +36,16 @@ function frequencyMetrics(result: unknown): Record<string, unknown> {
   return freqDomain as Record<string, unknown>
 }
 
-/**
- * Gráficos de las mediciones propias. Las filas sin fecha válida no se pintan
- * y las métricas ausentes quedan como huecos (`null`); no se convierten en 0
- * ni se rellenan con datos de ejemplo.
- */
-export default function HRVCharts({ results }: HRVChartsProps) {
-  const { t, language } = useLanguage()
-  const locale = language === 'en' ? 'en-US' : 'es-ES'
-  const notAvailable = t.kubios.personal.notAvailable
+/** Milisegundo de un resultado; `null` cuando su fecha no es interpretable. */
+function resultTimestampOf(result: KubiosLatestResult): number | null {
+  const date = parseKubiosDate(result.measured_timestamp)
+  return date === null ? null : date.getTime()
+}
 
+/** Inputs del gráfico a partir de los resultados; los sin fecha válida fuera. */
+function buildInputsFromResults(
+  results: readonly KubiosLatestResult[],
+): HrvMeasurementInput[] {
   const inputs: HrvMeasurementInput[] = []
   for (const result of results) {
     const date = parseKubiosDate(result.measured_timestamp)
@@ -48,8 +58,114 @@ export default function HRVCharts({ results }: HRVChartsProps) {
     const metrics = { ...resultMetrics, ...frequencyMetrics(result.result) }
     inputs.push({ time: date.getTime(), metrics })
   }
+  return inputs
+}
 
-  const rows = buildHrvChartRows(inputs, locale)
+/**
+ * Una sección de gráfico con expansión y filtro propio (MT69): la cabecera
+ * lleva el chip del rango activo y el botón de expandir, y el overlay dibuja
+ * el mismo gráfico a mayor tamaño. El rango propio SOLO estrecha los
+ * resultados ya cargados (client-side, src/lib/chart-scoped-filter.ts).
+ */
+function HrvSection({
+  title,
+  results,
+  lines,
+  yLabel,
+  domain,
+  collapsedHeight = DEFAULT_CHART_HEIGHT,
+}: {
+  title: string
+  results: readonly KubiosLatestResult[]
+  lines: ChartLine[]
+  yLabel: string
+  domain?: [number, number]
+  collapsedHeight?: number
+}) {
+  const { t, language } = useLanguage()
+  const locale = language === 'en' ? 'en-US' : 'es-ES'
+  const { open, expand, collapse } = useChartExpand()
+  const [days, setDays] = useState<number | null>(null)
+
+  // "Ahora" por render: el filtro propio solo estrecha lo ya cargado (MT69).
+  const nowMs = new Date().getTime()
+  const scopedResults =
+    days === null
+      ? results
+      : recordsWithinRange(results, lastDaysRange(days, nowMs), resultTimestampOf)
+  const scopedRows = buildHrvChartRows(buildInputsFromResults(scopedResults), locale)
+
+  return (
+    <>
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+          <div className="flex shrink-0 items-center gap-2">
+            {days !== null && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                {t.chart.lastNDays.replace('{days}', String(days))}
+              </span>
+            )}
+            <ChartExpandButton onExpand={expand} />
+          </div>
+        </div>
+        <ScrollableChart
+          height={collapsedHeight}
+          minInnerWidth={scopedRows.length * INNER_WIDTH_PER_MEASUREMENT}
+        >
+          <HrvLineChart rows={scopedRows} yLabel={yLabel} domain={domain} lines={lines} />
+        </ScrollableChart>
+      </div>
+      <ChartExpandOverlay
+        open={open}
+        onClose={collapse}
+        title={title}
+        scopedFilter={{
+          active: days !== null,
+          summary:
+            days !== null
+              ? t.chart.lastNDays.replace('{days}', String(days))
+              : undefined,
+          onClear: () => setDays(null),
+          node: (
+            <Select
+              value={days === null ? 'none' : String(days)}
+              onChange={(event) =>
+                setDays(event.target.value === 'none' ? null : Number(event.target.value))
+              }
+              aria-label={t.chart.ownFilterLabel}
+              className="w-36"
+            >
+              <option value="none">{t.chart.ownFilterNone}</option>
+              <option value="7">{t.data.last7Days}</option>
+              <option value="30">{t.data.last30Days}</option>
+            </Select>
+          ),
+        }}
+        renderChart={() => (
+          <ScrollableChart
+            height={EXPANDED_CHART_HEIGHT}
+            minInnerWidth={scopedRows.length * INNER_WIDTH_PER_MEASUREMENT}
+          >
+            <HrvLineChart rows={scopedRows} yLabel={yLabel} domain={domain} lines={lines} />
+          </ScrollableChart>
+        )}
+      />
+    </>
+  )
+}
+
+/**
+ * Gráficos de las mediciones propias. Las filas sin fecha válida no se pintan
+ * y las métricas ausentes quedan como huecos (`null`); no se convierten en 0
+ * ni se rellenan con datos de ejemplo.
+ */
+export default function HRVCharts({ results }: HRVChartsProps) {
+  const { t, language } = useLanguage()
+  const locale = language === 'en' ? 'en-US' : 'es-ES'
+  const notAvailable = t.kubios.personal.notAvailable
+
+  const rows = buildHrvChartRows(buildInputsFromResults(results), locale)
 
   if (rows.length === 0) {
     return (
@@ -126,125 +242,96 @@ export default function HRVCharts({ results }: HRVChartsProps) {
         </div>
       </div>
 
-      <div>
-        <h3 className="mb-3 text-lg font-bold text-slate-900">
-          {t.kubios.charts.readinessEvolution}
-        </h3>
-        <ScrollableChart height={DEFAULT_CHART_HEIGHT} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
-          <HrvLineChart
-            rows={rows}
-            yLabel={t.kubios.charts.readinessPercentage}
-            domain={[0, 100]}
-            lines={[
-              {
-                dataKey: 'readiness',
-                name: t.kubios.charts.averageReadiness,
-                color: HRV_METRIC_COLORS.readiness,
-                unit: '%',
-              },
-            ]}
-          />
-        </ScrollableChart>
-      </div>
+      <HrvSection
+        title={t.kubios.charts.readinessEvolution}
+        results={results}
+        yLabel={t.kubios.charts.readinessPercentage}
+        domain={[0, 100]}
+        lines={[
+          {
+            dataKey: 'readiness',
+            name: t.kubios.charts.averageReadiness,
+            color: HRV_METRIC_COLORS.readiness,
+            unit: '%',
+          },
+        ]}
+      />
 
-      <div>
-        <h3 className="mb-3 text-lg font-bold text-slate-900">
-          {t.kubios.charts.rmssdEvolution}
-        </h3>
-        <ScrollableChart height={DEFAULT_CHART_HEIGHT} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
-          <HrvLineChart
-            rows={rows}
-            yLabel={t.kubios.charts.rmssdMs}
-            lines={[
-              {
-                dataKey: 'rmssd',
-                name: t.kubios.metrics.rmssd,
-                color: HRV_METRIC_COLORS.rmssd,
-                unit: 'ms',
-              },
-            ]}
-          />
-        </ScrollableChart>
-      </div>
+      <HrvSection
+        title={t.kubios.charts.rmssdEvolution}
+        results={results}
+        yLabel={t.kubios.charts.rmssdMs}
+        lines={[
+          {
+            dataKey: 'rmssd',
+            name: t.kubios.metrics.rmssd,
+            color: HRV_METRIC_COLORS.rmssd,
+            unit: 'ms',
+          },
+        ]}
+      />
 
-      <div>
-        <h3 className="mb-3 text-lg font-bold text-slate-900">
-          {t.kubios.charts.pnsSnsIndices}
-        </h3>
-        <ScrollableChart height={DEFAULT_CHART_HEIGHT} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
-          <HrvLineChart
-            rows={rows}
-            yLabel={t.kubios.charts.pnsSnsIndicesLabel}
-            lines={[
-              {
-                dataKey: 'pnsIndex',
-                name: t.kubios.charts.pnsIndex,
-                color: HRV_METRIC_COLORS.pns,
-                dashed: true,
-              },
-              {
-                dataKey: 'snsIndex',
-                name: t.kubios.charts.snsIndex,
-                color: HRV_METRIC_COLORS.sns,
-              },
-            ]}
-          />
-        </ScrollableChart>
-      </div>
+      <HrvSection
+        title={t.kubios.charts.pnsSnsIndices}
+        results={results}
+        yLabel={t.kubios.charts.pnsSnsIndicesLabel}
+        lines={[
+          {
+            dataKey: 'pnsIndex',
+            name: t.kubios.charts.pnsIndex,
+            color: HRV_METRIC_COLORS.pns,
+            dashed: true,
+          },
+          {
+            dataKey: 'snsIndex',
+            name: t.kubios.charts.snsIndex,
+            color: HRV_METRIC_COLORS.sns,
+          },
+        ]}
+      />
 
-      <div>
-        <h3 className="mb-3 text-lg font-bold text-slate-900">
-          {t.kubios.charts.heartRateRest}
-        </h3>
-        <ScrollableChart height={DEFAULT_CHART_HEIGHT} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
-          <HrvLineChart
-            rows={rows}
-            yLabel={t.kubios.charts.heartRateBpm}
-            lines={[
-              {
-                dataKey: 'heartRate',
-                name: t.kubios.charts.heartRateRestLabel,
-                color: HRV_METRIC_COLORS.heartRate,
-                unit: 'bpm',
-              },
-            ]}
-          />
-        </ScrollableChart>
-      </div>
+      <HrvSection
+        title={t.kubios.charts.heartRateRest}
+        results={results}
+        yLabel={t.kubios.charts.heartRateBpm}
+        lines={[
+          {
+            dataKey: 'heartRate',
+            name: t.kubios.charts.heartRateRestLabel,
+            color: HRV_METRIC_COLORS.heartRate,
+            unit: 'bpm',
+          },
+        ]}
+      />
 
-      <div>
-        <h3 className="mb-3 text-lg font-bold text-slate-900">
-          {t.kubios.charts.frequencyDomain}
-        </h3>
-        <ScrollableChart height={380} minInnerWidth={rows.length * INNER_WIDTH_PER_MEASUREMENT}>
-          <HrvLineChart
-            rows={rows}
-            yLabel={t.kubios.charts.spectralPower}
-            lines={[
-              {
-                dataKey: 'hfPower',
-                name: t.kubios.charts.hfPower,
-                color: HRV_METRIC_COLORS.hf,
-                unit: 'ms²',
-              },
-              {
-                dataKey: 'lfPower',
-                name: t.kubios.charts.lfPower,
-                color: HRV_METRIC_COLORS.lf,
-                dashed: true,
-                unit: 'ms²',
-              },
-              {
-                dataKey: 'vlfPower',
-                name: t.kubios.charts.vlfPower,
-                color: HRV_METRIC_COLORS.vlf,
-                dashed: true,
-                unit: 'ms²',
-              },
-            ]}
-          />
-        </ScrollableChart>
-      </div>
+      <HrvSection
+        title={t.kubios.charts.frequencyDomain}
+        results={results}
+        yLabel={t.kubios.charts.spectralPower}
+        collapsedHeight={380}
+        lines={[
+          {
+            dataKey: 'hfPower',
+            name: t.kubios.charts.hfPower,
+            color: HRV_METRIC_COLORS.hf,
+            unit: 'ms²',
+          },
+          {
+            dataKey: 'lfPower',
+            name: t.kubios.charts.lfPower,
+            color: HRV_METRIC_COLORS.lf,
+            dashed: true,
+            unit: 'ms²',
+          },
+          {
+            dataKey: 'vlfPower',
+            name: t.kubios.charts.vlfPower,
+            color: HRV_METRIC_COLORS.vlf,
+            dashed: true,
+            unit: 'ms²',
+          },
+        ]}
+      />
     </div>
   )
 }

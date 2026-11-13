@@ -104,20 +104,18 @@ export default function AdminNewPage() {
           )}
           {/* Header con estadísticas generales */}
           <div className="mb-12">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">
-              <div className="text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start mb-6">
-                  <div className="p-5 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-lg">
-                    <Shield className="h-12 w-12 text-white" />
-                  </div>
-                  <div className="ml-6">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">{t.dashboard.administration}</h1>
-                    <p className="text-gray-600 text-lg">{t.admin.description}</p>
-                  </div>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 items-center sm:items-start">
+                <div className="shrink-0 p-4 sm:p-5 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-lg">
+                  <Shield className="h-9 w-9 sm:h-12 sm:w-12 text-white" />
+                </div>
+                <div className="ml-5 sm:ml-6 min-w-0">
+                  <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">{t.dashboard.administration}</h1>
+                  <p className="text-gray-600 text-base sm:text-lg max-w-2xl">{t.admin.description}</p>
                 </div>
               </div>
-              
-              <div className="flex flex-wrap gap-4 mt-6 sm:mt-0">
+
+              <div className="flex flex-wrap gap-4 shrink-0">
                 {stats.totalUsers !== null && (
                 <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl px-6 py-4 shadow-lg">
                   <div className="flex items-center space-x-3">
@@ -131,7 +129,7 @@ export default function AdminNewPage() {
                   </div>
                 </div>
                 )}
-                
+
                 {stats.totalRecords !== null && (
                 <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl px-6 py-4 shadow-lg">
                   <div className="flex items-center space-x-3">
