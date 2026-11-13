@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Geist } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppAuthProvider } from "@/contexts/AppAuthContext";
@@ -7,6 +7,9 @@ import { SessionProvider } from "@/contexts/SessionContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import GlobalLanguageSelector from "@/components/GlobalLanguageSelector";
 import PrivacyBoundary from '@/components/privacy/PrivacyBoundary';
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
       <body className={inter.className} suppressHydrationWarning>
         <LanguageProvider>
           <SessionProvider>
