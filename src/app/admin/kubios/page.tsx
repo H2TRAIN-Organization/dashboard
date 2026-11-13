@@ -15,6 +15,7 @@ import {
 import HybridNavigation from '@/components/HybridNavigation'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
 import HybridRoleGuard from '@/components/HybridRoleGuard'
+import { Button } from '@/components/ui/button'
 import AdminKubiosCharts from '@/components/kubios/AdminKubiosCharts'
 import UserAutocomplete, {
   type UserAutocompleteItem,
@@ -183,13 +184,15 @@ function AdminKubiosContent() {
               className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 sm:flex-row sm:items-center sm:justify-between"
             >
               <span>{t.admin.kubios.participantsError}</span>
-              <button
+              <Button
                 type="button"
                 onClick={reloadParticipants}
-                className="self-start rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700"
+                variant="destructive"
+                size="sm"
+                className="self-start text-sm"
               >
                 {t.admin.kubios.retryParticipants}
-              </button>
+              </Button>
             </div>
           ) : null}
         </section>
@@ -204,12 +207,14 @@ function AdminKubiosContent() {
             </div>
             <div className="flex items-center gap-2">
               {isAdmin && selectedUserId !== null ? (
-                <button
+                <Button
                   type="button"
                   onClick={() => void syncParticipant()}
                   disabled={sync.phase === 'busy' || loading}
                   data-testid="admin-kubios-sync"
-                  className="inline-flex items-center gap-1 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  variant="secondary"
+                  size="sm"
+                  className="gap-1 font-semibold text-sm disabled:opacity-40"
                 >
                   <RefreshCw
                     className={
@@ -221,29 +226,33 @@ function AdminKubiosContent() {
                   {sync.phase === 'busy'
                     ? t.admin.kubios.syncBusy
                     : t.admin.kubios.sync}
-                </button>
+                </Button>
               ) : null}
-              <button
+              <Button
                 type="button"
                 onClick={goPrevious}
                 disabled={!canGoPrevious}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                variant="outline"
+                size="sm"
+                className="gap-1 font-semibold text-sm disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
                 {t.admin.kubios.previous}
-              </button>
+              </Button>
               <span className="text-xs font-semibold text-slate-500">
                 {t.admin.kubios.page} {pageNumber}
               </span>
-              <button
+              <Button
                 type="button"
                 onClick={goNext}
                 disabled={!canGoNext}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                variant="outline"
+                size="sm"
+                className="gap-1 font-semibold text-sm disabled:opacity-40"
               >
                 {t.admin.kubios.next}
                 <ChevronRight className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -266,15 +275,17 @@ function AdminKubiosContent() {
               )}
               <span className="flex-1">{t.admin.kubios[sync.message]}</span>
               {sync.phase === 'error' ? (
-                <button
+                <Button
                   type="button"
                   onClick={() => void syncParticipant()}
                   data-testid="admin-kubios-sync-retry"
-                  className="inline-flex items-center gap-2 self-start rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700"
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2 self-start text-sm"
                 >
                   <RefreshCw className="h-4 w-4" />
                   {t.admin.kubios.retry}
-                </button>
+                </Button>
               ) : null}
             </div>
           ) : null}
@@ -315,14 +326,16 @@ function AdminKubiosContent() {
               className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-sm font-medium text-red-700 sm:flex-row sm:items-center sm:justify-between"
             >
               <span>{t.admin.kubios.loadError}</span>
-              <button
+              <Button
                 type="button"
                 onClick={reloadMeasurements}
-                className="inline-flex items-center gap-2 self-start rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white hover:bg-red-700"
+                variant="destructive"
+                size="sm"
+                className="gap-2 self-start text-sm"
               >
                 <RefreshCw className="h-4 w-4" />
                 {t.admin.kubios.retry}
-              </button>
+              </Button>
             </div>
           ) : loading ? (
             <div className="flex items-center justify-center py-12">

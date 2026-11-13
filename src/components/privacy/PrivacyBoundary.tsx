@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useSession } from '@/contexts/SessionContext'
+import { Button } from '@/components/ui/button'
 import { privacyPolicy, PRIVACY_POLICY_HASH, PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
 import { classifyPrivacyDecisionFailure, privacyGateText, type PrivacyDecisionFailureKind } from '@/lib/privacy-gate'
 import PrivacyNotice from './PrivacyNotice'
@@ -52,22 +53,25 @@ function DecisionFailureAlert({ failure, language, onRetry, onEscape, showEscape
     <div role="alert" className="mt-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       <p className="font-medium">{message}</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button
+        <Button
           onClick={onRetry}
-          className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-2 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700"
+          variant="primary"
+          size="lg"
         >
           {text.retry}
-        </button>
+        </Button>
         <Link href="/privacy" className="rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50">
           {text.policy}
         </Link>
         {showEscape && (
-          <button
+          <Button
             onClick={onEscape}
-            className="rounded-xl border border-red-300 bg-white px-4 py-2 font-semibold text-red-700 transition hover:bg-red-50"
+            variant="destructive-outline"
+            size="lg"
+            className="font-semibold"
           >
             {gate.escape}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -187,7 +191,7 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
       <div className="space-y-4 text-center" role="alert">
         <p className="text-base font-medium text-gray-700">{text.unavailable}</p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <button onClick={() => void refresh()} className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-2 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700">{text.retry}</button>
+          <Button onClick={() => void refresh()} variant="primary" size="lg">{text.retry}</Button>
           <Link href="/privacy" className="rounded-xl border border-blue-200 bg-white px-4 py-2 font-semibold text-blue-700 transition hover:bg-blue-50">{text.policy}</Link>
         </div>
       </div>
@@ -227,8 +231,14 @@ export default function PrivacyBoundary({ children }: { children: React.ReactNod
           />
         )}
         <div className="mt-6 flex flex-wrap gap-3">
-          <button disabled={busy} className="rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-4 py-3 font-semibold text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50" onClick={() => void decide('accept')}>{text.accept}</button>
-          <button disabled={busy} className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50" onClick={() => void decide('reject')}>{text.reject}</button>
+          <Button disabled={busy} variant="primary" size="lg" onClick={() => void decide('accept')}>{text.accept}</Button>
+          <Button
+            disabled={busy}
+            variant="outline"
+            size="lg"
+            className="font-semibold hover:border-gray-300 hover:bg-slate-100"
+            onClick={() => void decide('reject')}
+          >{text.reject}</Button>
         </div>
       </div>
     </PrivacyPanel>

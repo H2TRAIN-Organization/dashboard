@@ -13,6 +13,7 @@ import { Check, ChevronDown, Search, Users, X } from 'lucide-react'
 import type { User } from '@/lib/api-types'
 import { getDisplayUsername } from '@/lib/user-mapper'
 import { useLanguage } from '@/contexts/LanguageContext'
+import { Button } from '@/components/ui/button'
 
 export interface UserAutocompleteItem {
   /** Stable React key for the option. */
@@ -392,15 +393,17 @@ export default function UserAutocomplete({
           className="w-full bg-white border-2 border-blue-200 rounded-lg sm:rounded-xl pl-9 pr-16 py-2 sm:py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-blue-900 shadow-lg hover:border-blue-300 transition-all duration-300 text-sm sm:text-base disabled:opacity-60"
         />
         {showClear ? (
-          <button
+          <Button
             type="button"
             onClick={clearSelection}
             aria-label={t.dashboard.clearUserSelection}
             title={t.dashboard.clearUserSelection}
-            className="absolute right-8 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+            variant="ghost"
+            size="icon-xs"
+            className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-500"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         ) : null}
         <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-600" />
       </div>

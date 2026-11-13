@@ -7,6 +7,7 @@ import { getDisplayUsername } from '@/lib/user-mapper'
 import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronFirst, ChevronLast, Database, Trash2, type LucideIcon } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
+import { Button } from '@/components/ui/button'
 import CalendarDatePicker from '@/components/calendar/CalendarDatePicker'
 import { formatDateValue } from '@/components/calendar/calendar-utils'
 import { useSession } from '@/contexts/SessionContext'
@@ -477,49 +478,57 @@ export default function DataPage() {
                   </option>
                 ))}
               </select>
-              <button
+              <Button
                 type="button"
                 onClick={() => goToRecordPage(pageKey, 1)}
                 disabled={currentPage <= 1}
                 aria-label={t.common.firstPage}
                 title={t.common.firstPage}
-                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                variant="outline"
+                size="icon-sm"
+                className="disabled:opacity-40"
               >
                 <ChevronFirst className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => goToRecordPage(pageKey, currentPage - 1)}
                 disabled={currentPage <= 1}
                 aria-label={t.common.previous}
                 title={t.common.previous}
-                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                variant="outline"
+                size="icon-sm"
+                className="disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
-              </button>
+              </Button>
               <span className="min-w-[56px] text-center text-sm font-semibold text-gray-800">
                 {currentPage} / {totalPages}
               </span>
-              <button
+              <Button
                 type="button"
                 onClick={() => goToRecordPage(pageKey, currentPage + 1)}
                 disabled={currentPage >= totalPages}
                 aria-label={t.common.next}
                 title={t.common.next}
-                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                variant="outline"
+                size="icon-sm"
+                className="disabled:opacity-40"
               >
                 <ChevronRight className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => goToRecordPage(pageKey, totalPages)}
                 disabled={currentPage >= totalPages}
                 aria-label={t.common.lastPage}
                 title={t.common.lastPage}
-                className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                variant="outline"
+                size="icon-sm"
+                className="disabled:opacity-40"
               >
                 <ChevronLast className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -564,13 +573,15 @@ export default function DataPage() {
                     {stats.totalRecords} {t.dashboard.totalRecords}
                   </span>
                 </div>
-                <button
+                <Button
                   onClick={exportData}
-                  className="flex items-center space-x-2 sm:space-x-3 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl"
+                  variant="primary"
+                  size="lg"
+                  className="gap-0 space-x-2 sm:space-x-3 duration-300 hover:-translate-y-0.5"
                 >
                   <Download className="h-4 w-4 sm:h-5 sm:w-5" />
                   <span className="font-semibold text-sm sm:text-lg">{t.dashboard.exportCSV}</span>
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -578,13 +589,15 @@ export default function DataPage() {
           {errorText && (
             <div className="mb-6 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 sm:flex-row sm:items-center sm:justify-between">
               <span role="alert">{errorText}</span>
-              <button
+              <Button
                 type="button"
                 onClick={() => void fetchData()}
-                className="self-start rounded-lg bg-red-600 px-3 py-1.5 text-white hover:bg-red-700"
+                variant="destructive"
+                size="sm"
+                className="self-start text-sm"
               >
                 {t.common.retry}
-              </button>
+              </Button>
             </div>
           )}
 
@@ -624,13 +637,14 @@ export default function DataPage() {
                   </div>
                   <h2 className="text-lg sm:text-xl font-bold text-blue-900">{t.dashboard.dataFilters}</h2>
                 </div>
-                <button
+                <Button
                   onClick={clearFilters}
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105 flex items-center"
+                  variant="default"
+                  className="gap-0 text-xs sm:text-sm duration-300 hover:scale-105"
                 >
                   <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
                   {t.dashboard.clearFilters}
-                </button>
+                </Button>
               </div>
               
               <div className={`grid grid-cols-1 gap-4 sm:gap-6 ${isIndividualUser ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4'}`}>
@@ -775,19 +789,21 @@ export default function DataPage() {
                             </p>
                           </div>
                           {!isIndividualUser && (
-                            <button
+                            <Button
                               type="button"
                               onClick={() => toggleUserExpansion(group.user.UserID)}
                               aria-expanded={isExpanded}
                               title={isExpanded ? t.dashboard.showLess : t.dashboard.viewAll}
-                              className="p-2 sm:p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl hover:from-blue-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105 flex-shrink-0"
+                              variant="default"
+                              size="icon"
+                              className="duration-300 hover:scale-105"
                             >
                               {isExpanded ? (
                                 <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                               ) : (
                                 <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                               )}
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </div>

@@ -17,6 +17,7 @@ import {
 import { Edit, Trash2, Search, Save, X, RefreshCw, User as UserIcon, Key, Shield, CheckCircle, AlertCircle, Users, Plus, Lock, ChevronLeft, ChevronRight } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
+import { Button } from '@/components/ui/button'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 
@@ -325,13 +326,13 @@ export default function UsersPage() {
                   </span>
                 </div>
                 {canWrite && (
-                  <button
+                  <Button
                     onClick={() => setShowCreateForm(true)}
-                    className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 text-white px-4 py-2 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl"
+                    variant="primary"
                   >
                     <Plus className="h-4 w-4" />
                     <span className="font-semibold text-sm">{t.dashboard.createUser}</span>
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -349,15 +350,17 @@ export default function UsersPage() {
                   className="w-full pl-10 sm:pl-12 pr-10 sm:pr-12 py-2.5 sm:py-3 bg-white/50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 hover:bg-white/70 text-sm"
                 />
                 {searchTerm.length > 0 && (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setSearchTerm('')}
                     aria-label={t.common.clear}
                     title={t.common.clear}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-500 hover:bg-white hover:text-gray-800"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:bg-white hover:text-gray-800"
                   >
                     <X className="h-4 w-4" />
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -451,45 +454,53 @@ export default function UsersPage() {
                             {user.UUID ?? t.users.noUUIDAssigned}
                           </div>
                           {user.UUID && (
-                            <button
+                            <Button
                               onClick={() => copyToClipboard(user.UUID!)}
-                              className="rounded-lg border border-blue-200 bg-white p-1.5 text-blue-600 hover:bg-blue-50 transition-colors flex-shrink-0"
+                              variant="outline"
+                              size="icon-sm"
+                              className="border-blue-200 text-blue-600 hover:border-blue-200 hover:bg-blue-50"
                               title={t.users.copyUUID}
                               aria-label={t.users.copyUUID}
                             >
                               <Key className="h-3.5 w-3.5" />
-                            </button>
+                            </Button>
                           )}
                         </div>
 
                         {/* Botones de acción */}
                         {canWrite && (
                           <div className="mt-3 flex items-center justify-end gap-2 border-t border-gray-100 pt-3">
-                            <button
+                            <Button
                               onClick={() => startEditing(user)}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 transition-colors"
+                              variant="outline"
+                              size="sm"
+                              className="border-blue-200 font-semibold text-xs text-blue-700 hover:border-blue-200 hover:bg-blue-50"
                               title={t.dashboard.edit}
                             >
                               <Edit className="h-3.5 w-3.5" />
                               {t.dashboard.edit}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => clearUUID(user.UserID)}
                               disabled={clearingUUID}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                              variant="outline"
+                              size="sm"
+                              className="font-semibold text-xs"
                               title={t.users.clearUUID}
                             >
                               <RefreshCw className={`h-3.5 w-3.5 ${clearingUUID ? 'animate-spin' : ''}`} />
                               {t.common.clear}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => deleteUser(user)}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                              variant="destructive-outline"
+                              size="sm"
+                              className="font-semibold text-xs"
                               title={t.dashboard.delete}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               {t.dashboard.delete}
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -574,14 +585,16 @@ export default function UsersPage() {
                                   {user.UUID ?? t.users.noUUIDAssigned}
                                 </div>
                                 {user.UUID && (
-                                  <button
+                                  <Button
                                     onClick={() => copyToClipboard(user.UUID!)}
-                                    className="flex-shrink-0 rounded-lg border border-blue-200 bg-white p-1.5 text-blue-600 hover:bg-blue-50 transition-colors"
+                                    variant="outline"
+                                    size="icon-sm"
+                                    className="border-blue-200 text-blue-600 hover:border-blue-200 hover:bg-blue-50"
                                     title={t.users.copyUUID}
                                     aria-label={t.users.copyUUID}
                                   >
                                     <Key className="h-3.5 w-3.5" />
-                                  </button>
+                                  </Button>
                                 )}
                               </div>
                             </td>
@@ -618,31 +631,35 @@ export default function UsersPage() {
                             <td className="px-3 py-2.5 text-right">
                               {canWrite && (
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <button
+                                  <Button
                                     onClick={() => startEditing(user)}
-                                    className="rounded-lg border border-blue-200 bg-white p-2 text-blue-600 hover:bg-blue-50 transition-colors"
+                                    variant="outline"
+                                    size="icon-sm"
+                                    className="border-blue-200 text-blue-600 hover:border-blue-200 hover:bg-blue-50"
                                     title={t.dashboard.edit}
                                     aria-label={t.dashboard.edit}
                                   >
                                     <Edit className="h-4 w-4" />
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
                                     onClick={() => clearUUID(user.UserID)}
                                     disabled={clearingUUID}
-                                    className="rounded-lg border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                                    variant="outline"
+                                    size="icon-sm"
                                     title={t.users.clearUUID}
                                     aria-label={t.users.clearUUID}
                                   >
                                     <RefreshCw className={`h-4 w-4 ${clearingUUID ? 'animate-spin' : ''}`} />
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
                                     onClick={() => deleteUser(user)}
-                                    className="rounded-lg border border-red-200 bg-white p-2 text-red-600 hover:bg-red-50 transition-colors"
+                                    variant="destructive-outline"
+                                    size="icon-sm"
                                     title={t.dashboard.delete}
                                     aria-label={t.dashboard.delete}
                                   >
                                     <Trash2 className="h-4 w-4" />
-                                  </button>
+                                  </Button>
                                 </div>
                               )}
                             </td>
@@ -682,29 +699,33 @@ export default function UsersPage() {
                             </option>
                           ))}
                         </select>
-                        <button
+                        <Button
                           type="button"
                           onClick={() => setPage(Math.max(1, currentPage - 1))}
                           disabled={currentPage <= 1 || refreshing}
                           aria-label={t.common.previous}
                           title={t.common.previous}
-                          className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                          variant="outline"
+                          size="icon-sm"
+                          className="disabled:opacity-40"
                         >
                           <ChevronLeft className="h-4 w-4" />
-                        </button>
+                        </Button>
                         <span className="min-w-[64px] text-center text-sm font-semibold text-gray-800">
                           {currentPage} / {totalPageCount}
                         </span>
-                        <button
+                        <Button
                           type="button"
                           onClick={() => setPage(Math.min(totalPageCount, currentPage + 1))}
                           disabled={currentPage >= totalPageCount || refreshing}
                           aria-label={t.common.next}
                           title={t.common.next}
-                          className="rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                          variant="outline"
+                          size="icon-sm"
+                          className="disabled:opacity-40"
                         >
                           <ChevronRight className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -728,13 +749,15 @@ export default function UsersPage() {
               <div className="relative bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-lg sm:text-xl font-bold text-gray-900">{t.users.editUser}</h3>
-                  <button
+                  <Button
                     onClick={cancelEditing}
-                    className="rounded-xl border border-gray-200 bg-white p-2 text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors"
+                    variant="outline"
+                    size="icon"
+                    className="hover:border-gray-200 hover:text-gray-800"
                     aria-label={t.users.cancel}
                   >
                     <X className="h-5 w-5" />
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="space-y-5">
@@ -775,16 +798,20 @@ export default function UsersPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 mt-6">
-                  <button
+                  <Button
                     onClick={cancelEditing}
-                    className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-white/50 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                    variant="outline"
+                    size="lg"
+                    className="bg-white/50 font-semibold text-gray-600"
                   >
                     {t.users.cancel}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={saveUser}
                     disabled={saving || !editForm.Username.trim()}
-                    className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 rounded-xl hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-lg"
+                    variant="primary"
+                    size="lg"
+                    className="gap-0"
                   >
                     {saving ? (
                       <>
@@ -797,7 +824,7 @@ export default function UsersPage() {
                         {t.users.save}
                       </>
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -809,13 +836,15 @@ export default function UsersPage() {
               <div className="relative bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-2xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-lg sm:text-xl font-bold text-gray-900">{t.users.createNewUser}</h3>
-                  <button
+                  <Button
                     onClick={() => setShowCreateForm(false)}
-                    className="rounded-xl border border-gray-200 bg-white p-2 text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors"
+                    variant="outline"
+                    size="icon"
+                    className="hover:border-gray-200 hover:text-gray-800"
                     aria-label={t.users.cancel}
                   >
                     <X className="h-5 w-5" />
-                  </button>
+                  </Button>
                 </div>
 
                 <form onSubmit={handleCreateUser} className="space-y-5">
@@ -882,17 +911,21 @@ export default function UsersPage() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 mt-6">
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setShowCreateForm(false)}
-                      className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-white/50 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                      variant="outline"
+                      size="lg"
+                      className="bg-white/50 font-semibold text-gray-600"
                     >
                       {t.users.cancel}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="submit"
                       disabled={createLoading || !createForm.username || !createForm.password}
-                      className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 rounded-xl hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-lg"
+                      variant="primary"
+                      size="lg"
+                      className="gap-0"
                     >
                       {createLoading ? (
                         <>
@@ -905,7 +938,7 @@ export default function UsersPage() {
                           {t.users.create}
                         </>
                       )}
-                    </button>
+                    </Button>
                   </div>
                 </form>
               </div>

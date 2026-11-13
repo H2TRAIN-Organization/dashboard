@@ -1,6 +1,7 @@
 'use client'
 import { ShieldCheck } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
+import { Button } from '@/components/ui/button'
 import { privacyPolicy, PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
 
 /** Único correo de contacto para privacidad/GDPR en todo el dashboard. */
@@ -25,19 +26,21 @@ export default function PrivacyNotice() {
         </div>
         <div className="flex gap-2" aria-label="Language / Idioma">
           {LANGUAGES.map(({ code, label }) => (
-            <button
+            <Button
               key={code}
               type="button"
               aria-pressed={language === code}
               onClick={() => setLanguage(code)}
+              variant={language === code ? 'default' : 'secondary'}
+              size="sm"
               className={
                 language === code
-                  ? 'rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-1.5 text-sm font-semibold text-white shadow-md'
-                  : 'rounded-lg border border-blue-200 bg-white/80 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors'
+                  ? 'font-semibold text-sm shadow-md hover:bg-blue-600'
+                  : 'bg-white/80 font-semibold text-sm hover:border-blue-200 hover:bg-blue-50'
               }
             >
               {label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

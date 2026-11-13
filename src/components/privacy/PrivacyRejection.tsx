@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation'
 import { AlertTriangle, ShieldAlert } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useSession } from '@/contexts/SessionContext'
+import { Button } from '@/components/ui/button'
 import { PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
 import {
   classifyPrivacyDecisionFailure,
@@ -85,15 +86,17 @@ export default function PrivacyRejection() {
 
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={openModal}
         aria-haspopup="dialog"
-        className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-600 px-4 py-2 font-semibold text-white shadow-md transition hover:bg-red-700"
+        variant="destructive"
+        size="lg"
+        className="border-red-300"
       >
         <ShieldAlert className="h-4 w-4" aria-hidden="true" />
         {text.rejectButton}
-      </button>
+      </Button>
 
       {confirmOpen && (
         <div
@@ -129,22 +132,25 @@ export default function PrivacyRejection() {
             )}
 
             <div className="mt-6 flex flex-wrap gap-3">
-              <button
+              <Button
                 type="button"
                 onClick={() => void confirmRejection()}
                 disabled={busy}
-                className="rounded-xl bg-red-600 px-4 py-2.5 font-semibold text-white shadow-lg transition hover:bg-red-700 disabled:opacity-50"
+                variant="destructive"
+                size="lg"
               >
                 {text.confirm}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => setConfirmOpen(false)}
                 disabled={busy}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                variant="outline"
+                size="lg"
+                className="font-semibold hover:border-gray-300 hover:bg-slate-100"
               >
                 {text.cancel}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

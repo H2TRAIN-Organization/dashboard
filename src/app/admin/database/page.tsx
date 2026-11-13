@@ -10,8 +10,8 @@ import { databaseApi, saveDatabaseDownload, type DatabaseStats, type DatabasePag
 import { databaseDictionary } from '@/lib/admin-database-dictionary'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
+import { Button, buttonVariants } from '@/components/ui/button'
 
-const button = 'rounded-xl bg-blue-700 px-4 py-3 font-semibold text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:cursor-wait disabled:opacity-50'
 const input = 'min-w-0 rounded-lg border border-slate-300 bg-white p-3 text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-700'
 const panel = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7'
 
@@ -81,10 +81,10 @@ export default function AdminDatabasePage() {
       <main className="mx-auto max-w-7xl space-y-7 px-4 py-8 sm:px-6">
         <header><h1 className="flex items-center gap-3 text-3xl font-bold"><Database aria-hidden="true" />{text.title}</h1><p className="mt-3 text-slate-600">{text.description}</p></header>
         <nav aria-label={text.title} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <a className={button} href="#explorer"><Table className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.explorer}</a>
-          <a className={button} href="#exports"><Download className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.exports}</a>
-          <a className={button} href="#logical-copy"><Database className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.copy}</a>
-          <button className={button} disabled={statsLoading} onClick={() => void refreshStats()}><RefreshCw className="mr-2 inline h-5 w-5" aria-hidden="true" />{statsLoading ? text.loading : text.refresh}</button>
+          <a className={buttonVariants({ variant: 'default', size: 'lg', className: 'gap-0' })} href="#explorer"><Table className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.explorer}</a>
+          <a className={buttonVariants({ variant: 'default', size: 'lg', className: 'gap-0' })} href="#exports"><Download className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.exports}</a>
+          <a className={buttonVariants({ variant: 'default', size: 'lg', className: 'gap-0' })} href="#logical-copy"><Database className="mr-2 inline h-5 w-5" aria-hidden="true" />{text.copy}</a>
+          <Button variant="default" size="lg" className="gap-0 font-semibold" disabled={statsLoading} onClick={() => void refreshStats()}><RefreshCw className="mr-2 inline h-5 w-5" aria-hidden="true" />{statsLoading ? text.loading : text.refresh}</Button>
         </nav>
         <section className={panel} aria-busy={statsLoading} aria-label={text.refresh}>
           <p role="status" className="font-semibold">{statsLoading ? text.loading : statsError ? text.failedAttempt : status}</p>
@@ -100,16 +100,16 @@ export default function AdminDatabasePage() {
           <form className="my-5 flex flex-wrap items-end gap-4" onSubmit={event => { event.preventDefault(); void browse() }}>
             <label className="grid gap-2">{text.table}<select className={input} value={table} disabled={pageLoading || action !== null} onChange={event => { setTable(event.target.value); setPage(null) }}>{(stats?.tables ?? [{ name: 'users', accessible: true }]).map(item => <option key={item.name} value={item.name} disabled={!item.accessible}>{item.name}</option>)}</select></label>
             <label className="grid gap-2">{text.pageSize}<select className={input} value={pageSize} disabled={pageLoading} onChange={event => { setPageSize(Number(event.target.value)); setPage(null) }}>{[25, 50, 100, 250].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
-            <button className={button} disabled={pageLoading} type="submit">{pageLoading ? text.loading : text.browse}</button>
+            <Button variant="default" size="lg" className="font-semibold" disabled={pageLoading} type="submit">{pageLoading ? text.loading : text.browse}</Button>
           </form>
           {page && <>
             <p className="mb-3" role="status">{text.showing} {page.data.length === 0 ? 0 : page.offset + 1}–{page.offset + page.returnedRecords} {text.of} {page.totalRecords.toLocaleString(locale)}</p>
             {page.data.length === 0 ? <p>{text.empty}</p> : <div className="max-h-[32rem] overflow-auto rounded-lg border border-slate-200" tabIndex={0} role="region" aria-label={`${text.table}: ${page.tableName}`}><table className="w-full border-collapse text-left text-sm"><thead className="sticky top-0 bg-slate-100"><tr>{columns.map(column => <th key={column} scope="col" className="whitespace-nowrap border-b p-3">{column}</th>)}</tr></thead><tbody>{page.data.map((row, index) => <tr key={String(row.UserID ?? row.id ?? index)} className="odd:bg-slate-50">{columns.map(column => <td key={column} className="max-w-xs break-words border-b p-3">{row[column] == null ? '—' : typeof row[column] === 'object' ? JSON.stringify(row[column]) : String(row[column])}</td>)}</tr>)}</tbody></table></div>}
-            <div className="mt-4 flex flex-wrap gap-3"><button className={button} disabled={pageLoading || page.offset === 0} onClick={() => void browse(Math.max(0, page.offset - pageSize))}>{text.previous}</button><button className={button} disabled={pageLoading || !page.hasMore} onClick={() => void browse(page.offset + page.returnedRecords)}>{text.next}</button></div>
+            <div className="mt-4 flex flex-wrap gap-3"><Button variant="default" size="lg" className="font-semibold" disabled={pageLoading || page.offset === 0} onClick={() => void browse(Math.max(0, page.offset - pageSize))}>{text.previous}</Button><Button variant="default" size="lg" className="font-semibold" disabled={pageLoading || !page.hasMore} onClick={() => void browse(page.offset + page.returnedRecords)}>{text.next}</Button></div>
           </>}
         </section>
-        <section id="exports" className={panel}><h2 className="text-2xl font-bold">{text.exports}</h2><p className="my-3 text-slate-600">{text.exportDescription}</p><p className="mb-4">{text.table}: <strong>{table}</strong></p><div className="flex flex-wrap gap-3"><button className={button} disabled={action !== null} onClick={() => void exportTable('csv')}>CSV</button><button className={button} disabled={action !== null} onClick={() => void exportTable('json')}>JSON</button></div></section>
-        <section id="logical-copy" className={panel}><h2 className="text-2xl font-bold">{text.copy}</h2><p className="mt-3 text-slate-600">{text.copyDescription}</p><p className="mt-3 text-slate-600">{text.recovery}</p><form onSubmit={event => void copy(event)} className="mt-5 grid max-w-lg gap-4"><label className="grid gap-2">{text.password}<input className={input} type="password" autoComplete="new-password" required minLength={12} maxLength={1024} value={password} onChange={event => setPassword(event.target.value)} disabled={action !== null} /></label><label className="grid gap-2">{text.confirm}<input className={input} type="password" autoComplete="new-password" required minLength={12} maxLength={1024} value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={action !== null} /></label><button type="submit" className={button} disabled={action !== null}>{action === 'copy' ? text.busy : text.downloadCopy}</button></form></section>
+        <section id="exports" className={panel}><h2 className="text-2xl font-bold">{text.exports}</h2><p className="my-3 text-slate-600">{text.exportDescription}</p><p className="mb-4">{text.table}: <strong>{table}</strong></p><div className="flex flex-wrap gap-3"><Button variant="default" size="lg" className="font-semibold" disabled={action !== null} onClick={() => void exportTable('csv')}>CSV</Button><Button variant="default" size="lg" className="font-semibold" disabled={action !== null} onClick={() => void exportTable('json')}>JSON</Button></div></section>
+        <section id="logical-copy" className={panel}><h2 className="text-2xl font-bold">{text.copy}</h2><p className="mt-3 text-slate-600">{text.copyDescription}</p><p className="mt-3 text-slate-600">{text.recovery}</p><form onSubmit={event => void copy(event)} className="mt-5 grid max-w-lg gap-4"><label className="grid gap-2">{text.password}<input className={input} type="password" autoComplete="new-password" required minLength={12} maxLength={1024} value={password} onChange={event => setPassword(event.target.value)} disabled={action !== null} /></label><label className="grid gap-2">{text.confirm}<input className={input} type="password" autoComplete="new-password" required minLength={12} maxLength={1024} value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={action !== null} /></label><Button type="submit" variant="default" size="lg" className="font-semibold" disabled={action !== null}>{action === 'copy' ? text.busy : text.downloadCopy}</Button></form></section>
       </main>
     </div>
   </HybridRoleGuard></HybridProtectedRoute>

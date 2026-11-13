@@ -7,6 +7,7 @@ import { Eye, EyeOff, Lock, LogIn, Mail, Shield, User } from 'lucide-react'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { useSession } from '@/contexts/SessionContext'
 import { ApiError, errorFrom } from '@/lib/api-client'
+import { Button } from '@/components/ui/button'
 import {
   buildLoginIdentityAttempts,
   toLoginInput,
@@ -199,6 +200,9 @@ export default function LoginPage() {
                     className="block w-full rounded-xl border border-gray-200 bg-white/50 py-4 pl-12 pr-14 text-gray-900 placeholder-gray-500 transition-all duration-200 hover:bg-white/70 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     placeholder="••••••••"
                   />
+                  {/* MT57: este botón es un adorno del input (estirado con
+                      inset-y-0); la primitiva normalizaría altura e icono, así
+                      que se mantiene como <button> nativo. */}
                   <button
                     type="button"
                     onClick={() => setShowPassword((visible) => !visible)}
@@ -214,10 +218,12 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <button
+              <Button
                 type="submit"
                 disabled={submitting}
-                className="w-full transform rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-6 py-4 text-lg font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-700 hover:shadow-xl focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                variant="primary"
+                size="xl"
+                className="w-full duration-300 hover:-translate-y-0.5"
               >
                 {submitting ? (
                   <span className="flex items-center justify-center">
@@ -230,7 +236,7 @@ export default function LoginPage() {
                     {t.auth.signIn}
                   </span>
                 )}
-              </button>
+              </Button>
             </form>
           </div>
         </div>
