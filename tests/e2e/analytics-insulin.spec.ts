@@ -120,7 +120,7 @@ test('the mood distribution is an ordinal bar chart across the full 0-10 scale',
   // Since T04 the mood distribution is an ordinal bar chart, not a pie: the
   // axis shows every level 0..10 (zeros included) and each level is a bar.
   const moodCard = page.locator('div', { has: page.getByRole('heading', { name: 'Distribución de Estado de Ánimo' }) }).last();
-  const ticks = moodCard.locator('.recharts-xAxis .recharts-cartesian-axis-tick-value');
+  const ticks = moodCard.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value');
   await expect(ticks).toHaveCount(11);
   await expect(ticks.first()).toHaveText('0');
   await expect(ticks.nth(8)).toHaveText('8');

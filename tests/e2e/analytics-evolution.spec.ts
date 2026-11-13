@@ -100,7 +100,7 @@ test('evolution charts keep the per-day axis with real date labels', async ({ pa
   await page.goto('/analytics');
 
   const insulinCard = page.locator('div', { has: page.getByRole('heading', { name: 'Evolución de Registros de Insulina' }) }).last();
-  const ticks = insulinCard.locator('.recharts-xAxis .recharts-cartesian-axis-tick-value');
+  const ticks = insulinCard.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value');
   await expect(ticks).toHaveCount(3);
   await expect(ticks.first()).toContainText(/1/);
   await expect(ticks.nth(1)).toContainText(/2/);
@@ -114,7 +114,7 @@ test('daily injections bars are positioned on the date axis', async ({ page }) =
   // Same root cause as the evolution charts: the daily bar chart reads the
   // `date` axis key from rows that must provide it.
   const injectionsCard = page.locator('div', { has: page.getByRole('heading', { name: 'Inyecciones por Día' }) }).last();
-  const ticks = injectionsCard.locator('.recharts-xAxis .recharts-cartesian-axis-tick-value');
+  const ticks = injectionsCard.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value');
   await expect(ticks).toHaveCount(3);
 
   const bars = injectionsCard.locator('.recharts-bar-rectangle path');
