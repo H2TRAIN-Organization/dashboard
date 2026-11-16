@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from '@/contexts/SessionContext'
@@ -25,6 +25,22 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
   const { view: kubiosView } = useKubiosMe()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // Encabezado fijo: la altura real (móvil y escritorio) se publica en la
+  // variable CSS --app-header-h y el flujo normal reserva ese espacio, de modo
+  // que solo el contenido se desplaza al hacer scroll.
+  const headerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const header = headerRef.current
+    if (!header) return
+    const root = document.documentElement
+    const apply = () =>
+      root.style.setProperty('--app-header-h', `${header.offsetHeight}px`)
+    apply()
+    const observer = new ResizeObserver(apply)
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [])
 
   const handleSignOut = async () => {
     await logout()
@@ -77,7 +93,11 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
   )
 
   return (
-    <div className="relative bg-gradient-to-r from-blue-600/95 via-blue-700/95 to-blue-800/95 backdrop-blur-xl border-b border-blue-200/30 z-50">
+    <>
+      <div
+        ref={headerRef}
+        className="fixed inset-x-0 top-0 z-50 bg-gradient-to-r from-blue-600/95 via-blue-700/95 to-blue-800/95 backdrop-blur-xl border-b border-blue-200/30"
+      >
       {/* Efectos de fondo */}
       <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-blue-600/10 to-blue-700/10"></div>
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%230066CC%22%20fill-opacity%3D%220.1%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%221%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-30"></div>
@@ -261,6 +281,8 @@ export default function Navigation({ title, showBackButton = true }: NavigationP
           </div>
         </div>
       </div>
-    </div>
+      </div>
+      <div aria-hidden="true" style={{ height: 'var(--app-header-h, 0px)' }} />
+    </>
   )
 }
