@@ -37,19 +37,26 @@ function compareFilterValue(value: unknown, expected: string): number | null {
 
 function matches(row: FakeRow, filter: PersistenceFilter): boolean {
   const value = row[filter.column];
-  const compared =
-    filter.kind === "eq" || filter.kind === "ilike" || filter.kind === "is"
-      ? null
-      : compareFilterValue(value, filter.value);
   switch (filter.kind) {
     case "eq":
       return value === filter.value;
-    case "gte":
+    case "in":
+      return (
+        typeof value === "string" &&
+        filter.values.some((candidate) => candidate === value)
+      );
+    case "gte": {
+      const compared = compareFilterValue(value, filter.value);
       return compared !== null && compared >= 0;
-    case "lt":
+    }
+    case "lt": {
+      const compared = compareFilterValue(value, filter.value);
       return compared !== null && compared < 0;
-    case "lte":
+    }
+    case "lte": {
+      const compared = compareFilterValue(value, filter.value);
       return compared !== null && compared <= 0;
+    }
     case "ilike": {
       if (typeof value !== "string") {
         return false;

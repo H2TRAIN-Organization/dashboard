@@ -21,6 +21,7 @@ interface PostgrestResponse {
  */
 interface QueryBuilder extends PromiseLike<PostgrestResponse> {
   eq(column: string, value: unknown): QueryBuilder;
+  in(column: string, values: readonly unknown[]): QueryBuilder;
   gte(column: string, value: unknown): QueryBuilder;
   lt(column: string, value: unknown): QueryBuilder;
   lte(column: string, value: unknown): QueryBuilder;
@@ -54,6 +55,8 @@ function applyFilter(builder: QueryBuilder, filter: PersistenceFilter): QueryBui
   switch (filter.kind) {
     case "eq":
       return builder.eq(filter.column, filter.value);
+    case "in":
+      return builder.in(filter.column, filter.values);
     case "gte":
       return builder.gte(filter.column, filter.value);
     case "lt":

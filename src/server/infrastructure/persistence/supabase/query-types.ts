@@ -1,5 +1,6 @@
 export type PersistenceFilter =
   | { readonly kind: "eq"; readonly column: string; readonly value: string | number | boolean }
+  | { readonly kind: "in"; readonly column: string; readonly values: readonly string[] }
   | { readonly kind: "gte"; readonly column: string; readonly value: string }
   | { readonly kind: "lt"; readonly column: string; readonly value: string }
   | { readonly kind: "lte"; readonly column: string; readonly value: string }
