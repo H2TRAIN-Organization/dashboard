@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useOptionalLanguage } from '@/contexts/LanguageContext'
+import { formatEuropeanFullDate } from '@/lib/date-format'
 import {
   addDays,
   addMonthsClamped,
@@ -105,10 +106,6 @@ export default function Calendar({
   const monthLabel = capitalizeFirst(
     new Intl.DateTimeFormat(locale, { month: 'long' }).format(month),
     locale,
-  )
-  const fullDateFormatter = useMemo(
-    () => new Intl.DateTimeFormat(locale, { dateStyle: 'full' }),
-    [locale],
   )
   const days = useMemo(() => buildCalendarDays(month), [month])
   const weeks = useMemo(
@@ -274,7 +271,7 @@ export default function Calendar({
                     type="button"
                     data-date={value}
                     data-outside={isOutside ? 'true' : undefined}
-                    aria-label={fullDateFormatter.format(date)}
+                    aria-label={formatEuropeanFullDate(date, locale)}
                     aria-current={isTodayDay ? 'date' : undefined}
                     aria-pressed={isSelected}
                     disabled={isDisabled}

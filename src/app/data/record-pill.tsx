@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useOptionalLanguage } from '@/contexts/LanguageContext'
+import { formatEuropeanDate } from '@/lib/date-format'
 
 export type HealthRecordType =
   | 'insulin'
@@ -163,17 +164,17 @@ function recordDate(record: HealthRecord): string {
 export function RecordPill({
   record,
   type,
-  locale,
   t,
 }: {
   record: HealthRecord
   type: HealthRecordType
-  locale: string
+  /** Kept for call-site compatibility; dates render day-first in every language. */
+  locale?: string
   t: DashboardTranslations
 }) {
   const meta = RECORD_TYPE_META[type]
   const { Icon } = meta
-  const dateText = new Date(recordDate(record)).toLocaleDateString(locale)
+  const dateText = formatEuropeanDate(recordDate(record))
   const details = recordDetails(record, type, t)
 
   return (

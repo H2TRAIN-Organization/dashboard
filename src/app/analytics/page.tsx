@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
+import { formatEuropeanDate, formatEuropeanShortDay } from '@/lib/date-format'
 import { TrendingUp, Activity, Heart, Calendar, User as UserIcon, Filter, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, LineChart as LineChartIcon, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -145,7 +146,7 @@ export default function AnalyticsPage() {
   // localizadas se generan al final. Los registros con fecha inválida se
   // omiten.
   const dayLabelOf = (ms: number): string =>
-    new Date(ms).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+    formatEuropeanShortDay(ms, locale)
   const timeOf = (value: string): number => new Date(String(value)).getTime()
 
   const insulinByDate = countByDate(insulinData, (row) => timeOf(row.date_time), dayLabelOf)
@@ -473,7 +474,7 @@ export default function AnalyticsPage() {
                 iconGradient="from-red-500 to-red-600"
                 accent="text-red-600"
                 title={t.dashboard.lastActivity}
-                value={new Date(stats.lastActivity).toLocaleDateString(locale)}
+                value={formatEuropeanDate(stats.lastActivity)}
                 description={t.analytics.mostRecentDate}
               />
             )}

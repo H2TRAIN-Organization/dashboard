@@ -5,6 +5,8 @@
  * testearse sin renderizar Recharts.
  */
 
+import { formatEuropeanShortDay, formatEuropeanDateTime } from './date-format'
+
 export interface HrvChartRow {
   /** Milisegundo de la medición (clave cronológica). */
   time: number
@@ -48,11 +50,8 @@ export function buildHrvChartRows(
 ): HrvChartRow[] {
   const rows = inputs.map(({ time, metrics }) => ({
     time,
-    date: new Date(time).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
-    dateLong: new Date(time).toLocaleString(locale, {
-      dateStyle: 'long',
-      timeStyle: 'short',
-    }),
+    date: formatEuropeanShortDay(time, locale),
+    dateLong: formatEuropeanDateTime(time),
     readiness: numericMetric(metrics, 'readiness'),
     rmssd: numericMetric(metrics, 'rmssd_ms'),
     pnsIndex: numericMetric(metrics, 'pns_index'),

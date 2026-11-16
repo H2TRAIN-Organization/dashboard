@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
+import { formatEuropeanDate } from '@/lib/date-format'
 import { Download, Activity, Calendar, Filter, Clock, Pill, Utensils, Dumbbell, CalendarDays, Smile, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ChevronFirst, ChevronLast, Database, Trash2, type LucideIcon } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
@@ -769,7 +770,7 @@ export default function DataPage() {
                             <p className="text-xs sm:text-sm text-blue-600">{t.dashboard.lastActivity}</p>
                             <p className="text-xs sm:text-sm font-medium text-blue-900">
                               {group.stats.lastActivity ? 
-                                new Date(group.stats.lastActivity).toLocaleDateString(locale) :
+                                formatEuropeanDate(group.stats.lastActivity) :
                                 t.common.notAvailable
                               }
                             </p>
