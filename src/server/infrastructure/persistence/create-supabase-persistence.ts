@@ -3,6 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdminDatabaseRepository } from "@/server/application/ports/admin-database-repository";
 import type { HealthDataRepository } from "@/server/application/ports/health-data-repository";
 import type {
+  HealthRecordKeyResolver,
+} from "@/server/application/ports/health-record-key-resolver";
+import type {
   UserDataPresence,
   UserRepository,
 } from "@/server/application/ports/user-repository";
@@ -30,12 +33,14 @@ import {
   SupabaseUserRepository,
 } from "./user/supabase-user-repository";
 import type { PasswordHasher } from "./user/password-hasher";
+import { SupabaseHealthRecordKeyResolver } from "@/server/infrastructure/auth/health-record-key-resolver";
 
 export interface SupabasePersistence {
   readonly client: SupabaseClient;
   readonly users: UserRepository;
   readonly userDataPresence: UserDataPresence;
   readonly healthData: HealthDataRepository;
+  readonly healthRecordKeys: HealthRecordKeyResolver;
   readonly adminDatabase: AdminDatabaseRepository;
   readonly credentials: UserCredentialsRepository;
   readonly decryptor: TextDecryptor;
@@ -75,6 +80,10 @@ export function createPersistenceWithClient(
     userDataPresence: new SupabaseUserDataPresence(gateway),
     healthData: new SupabaseHealthDataRepository(gateway, decryptor, {
       pageSize: options.pageSize,
+    }),
+    healthRecordKeys: new SupabaseHealthRecordKeyResolver({
+      client: options.client,
+      users: gateway,
     }),
     adminDatabase: new SupabaseAdminDatabaseRepository(gateway, decryptor),
     credentials: new SupabaseUserCredentialsRepository(

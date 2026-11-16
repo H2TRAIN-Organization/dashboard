@@ -57,7 +57,7 @@ export interface HealthDataRepositoryOptions {
 }
 
 interface TableQuery {
-  readonly selectedUser: string | null;
+  readonly recordKeys: readonly string[];
   readonly from: string | null;
   readonly to: string;
 }
@@ -118,7 +118,7 @@ export class SupabaseHealthDataRepository implements HealthDataRepository {
 
   async getLegacyData(query: LegacyDataQuery): Promise<LegacyData> {
     const tableQuery: TableQuery = {
-      selectedUser: query.selectedUser,
+      recordKeys: query.recordKeys,
       from: query.from,
       to: query.to,
     };
@@ -163,8 +163,8 @@ export class SupabaseHealthDataRepository implements HealthDataRepository {
     toExclusive: boolean,
   ): Promise<readonly HealthRecord[]> {
     const filters: PersistenceFilter[] = [];
-    if (query.selectedUser !== null) {
-      filters.push({ kind: "eq", column: "username", value: query.selectedUser });
+    if (query.recordKeys.length > 0) {
+      filters.push({ kind: "in", column: "username", values: query.recordKeys });
     }
     if (query.from !== null && query.from.length > 0) {
       filters.push({ kind: "gte", column: DATE_COLUMN[table], value: query.from });

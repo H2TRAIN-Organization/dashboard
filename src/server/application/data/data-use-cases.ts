@@ -11,6 +11,11 @@ import {
 import type { ActiveActor } from "@/server/domain/user";
 import type { Clock } from "../ports/clock";
 import type { HealthDataRepository } from "../ports/health-data-repository";
+import type {
+  HealthRecordKeyResolver,
+  RecordKeyQuery,
+} from "../ports/health-record-key-resolver";
+import { createCanonicalRecordKeyResolver } from "../ports/health-record-key-resolver";
 
 export interface LegacyQuery {
   readonly type: LegacyDataType;
@@ -50,7 +55,7 @@ function parseUtcDay(day: string): Date {
 
 function resolveDataQuery(
   query: DataQuery,
-  selectedUser: string | null,
+  recordKeys: readonly string[],
   now: Date,
 ): ResolvedDataQuery {
   const days = daysForTimeRange(query.timeRange);
@@ -72,7 +77,7 @@ function resolveDataQuery(
 
     return {
       ...query,
-      selectedUser,
+      recordKeys,
       dateFilter: query.dateFilter,
       from: query.dateFrom === null ? null : parseUtcDay(query.dateFrom).toISOString(),
       to:
@@ -98,7 +103,7 @@ function resolveDataQuery(
 
   return {
     ...query,
-    selectedUser,
+    recordKeys,
     // Keep the caller's calendar day for traceability; repositories use
     // from/to exclusively for the window.
     dateFilter: query.dateFilter,
@@ -110,25 +115,52 @@ function resolveDataQuery(
 export function createDataUseCases(
   repository: HealthDataRepository,
   clock: Clock,
+  recordKeys: HealthRecordKeyResolver = createCanonicalRecordKeyResolver(),
 ): DataUseCases {
+  /**
+   * Server-side normalization is the security boundary. A regular user is
+   * always scoped to the record keys resolved for their own account, even when
+   * that username is the legacy value "all" and even when the client sends a
+   * different selectedUser. Resolution never trusts HTTP input for regular
+   * users. Only privileged roles may turn the HTTP "all" UI sentinel into an
+   * empty key set (global repository query) or select another user by literal
+   * username.
+   */
+  async function resolveKeys(query: RecordKeyQuery): Promise<readonly string[]> {
+    return recordKeys.resolve(query);
+  }
+
+  function emptyKeys(): readonly string[] {
+    return [];
+  }
+
   return {
     async getDecryptedData(
       actor: ActiveActor,
       query: DataQuery,
     ): Promise<DecryptedData> {
       // Server-side normalization is the security boundary. Any actor without
-      // the `health-data:read:all` capability is always scoped to their literal
-      // username, even when that username is the legacy value "all". Only
-      // privileged roles may turn the HTTP "all" UI sentinel into a null
-      // (global) repository query.
-      const selectedUser = canReadAllHealthData(actor)
-        ? query.selectedUser === "all"
-          ? null
-          : query.selectedUser
-        : actor.username;
+      // the `health-data:read:all` capability is always scoped to the record
+      // keys resolved for their own account, even when that username is the
+      // legacy value "all". Only privileged roles may turn the HTTP "all" UI
+      // sentinel into an empty key set (global repository query) or select
+      // another account by literal username.
+      if (canReadAllHealthData(actor)) {
+        const keys =
+          query.selectedUser === "all"
+            ? emptyKeys()
+            : await resolveKeys({ username: query.selectedUser });
+        return repository.getDecryptedData(
+          resolveDataQuery(query, keys, clock.now()),
+        );
+      }
 
+      const keys = await resolveKeys({
+        username: actor.username,
+        userId: actor.userId,
+      });
       return repository.getDecryptedData(
-        resolveDataQuery(query, selectedUser, clock.now()),
+        resolveDataQuery(query, keys, clock.now()),
       );
     },
 
@@ -142,10 +174,17 @@ export function createDataUseCases(
         now.getTime() - query.rangeDays * 24 * 60 * 60 * 1000,
       ).toISOString();
 
+      const keys = canReadAllHealthData(actor)
+        ? emptyKeys()
+        : await resolveKeys({
+            username: actor.username,
+            userId: actor.userId,
+          });
+
       return repository.getLegacyData({
         type: query.type,
         rangeDays: query.rangeDays,
-        selectedUser: canReadAllHealthData(actor) ? null : actor.username,
+        recordKeys: keys,
         from,
         to: now.toISOString(),
       });

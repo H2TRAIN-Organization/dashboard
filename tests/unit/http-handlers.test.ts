@@ -301,14 +301,14 @@ describe("HTTP data and admin handlers", () => {
       query: { selectedUser: "all" },
     });
     expect(decrypted.status).toBe(200);
-    expect(dataRepository.lastDecryptedQuery?.selectedUser).toBe("all");
+    expect(dataRepository.lastDecryptedQuery?.recordKeys).toEqual(["all"]);
 
     const legacy = await api.data.legacy({
       sessionToken: "all-token",
       query: { type: "all", range: "30" },
     });
     expect(legacy.status).toBe(200);
-    expect(dataRepository.lastLegacyQuery?.selectedUser).toBe("all");
+    expect(dataRepository.lastLegacyQuery?.recordKeys).toEqual(["all"]);
   });
 
   it("accepts an explicit from-to range and rejects an inverted one (T13)", async () => {

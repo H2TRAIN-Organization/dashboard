@@ -12,6 +12,11 @@ export type { AuthGateway } from "./ports/auth-gateway";
 export type { AdminDatabaseRepository } from "./ports/admin-database-repository";
 export type { HealthDataRepository } from "./ports/health-data-repository";
 export type {
+  HealthRecordKeyResolver,
+  RecordKeyQuery,
+} from "./ports/health-record-key-resolver";
+export { createCanonicalRecordKeyResolver } from "./ports/health-record-key-resolver";
+export type {
   CreateUserRecord,
   UserDataPresence,
   UserRepository,

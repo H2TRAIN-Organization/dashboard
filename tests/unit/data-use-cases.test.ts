@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createDataUseCases } from "@/server/application/data/data-use-cases";
+import { createCanonicalRecordKeyResolver } from "@/server/application/ports/health-record-key-resolver";
+import type {
+  HealthRecordKeyResolver,
+  RecordKeyQuery,
+} from "@/server/application/ports/health-record-key-resolver";
 import { InMemoryHealthDataRepository } from "@/server/infrastructure/testing/in-memory-health-data-repository";
 import type { DecryptedData } from "@/server/domain/health-data";
 import { actorFor, makeUser } from "../helpers/fixtures";
@@ -28,14 +33,35 @@ const userNamedAllActor = actorFor(
   makeUser({ id: "user-all", username: "all", role: "user" }),
 );
 
-function setup() {
+function setup(resolver?: HealthRecordKeyResolver) {
   const repository = new InMemoryHealthDataRepository(data, {
     exercise: data.exerciseData,
     mood: data.moodData,
     insulin: data.insulinData,
     meal: data.foodData,
   });
-  return { repository, useCases: createDataUseCases(repository, clock) };
+  return {
+    repository,
+    useCases: createDataUseCases(
+      repository,
+      clock,
+      resolver ?? createCanonicalRecordKeyResolver(),
+    ),
+  };
+}
+
+/** Resolver double that always appends a fixed alias, with call recording. */
+function aliasResolver(alias: string): HealthRecordKeyResolver & {
+  calls: RecordKeyQuery[];
+} {
+  const calls: RecordKeyQuery[] = [];
+  return {
+    calls,
+    async resolve(query: RecordKeyQuery) {
+      calls.push(query);
+      return [query.username, alias];
+    },
+  };
 }
 
 describe("health data use cases", () => {
@@ -52,7 +78,7 @@ describe("health data use cases", () => {
     });
 
     expect(result.insulinData).toHaveLength(1);
-    expect(repository.lastDecryptedQuery?.selectedUser).toBeNull();
+    expect(repository.lastDecryptedQuery?.recordKeys).toEqual([]);
     expect(repository.lastDecryptedQuery?.from).toBe("2026-01-01T12:00:00.000Z");
     expect(repository.lastDecryptedQuery?.to).toBe(now.toISOString());
   });
@@ -138,8 +164,15 @@ describe("health data use cases", () => {
     expect(repository.lastDecryptedQuery?.to).toBe(now.toISOString());
   });
 
-  it("normalizes a regular user's selectedUser to their own literal username", async () => {
-    const { repository, useCases } = setup();
+  it("normalizes a regular user's scope to their resolved record keys", async () => {
+    const repository = new InMemoryHealthDataRepository(data, {
+      exercise: data.exerciseData,
+      mood: data.moodData,
+      insulin: data.insulinData,
+      meal: data.foodData,
+    });
+    const resolver = aliasResolver("auth_11111111-2222-4333-8444-555555555555");
+    const useCases = createDataUseCases(repository, clock, resolver);
     const base = {
       timeRange: "30d",
       selectedDataType: "all",
@@ -154,11 +187,18 @@ describe("health data use cases", () => {
         selectedUser,
       });
       expect(own.insulinData).toHaveLength(1);
-      expect(repository.lastDecryptedQuery?.selectedUser).toBe("alice");
+      expect(repository.lastDecryptedQuery?.recordKeys).toEqual([
+        "alice",
+        "auth_11111111-2222-4333-8444-555555555555",
+      ]);
+      expect(resolver.calls[resolver.calls.length - 1]).toEqual({
+        username: "alice",
+        userId: "user-1",
+      });
     }
   });
 
-  it("keeps the literal username all for users and reserves null for privileged all", async () => {
+  it("keeps the literal username all for users and reserves empty keys for privileged all", async () => {
     const { repository, useCases } = setup();
     const query = {
       selectedUser: "all",
@@ -170,16 +210,16 @@ describe("health data use cases", () => {
     } as const;
 
     await useCases.getDecryptedData(userNamedAllActor, query);
-    expect(repository.lastDecryptedQuery?.selectedUser).toBe("all");
+    expect(repository.lastDecryptedQuery?.recordKeys).toEqual(["all"]);
 
     await useCases.getDecryptedData(adminActor, query);
-    expect(repository.lastDecryptedQuery?.selectedUser).toBeNull();
+    expect(repository.lastDecryptedQuery?.recordKeys).toEqual([]);
 
     await useCases.getDecryptedData(doctorActor, {
       ...query,
       selectedUser: "alice",
     });
-    expect(repository.lastDecryptedQuery?.selectedUser).toBe("alice");
+    expect(repository.lastDecryptedQuery?.recordKeys).toEqual(["alice"]);
   });
 
   it("rejects invalid calendar days", async () => {
@@ -261,16 +301,16 @@ describe("health data use cases", () => {
     const { repository, useCases } = setup();
 
     await useCases.getLegacyData(userActor, { type: "all", rangeDays: 30 });
-    expect(repository.lastLegacyQuery?.selectedUser).toBe("alice");
+    expect(repository.lastLegacyQuery?.recordKeys).toEqual(["alice"]);
 
     await useCases.getLegacyData(userNamedAllActor, {
       type: "all",
       rangeDays: 30,
     });
-    expect(repository.lastLegacyQuery?.selectedUser).toBe("all");
+    expect(repository.lastLegacyQuery?.recordKeys).toEqual(["all"]);
 
     await useCases.getLegacyData(adminActor, { type: "all", rangeDays: 30 });
-    expect(repository.lastLegacyQuery?.selectedUser).toBeNull();
+    expect(repository.lastLegacyQuery?.recordKeys).toEqual([]);
     expect(repository.lastLegacyQuery?.from).toBe("2026-01-01T12:00:00.000Z");
   });
 

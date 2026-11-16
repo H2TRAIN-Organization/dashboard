@@ -58,10 +58,11 @@ export interface DataQuery {
 
 export interface ResolvedDataQuery extends Omit<DataQuery, "selectedUser"> {
   /**
-   * null means every user and is only produced for privileged roles. Any
-   * string is a literal username, including the legacy username "all".
+   * Every `username` value in the health tables that belongs to the requested
+   * account: the canonical users.Username plus any alias resolved server-side.
+   * Empty means every user and is only produced for privileged roles.
    */
-  readonly selectedUser: string | null;
+  readonly recordKeys: readonly string[];
   /** Inclusive lower bound, ISO-8601, or null for no lower bound. */
   readonly from: string | null;
   /** Exclusive upper bound, ISO-8601. Repositories must use `< to`. */
@@ -71,8 +72,12 @@ export interface ResolvedDataQuery extends Omit<DataQuery, "selectedUser"> {
 export interface LegacyDataQuery {
   readonly type: LegacyDataType;
   readonly rangeDays: number;
-  /** null means every user (only reachable by admin/doctor). */
-  readonly selectedUser: string | null;
+  /**
+   * Same contract as ResolvedDataQuery.recordKeys: server-resolved username
+   * values owned by the requested account. Empty means every user (only
+   * reachable by admin/doctor).
+   */
+  readonly recordKeys: readonly string[];
   /** Inclusive lower bound, ISO-8601. */
   readonly from: string;
   /** Inclusive upper bound, ISO-8601. */
@@ -92,4 +97,35 @@ export function daysForTimeRange(range: TimeRange): number | null {
     case "all":
       return null;
   }
+}
+
+/**
+ * Alias record keys. External producers (the mobile app) key health rows with
+ * `auth_<supabase-uid>` instead of the canonical users.Username. The dashboard
+ * never writes this format; it only resolves it server-side from verified
+ * Supabase Auth identities.
+ */
+export const AUTH_RECORD_KEY_PREFIX = "auth_";
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuidString(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
+export function buildAuthAliasRecordKey(authUserId: string): string {
+  return `${AUTH_RECORD_KEY_PREFIX}${authUserId}`;
+}
+
+/**
+ * True only for exact `auth_<uuid>` values. Never accept a user-supplied value
+ * through this parser: it is a helper for server-side resolution.
+ */
+export function parseAuthAliasRecordKey(value: string): string | null {
+  if (!value.startsWith(AUTH_RECORD_KEY_PREFIX)) {
+    return null;
+  }
+  const uuid = value.slice(AUTH_RECORD_KEY_PREFIX.length);
+  return isUuidString(uuid) ? uuid : null;
 }
