@@ -3,7 +3,7 @@ export { assertSafeTableName, assertTableLimit } from "./admin-database";
 export type { DatabaseTableInfo, DatabaseTablePage, DatabaseTablesResult } from "./admin-database";
 export { AppError, BadRequestError, ConflictError, ForbiddenError, isAppError, NotFoundError, NotImplementedError, ServiceUnavailableError, UnauthorizedError, ValidationError } from "./errors";
 export type { ErrorCode } from "./errors";
-export { DATA_TYPES, LEGACY_DATA_TYPES, TIME_RANGES, daysForTimeRange } from "./health-data";
+export { AUTH_RECORD_KEY_PREFIX, buildAuthAliasRecordKey, daysForTimeRange, DATA_TYPES, LEGACY_DATA_TYPES, TIME_RANGES, isUuidString, parseAuthAliasRecordKey } from "./health-data";
 export type { DataQuery, DataType, DecryptedData, HealthRecord, LegacyData, LegacyDataQuery, LegacyDataType, ResolvedDataQuery, TimeRange } from "./health-data";
 export { toActiveActor, toPublicSession, AUTH_METHODS } from "./session";
 export type { AuthMethod, PublicSession, Session } from "./session";
