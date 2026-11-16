@@ -6,6 +6,9 @@ import type { Clock } from "@/server/application/ports/clock";
 import { systemClock } from "@/server/application/ports/clock";
 import type { HealthDataRepository } from "@/server/application/ports/health-data-repository";
 import type {
+  HealthRecordKeyResolver,
+} from "@/server/application/ports/health-record-key-resolver";
+import type {
   UserDataPresence,
   UserRepository,
 } from "@/server/application/ports/user-repository";
@@ -25,6 +28,12 @@ export interface ServerDependencies {
   readonly users: UserRepository;
   readonly userDataPresence: UserDataPresence;
   readonly healthData: HealthDataRepository;
+  /**
+   * Optional health-record key resolver. When absent, records are scoped to the
+   * literal canonical username only (the pre-alias behavior). Production wiring
+   * always provides the Supabase resolver.
+   */
+  readonly healthRecordKeys?: HealthRecordKeyResolver;
   readonly adminDatabase: AdminDatabaseRepository;
   readonly clock?: Clock;
 }
@@ -46,7 +55,11 @@ export function composeServerApplication(
   const useCases = {
     auth: createAuthUseCases(dependencies.auth),
     users: createUserUseCases(dependencies.users, dependencies.userDataPresence),
-    data: createDataUseCases(dependencies.healthData, clock),
+    data: createDataUseCases(
+      dependencies.healthData,
+      clock,
+      dependencies.healthRecordKeys,
+    ),
     adminDatabase: createAdminDatabaseUseCases(dependencies.adminDatabase),
   };
 

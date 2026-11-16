@@ -96,6 +96,7 @@ export function createProductionServerRuntime(
       users: persistence.users,
       userDataPresence: persistence.userDataPresence,
       healthData: persistence.healthData,
+      healthRecordKeys: persistence.healthRecordKeys,
       adminDatabase: persistence.adminDatabase,
     });
   } catch (error) {
