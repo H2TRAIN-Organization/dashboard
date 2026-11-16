@@ -61,6 +61,9 @@ function aliasResolver(alias: string): HealthRecordKeyResolver & {
       calls.push(query);
       return [query.username, alias];
     },
+    async ownershipByRecordKey() {
+      return new Map([[alias, "alice"]]);
+    },
   };
 }
 

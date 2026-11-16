@@ -17,6 +17,31 @@ import type {
 } from "../ports/health-record-key-resolver";
 import { createCanonicalRecordKeyResolver } from "../ports/health-record-key-resolver";
 
+/**
+ * Relabels the `username` of returned records with the canonical
+ * users.Username of the owning account, so rows written by external producers
+ * under an alias (auth_<uid>) group together with the rest of the account.
+ * Unknown keys keep their own value; the database is never rewritten.
+ */
+function normalizeOwnership<T extends Record<string, unknown>>(
+  records: readonly T[],
+  ownership: ReadonlyMap<string, string>,
+): T[] {
+  if (ownership.size === 0) {
+    return [...records];
+  }
+  return records.map((record) => {
+    if (typeof record.username !== "string") {
+      return record;
+    }
+    const canonical = ownership.get(record.username);
+    if (canonical === undefined || canonical === record.username) {
+      return record;
+    }
+    return { ...record, username: canonical };
+  });
+}
+
 export interface LegacyQuery {
   readonly type: LegacyDataType;
   readonly rangeDays: number;
@@ -134,6 +159,20 @@ export function createDataUseCases(
     return [];
   }
 
+  async function ownership(): Promise<ReadonlyMap<string, string>> {
+    return recordKeys.ownershipByRecordKey();
+  }
+
+  function ownedDecrypted(data: DecryptedData, owners: ReadonlyMap<string, string>): DecryptedData {
+    return {
+      insulinData: normalizeOwnership(data.insulinData, owners),
+      foodData: normalizeOwnership(data.foodData, owners),
+      exerciseData: normalizeOwnership(data.exerciseData, owners),
+      periodData: normalizeOwnership(data.periodData, owners),
+      moodData: normalizeOwnership(data.moodData, owners),
+    };
+  }
+
   return {
     async getDecryptedData(
       actor: ActiveActor,
@@ -145,23 +184,26 @@ export function createDataUseCases(
       // legacy value "all". Only privileged roles may turn the HTTP "all" UI
       // sentinel into an empty key set (global repository query) or select
       // another account by literal username.
+      const owners = await ownership();
       if (canReadAllHealthData(actor)) {
         const keys =
           query.selectedUser === "all"
             ? emptyKeys()
             : await resolveKeys({ username: query.selectedUser });
-        return repository.getDecryptedData(
+        const data = await repository.getDecryptedData(
           resolveDataQuery(query, keys, clock.now()),
         );
+        return ownedDecrypted(data, owners);
       }
 
       const keys = await resolveKeys({
         username: actor.username,
         userId: actor.userId,
       });
-      return repository.getDecryptedData(
+      const data = await repository.getDecryptedData(
         resolveDataQuery(query, keys, clock.now()),
       );
+      return ownedDecrypted(data, owners);
     },
 
     async getLegacyData(actor: ActiveActor, query: LegacyQuery): Promise<LegacyData> {
@@ -181,13 +223,20 @@ export function createDataUseCases(
             userId: actor.userId,
           });
 
-      return repository.getLegacyData({
+      const owners = await ownership();
+      const legacy = await repository.getLegacyData({
         type: query.type,
         rangeDays: query.rangeDays,
         recordKeys: keys,
         from,
         to: now.toISOString(),
       });
+      return {
+        exercise: normalizeOwnership(legacy.exercise, owners),
+        mood: normalizeOwnership(legacy.mood, owners),
+        insulin: normalizeOwnership(legacy.insulin, owners),
+        meal: normalizeOwnership(legacy.meal, owners),
+      };
     },
   };
 }

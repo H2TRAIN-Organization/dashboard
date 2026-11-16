@@ -25,6 +25,14 @@ export interface HealthRecordKeyResolver {
    * returning a partial set that would silently hide rows.
    */
   resolve(query: RecordKeyQuery): Promise<readonly string[]>;
+
+  /**
+   * Maps every known record key (canonical username and alias) to the
+   * canonical `users.Username` of the owning account. Record keys absent from
+   * the map keep their own value. Implementations may return an empty map
+   * when no identity link is known.
+   */
+  ownershipByRecordKey(): Promise<ReadonlyMap<string, string>>;
 }
 
 /**
@@ -36,6 +44,9 @@ export function createCanonicalRecordKeyResolver(): HealthRecordKeyResolver {
   return {
     async resolve(query: RecordKeyQuery): Promise<readonly string[]> {
       return [query.username];
+    },
+    async ownershipByRecordKey(): Promise<ReadonlyMap<string, string>> {
+      return new Map();
     },
   };
 }

@@ -80,8 +80,7 @@ describe("live alias flow against real Supabase", () => {
       expect(
         summary.mood.some(
           (row) =>
-            row.id === 88 &&
-            row.username === "auth_d16ebc46-1c2f-4a9e-b5e1-4b2fa997cf99",
+            row.id === 88 && row.username === "javier.alayon@ulpgc.es",
         ),
       ).toBe(true);
     },

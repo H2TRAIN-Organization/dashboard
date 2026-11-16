@@ -166,12 +166,15 @@ describe("health data alias flow (mobile app auth_<uid> rows)", () => {
     });
 
     expect(data.moodData.map((row) => row.id).sort()).toEqual([61, 88]);
+    // Rows are relabeled with the canonical users.Username of the account, so
+    // the alias-written row groups with the rest instead of appearing under a
+    // separate auth_<uid> name.
     expect(data.moodData[0]).toMatchObject({
       username: JAVIER_EMAIL,
       mood_value: 5,
     });
     expect(data.moodData[1]).toMatchObject({
-      username: `auth_${JAVIER_AUTH_UID}`,
+      username: JAVIER_EMAIL,
       mood_value: 7,
       routine_description: "rutina cumplida",
     });
@@ -205,19 +208,7 @@ describe("health data alias flow (mobile app auth_<uid> rows)", () => {
   });
 
   it("queries PostgREST with one username in (…) filter per table", async () => {
-    const { gateway } = build();
-
-    await build().useCases.getDecryptedData(javierActor, {
-      selectedUser: "all",
-      timeRange: "all",
-      selectedDataType: "all",
-      dateFilter: null,
-      dateFrom: null,
-      dateTo: null,
-    });
-    void gateway;
-
-    const { gateway: freshGateway, useCases } = build();
+    const { gateway, useCases } = build();
     await useCases.getDecryptedData(javierActor, {
       selectedUser: "all",
       timeRange: "all",
@@ -227,13 +218,15 @@ describe("health data alias flow (mobile app auth_<uid> rows)", () => {
       dateTo: null,
     });
 
-    const moodCalls = freshGateway.selectCalls.filter(
+    const moodCalls = gateway.selectCalls.filter(
       (call) => call.table === "mooddata",
     );
     expect(moodCalls).toHaveLength(1);
     const usernameFilter = moodCalls[0]?.request.filters?.find(
       (filter) => filter.column === "username",
     );
+    // The database keeps its original key values; the query still matches both
+    // keys and only the response is relabeled.
     expect(usernameFilter).toMatchObject({
       kind: "in",
       values: [JAVIER_EMAIL, `auth_${JAVIER_AUTH_UID}`],
