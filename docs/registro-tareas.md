@@ -457,3 +457,9 @@ Resultado: La release existe: `codex/release/0.2.0`, HEAD `50f950ebaf79fcd490b82
 Observaciones: Sesión `ses_ea1d42504ffeiZdPGFHjocTx5O`; inicio 15:51:38. Solo README/docs/.env.example; sin código, package, versión, build ni servidores. Sin git mutante. `progress.txt` de 0 bytes preservado. No hay nuevos gates; publicación remota pendiente.
 
 ------------------------------------
+
+Rol: Implementador
+Timestamp: 2026-11-16T11:07:00+00:00
+Tarea ejecutada: T-069 - Health Data: resolución de claves de registro con alias auth_<uid> (serie MT70-MT76, tablero Dashboard Remaking).
+Resultado: PASS. Diagnóstico: la app móvil escribe salud con `username=auth_<authUid>` y el dashboard leía solo `username=users.Username` (email), por lo que los registros móviles no aparecían (evidencia real: mooddata id=88, alias del auth uid de javier.alayon@ulpgc.es). Fix dashboard-side sin reescribir datos: puerto `HealthRecordKeyResolver` + `recordKeys` en `ResolvedDataQuery`/`LegacyDataQuery`, filtro PostgREST `in` (`username in (claves)`), adaptador service_role con match por email confirmado y por `app_metadata.app_user_id`, caché TTL 60s y fail-closed (503). `npm run check` PASS: typecheck x2, lint 0/0, capas OK, 35 archivos y 260 tests (19 nuevos: adaptador 13, integración 6). `npm run build` PASS. Verificación readonly contra Supabase real (`scripts/check_health_record_keys.mjs`): claves `[javier.alayon@ulpgc.es, auth_d16ebc46-…]`, mooddata incluye id=88 y excluye id=87 (otra cuenta).
+Observaciones: Gitflow con rama `codex/feature/health-record-alias` desde `codex/release/0.2.0`, merges --no-ff y push a la release. Sin escrituras en Supabase, sin tocar la app móvil ni reescribir filas. Pendiente: deploy preview en Vercel (nunca production).
