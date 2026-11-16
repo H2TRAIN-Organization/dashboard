@@ -9,6 +9,7 @@ import {
   encryptText,
   encryptTwice,
   ivHex,
+  LEGACY_KEY,
   OTHER_KEY,
   PREVIOUS_KEY,
 } from "./helpers/crypto-fixtures";
@@ -17,6 +18,7 @@ function decryptor(previous: string | null = PREVIOUS_KEY): Aes256CbcDecryptor {
   return new Aes256CbcDecryptor({
     currentKeyHex: CURRENT_KEY,
     previousKeyHex: previous,
+    legacyKeyHex: LEGACY_KEY,
   });
 }
 
@@ -32,6 +34,13 @@ describe("AES-256-CBC legacy decryption", () => {
     const ciphertext = encryptText("4 units", PREVIOUS_KEY, ivHex(2));
     expect(decryptor().decryptText(ciphertext, ivHex(2), "insulindata.dose")).toBe(
       "4 units",
+    );
+  });
+
+  it("decrypts with the legacy third-key slot", () => {
+    const ciphertext = encryptText("walk", LEGACY_KEY, ivHex(10));
+    expect(decryptor().decryptText(ciphertext, ivHex(10), "exercisedata.exercise_type")).toBe(
+      "walk",
     );
   });
 
@@ -158,6 +167,8 @@ describe("encryption key config", () => {
     expect(config).toEqual({
       currentKeyHex: CURRENT_KEY,
       previousKeyHex: PREVIOUS_KEY,
+      // The retired server key joins the chain as the oldest historical key.
+      legacyKeyHex: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
   });
 
@@ -182,5 +193,48 @@ describe("encryption key config", () => {
         ENCRYPTION_SECRET_KEY0: "not-a-key",
       }),
     ).toThrowError(expect.objectContaining({ code: "CONFIG_INVALID" }));
+  });
+});
+
+describe("encryption key config: legacy third key", () => {
+  it("falls back to the retired server key when the env slot is absent", () => {
+    const config = readEncryptionKeyConfig({
+      ENCRYPTION_SECRET_KEY: CURRENT_KEY,
+    });
+    expect(config.legacyKeyHex).toMatch(/^[0-9a-f]{64}$/);
+    expect(config.legacyKeyHex).not.toBe(CURRENT_KEY);
+    expect(config.previousKeyHex).toBeNull();
+  });
+
+  it("accepts ENCRYPTION_SECRET_KEY1 as the legacy key", () => {
+    const config = readEncryptionKeyConfig({
+      ENCRYPTION_SECRET_KEY: CURRENT_KEY,
+      ENCRYPTION_SECRET_KEY1: PREVIOUS_KEY,
+    });
+    expect(config.legacyKeyHex).toBe(PREVIOUS_KEY);
+  });
+
+  it("rejects an invalid legacy key", () => {
+    expect(() =>
+      readEncryptionKeyConfig({
+        ENCRYPTION_SECRET_KEY: CURRENT_KEY,
+        ENCRYPTION_SECRET_KEY1: "zz".repeat(32),
+      }),
+    ).toThrowError(expect.objectContaining({ code: "CONFIG_INVALID" }));
+  });
+
+  it("deduplicates equal keys across slots", () => {
+    const config = readEncryptionKeyConfig({
+      ENCRYPTION_SECRET_KEY: CURRENT_KEY,
+      ENCRYPTION_SECRET_KEY0: CURRENT_KEY,
+    });
+    expect(config.previousKeyHex).toBeNull();
+    expect(config.legacyKeyHex).not.toBe(CURRENT_KEY);
+
+    const explicit = readEncryptionKeyConfig({
+      ENCRYPTION_SECRET_KEY: CURRENT_KEY,
+      ENCRYPTION_SECRET_KEY1: CURRENT_KEY,
+    });
+    expect(explicit.legacyKeyHex).toBeNull();
   });
 });

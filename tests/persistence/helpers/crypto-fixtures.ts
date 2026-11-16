@@ -5,6 +5,8 @@ import type { PasswordHasher } from "@/server/infrastructure/persistence/user/pa
 export const CURRENT_KEY = "11".repeat(32);
 export const PREVIOUS_KEY = "22".repeat(32);
 export const OTHER_KEY = "33".repeat(32);
+/** Third rotation slot: the oldest key some legacy rows were written with. */
+export const LEGACY_KEY = "44".repeat(32);
 
 export function ivHex(seed: number): string {
   return seed.toString(16).padStart(32, "0");

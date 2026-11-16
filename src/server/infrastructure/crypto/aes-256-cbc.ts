@@ -87,7 +87,11 @@ export class Aes256CbcDecryptor implements TextDecryptor {
   private readonly keys: readonly Buffer[];
 
   constructor(config: EncryptionKeyConfig) {
-    const keys = [config.currentKeyHex, config.previousKeyHex]
+    const keys = [
+      config.currentKeyHex,
+      config.previousKeyHex,
+      config.legacyKeyHex,
+    ]
       .filter((value): value is string => typeof value === "string" && value.length > 0)
       .filter((value, index, all) => all.indexOf(value) === index)
       .map((value) => {
