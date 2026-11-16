@@ -1,5 +1,6 @@
 import { ApiError, apiRequest } from './api-client'
 import { tryParseJsonObject } from './kubios-snapshot-shape'
+import { formatEuropeanDateTime } from './date-format'
 
 /**
  * Contrato de presentación del Kubios personal.
@@ -342,13 +343,7 @@ export function formatKubiosDate(
   const date = parseKubiosDate(value)
   if (date === null) return fallback
 
-  return date.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatEuropeanDateTime(date)
 }
 
 function resultTime(result: KubiosLatestResult): number | null {

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { User, InsulinData, FoodData, ExerciseData, PeriodRecord, MoodData } from '@/lib/api-types'
 import { dataApi, errorMessage, usersApi } from '@/lib/api-client'
 import { getDisplayUsername } from '@/lib/user-mapper'
+import { formatEuropeanDate, formatEuropeanShortDay } from '@/lib/date-format'
 import { Users, Activity, TrendingUp, AlertTriangle, Pill, Utensils, Dumbbell, CalendarDays, Smile, Clock, BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, Database, Target } from 'lucide-react'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import PieSliceLabel from '@/components/analytics/PieSliceLabel'
@@ -43,7 +44,6 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now] = useState(() => Date.now())
-  const locale = language === 'en' ? 'en-US' : 'es-ES'
 
   const currentRole = session?.user.role ?? null
   const currentUsername = session?.user.username ?? null
@@ -235,7 +235,7 @@ export default function OverviewPage() {
   const activityByDay = Array.from({ length: 7 }, (_, i) => {
     const date = new Date()
     date.setDate(date.getDate() - i)
-    const dateStr = date.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', { month: 'short', day: 'numeric' })
+    const dateStr = formatEuropeanShortDay(date, language === 'en' ? 'en-US' : 'es-ES')
     
     const dayInsulin = insulinData.filter(d => 
       new Date(d.date_time).toDateString() === date.toDateString()
@@ -626,7 +626,7 @@ export default function OverviewPage() {
                         </div>
                         {user.lastActivity && (
                           <p className="text-xs text-gray-600">
-                            {new Date(user.lastActivity).toLocaleDateString(locale)}
+                            {formatEuropeanDate(user.lastActivity)}
                           </p>
                         )}
                       </div>
@@ -658,7 +658,7 @@ export default function OverviewPage() {
                             {getTypeLabel(item.type)} - {item.username}
                           </p>
                           <p className="text-xs text-gray-600">
-                            {new Date(item.displayDate).toLocaleDateString(locale)}
+                            {formatEuropeanDate(item.displayDate)}
                           </p>
                         </div>
                       </div>

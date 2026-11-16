@@ -3,6 +3,7 @@ import {
   averageOfChartKey,
   buildHrvChartRows,
 } from '@/lib/hrv-chart-rows'
+import { formatEuropeanShortDay, formatEuropeanDateTime } from '@/lib/date-format'
 
 const es = 'es-ES'
 
@@ -21,10 +22,8 @@ describe('buildHrvChartRows', () => {
 
     expect(rows).toHaveLength(1)
     expect(rows[0]?.time).toBe(ms)
-    expect(rows[0]?.date).toBe(new Date(ms).toLocaleDateString(es, { month: 'short', day: 'numeric' }))
-    expect(rows[0]?.dateLong).toBe(
-      new Date(ms).toLocaleString(es, { dateStyle: 'long', timeStyle: 'short' }),
-    )
+    expect(rows[0]?.date).toBe(formatEuropeanShortDay(ms, es))
+    expect(rows[0]?.dateLong).toBe(formatEuropeanDateTime(ms))
   })
 
   it('keeps missing metrics as gaps instead of zeroes', () => {

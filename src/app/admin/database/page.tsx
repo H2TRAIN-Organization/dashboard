@@ -1,5 +1,6 @@
 'use client'
 
+import { formatEuropeanDateTime } from '@/lib/date-format'
 import { useCallback, useEffect, useState } from 'react'
 import { Database, Download, RefreshCw, Table } from 'lucide-react'
 import HybridProtectedRoute from '@/components/HybridProtectedRoute'
@@ -89,7 +90,7 @@ export default function AdminDatabasePage() {
         <section className={panel} aria-busy={statsLoading} aria-label={text.refresh}>
           <p role="status" className="font-semibold">{statsLoading ? text.loading : statsError ? text.failedAttempt : status}</p>
           {statsError && <p role="alert" className="mt-2 text-red-700">{statsError}</p>}
-          {stats && <><p className="mt-2">{stats.accessibleCount} / {stats.totalCount} {text.available} · {stats.totalRecords.toLocaleString(locale)} {text.records}</p><p className="mt-2 text-sm text-slate-600">{text.observed}: <time dateTime={stats.observedAt}>{new Date(stats.observedAt).toLocaleString(locale)}</time></p>
+          {stats && <><p className="mt-2">{stats.accessibleCount} / {stats.totalCount} {text.available} · {stats.totalRecords.toLocaleString(locale)} {text.records}</p><p className="mt-2 text-sm text-slate-600">{text.observed}: <time dateTime={stats.observedAt}>{formatEuropeanDateTime(stats.observedAt)}</time></p>
             <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{stats.tables.map(item => <li key={item.name} className="rounded-lg bg-slate-50 p-3"><span className="font-mono">{item.name}</span>: {item.accessible ? `${item.recordCount.toLocaleString(locale)} ${text.records}` : text.unavailable}</li>)}</ul></>}
         </section>
         {error && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">{error}</p>}

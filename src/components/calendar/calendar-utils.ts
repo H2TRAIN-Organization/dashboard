@@ -6,6 +6,8 @@
  * the selected day stable for users in any timezone.
  */
 
+import { formatEuropeanDate } from '@/lib/date-format'
+
 const DATE_VALUE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
 function pad(value: number) {
@@ -97,18 +99,15 @@ export function buildCalendarDays(month: Date): Date[] {
   return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))
 }
 
-/** Localized display text for a stored `YYYY-MM-DD` value. */
+/** Localized display text for a stored `YYYY-MM-DD` value (dd/mm/aaaa). */
 export function formatDisplayDateValue(
   value: string,
   locale: string,
 ): string | null {
   const date = parseDateValue(value)
   if (!date) return null
-  return date.toLocaleDateString(locale, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
+  void locale
+  return formatEuropeanDate(date)
 }
 
 /** True when the value is valid and inside the optional inclusive range. */
