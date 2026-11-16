@@ -153,6 +153,7 @@ describe("production composition root", () => {
       users: store.users,
       userDataPresence: store.userDataPresence,
       healthData: store.healthData,
+      healthRecordKeys: store.healthRecordKeys,
       adminDatabase: store.adminDatabase,
     });
 

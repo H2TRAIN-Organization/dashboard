@@ -129,7 +129,7 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
   it("returns the five arrays filtered by user, date and type", async () => {
     const { repo } = repository();
     const data = await repo.getDecryptedData({
-      selectedUser: "alice",
+      recordKeys: ["alice"],
       timeRange: "30d",
       selectedDataType: "all",
       dateFilter: null,
@@ -186,7 +186,7 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
   it("uses an exclusive upper bound for decrypted windows and an inclusive one for legacy", async () => {
     const { repo } = repository();
     const decrypted = await repo.getDecryptedData({
-      selectedUser: "alice",
+      recordKeys: ["alice"],
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
@@ -198,17 +198,17 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
     const legacy = await repo.getLegacyData({
       type: "insulin",
       rangeDays: 30,
-      selectedUser: "alice",
+      recordKeys: ["alice"],
       from: "2026-01-15T10:00:00.000Z",
       to: "2026-01-15T10:00:00.000Z",
     });
     expect(legacy.insulin).toHaveLength(1);
   });
 
-  it("treats selectedUser=null as unscoped for privileged reads", async () => {
+  it("treats empty recordKeys as unscoped for privileged reads", async () => {
     const { gateway, repo } = repository();
     const data = await repo.getDecryptedData({
-      selectedUser: null,
+      recordKeys: [],
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
@@ -219,9 +219,7 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
     expect(data.insulinData).toHaveLength(3);
     expect(
       gateway.selectCalls.some((call) =>
-        call.request.filters?.some(
-          (filter) => filter.kind === "eq" && filter.column === "username",
-        ),
+        call.request.filters?.some((filter) => filter.column === "username"),
       ),
     ).toBe(false);
   });
@@ -236,7 +234,7 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
     const repo = new SupabaseHealthDataRepository(gateway, decryptor());
 
     const decrypted = await repo.getDecryptedData({
-      selectedUser: "all",
+      recordKeys: ["all"],
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
@@ -249,7 +247,7 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
     const legacy = await repo.getLegacyData({
       type: "insulin",
       rangeDays: 365,
-      selectedUser: "all",
+      recordKeys: ["all"],
       from: "2026-01-01T00:00:00.000Z",
       to: "2026-12-31T23:59:59.999Z",
     });
@@ -259,9 +257,10 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
       gateway.selectCalls.every((call) =>
         call.request.filters?.some(
           (filter) =>
-            filter.kind === "eq" &&
+            filter.kind === "in" &&
             filter.column === "username" &&
-            filter.value === "all",
+            filter.values.length === 1 &&
+            filter.values[0] === "all",
         ),
       ),
     ).toBe(true);
@@ -270,7 +269,7 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
   it("returns only the selected type and pages by id without truncation", async () => {
     const { gateway, repo } = repository(2);
     const data = await repo.getDecryptedData({
-      selectedUser: "alice",
+      recordKeys: ["alice"],
       timeRange: "all",
       selectedDataType: "insulin",
       dateFilter: null,
@@ -315,7 +314,7 @@ describe("SupabaseHealthDataRepository decrypted data", () => {
 
     try {
       await repo.getDecryptedData({
-        selectedUser: "alice",
+        recordKeys: ["alice"],
         timeRange: "all",
         selectedDataType: "insulin",
         dateFilter: null,
@@ -336,14 +335,14 @@ describe("SupabaseHealthDataRepository legacy compatibility", () => {
     const data = await repo.getLegacyData({
       type: "all",
       rangeDays: 30,
-      selectedUser: null,
+      recordKeys: [],
       from: "2026-01-01T00:00:00.000Z",
       to: "2026-01-31T23:59:59.999Z",
     });
 
     expect(data.exercise).toHaveLength(1);
     expect(data.mood).toHaveLength(1);
-    // selectedUser=null means all users; both January insulin rows match.
+    // recordKeys=[] means all users; both January insulin rows match.
     expect(data.insulin).toHaveLength(2);
     expect(data.insulin.map((record) => record.username).sort()).toEqual([
       "alice",
@@ -358,7 +357,7 @@ describe("SupabaseHealthDataRepository legacy compatibility", () => {
     const data = await repo.getLegacyData({
       type: "meal",
       rangeDays: 30,
-      selectedUser: "alice",
+      recordKeys: ["alice"],
       from: "2026-01-01T00:00:00.000Z",
       to: "2026-01-31T23:59:59.999Z",
     });
@@ -370,7 +369,7 @@ describe("SupabaseHealthDataRepository legacy compatibility", () => {
     expect(
       gateway.selectCalls.some((call) =>
         call.request.filters?.some(
-          (filter) => filter.kind === "eq" && filter.column === "username",
+          (filter) => filter.kind === "in" && filter.column === "username",
         ),
       ),
     ).toBe(true);
