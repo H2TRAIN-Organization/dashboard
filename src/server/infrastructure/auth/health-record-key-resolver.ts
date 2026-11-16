@@ -76,6 +76,14 @@ function readEmailConfirmed(value: unknown): boolean {
   return typeof value === "string" && value.trim() !== "";
 }
 
+function readUsernameValue(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
 function readAppUserId(value: unknown): number | null {
   if (!isRecord(value)) {
     return null;
@@ -120,6 +128,10 @@ export class SupabaseHealthRecordKeyResolver implements HealthRecordKeyResolver 
     readonly identities: readonly LinkedIdentity[];
     readonly expiresAt: number;
   } | null = null;
+  private usersCache: {
+    readonly byId: ReadonlyMap<number, string>;
+    readonly expiresAt: number;
+  } | null = null;
 
   constructor(private readonly options: HealthRecordKeyResolverOptions) {
     this.ttlMs = options.ttlMs ?? 60_000;
@@ -158,6 +170,73 @@ export class SupabaseHealthRecordKeyResolver implements HealthRecordKeyResolver 
       }
     }
     return keys;
+  }
+
+  /**
+   * Reverse map from every record key to the canonical users.Username of the
+   * owning account. Alias keys resolve through the same identity link used by
+   * resolve(); canonical keys map to themselves.
+   */
+  async ownershipByRecordKey(): Promise<ReadonlyMap<string, string>> {
+    const [identities, usersById] = await Promise.all([
+      this.scanIdentities(),
+      this.loadUsers(),
+    ]);
+
+    const ownership = new Map<string, string>();
+    for (const username of usersById.values()) {
+      ownership.set(username, username);
+    }
+
+    for (const identity of identities) {
+      const alias = buildAuthAliasRecordKey(identity.id);
+      let canonical: string | null = null;
+      if (identity.appUserId !== null) {
+        canonical = usersById.get(identity.appUserId) ?? null;
+      }
+      if (canonical === null && identity.emailConfirmed && identity.email !== null) {
+        const emailMatch = [...usersById.values()].find(
+          (username) => username.toLowerCase() === identity.email?.toLowerCase(),
+        );
+        canonical = emailMatch ?? identity.email;
+      }
+      if (canonical !== null && canonical !== alias) {
+        ownership.set(alias, canonical);
+      }
+    }
+    return ownership;
+  }
+
+  private async loadUsers(): Promise<ReadonlyMap<number, string>> {
+    const cached = this.usersCache;
+    if (cached !== null && this.clock() < cached.expiresAt) {
+      return cached.byId;
+    }
+    let rows: unknown;
+    try {
+      const response = await this.options.users.select("users", {
+        columns: "UserID,Username",
+        limit: 10_000,
+      });
+      rows = response.rows;
+    } catch {
+      throw new AuthInfrastructureError(
+        "No se pudo resolver la identidad del usuario",
+      );
+    }
+    const byId = new Map<number, string>();
+    for (const row of Array.isArray(rows) ? rows : []) {
+      if (!isRecord(row)) {
+        continue;
+      }
+      const id = parseCanonicalUserId(row.UserID);
+      const username = readUsernameValue(row.Username);
+      if (id !== null && username !== null) {
+        byId.set(id, username);
+      }
+    }
+    this.usersCache = { byId, expiresAt: this.clock() + this.ttlMs };
+    return byId;
   }
 
   private async targetUserId(

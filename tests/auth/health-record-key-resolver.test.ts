@@ -290,3 +290,60 @@ describe("SupabaseHealthRecordKeyResolver", () => {
     expect(keys[0]).toBe("javier.alayon@ulpgc.es");
   });
 });
+
+describe("SupabaseHealthRecordKeyResolver ownership map", () => {
+  it("maps the alias to the canonical username of the administered link", async () => {
+    const resolver = new SupabaseHealthRecordKeyResolver(
+      resolverOptions([JAVIER_AUTH_ROW]),
+    );
+
+    const ownership = await resolver.ownershipByRecordKey();
+
+    expect(ownership.get("javier.alayon@ulpgc.es")).toBe("javier.alayon@ulpgc.es");
+    expect(ownership.get(`auth_${JAVIER_AUTH_UID}`)).toBe("javier.alayon@ulpgc.es");
+  });
+
+  it("maps an alias with a confirmed email to the account with that username", async () => {
+    const resolver = new SupabaseHealthRecordKeyResolver(
+      resolverOptions([
+        row({
+          id: JAVIER_AUTH_UID,
+          email: "javier.alayon@ulpgc.es",
+          email_confirmed_at: "2026-10-29T11:27:42.000Z",
+          app_metadata: {},
+        }),
+      ]),
+    );
+
+    const ownership = await resolver.ownershipByRecordKey();
+
+    expect(ownership.get(`auth_${JAVIER_AUTH_UID}`)).toBe("javier.alayon@ulpgc.es");
+  });
+
+  it("maps an unlinked alias to its confirmed email and keeps email-less aliases unmapped", async () => {
+    const resolver = new SupabaseHealthRecordKeyResolver(
+      resolverOptions([
+        row({
+          id: "aa6cbf21-7d57-4eb3-9300-fc0e5f4dc39f",
+          email: "nobody@users.h2train.invalid",
+          email_confirmed_at: "2026-11-07T00:02:29.000Z",
+          app_metadata: {},
+        }),
+        row({
+          id: "9c594b24-0277-4379-b356-c5e967348f35",
+          app_metadata: {},
+        }),
+      ]),
+    );
+
+    const ownership = await resolver.ownershipByRecordKey();
+
+    // A confirmed email is the best available canonical name for an account
+    // that has no users row.
+    expect(ownership.get("auth_aa6cbf21-7d57-4eb3-9300-fc0e5f4dc39f")).toBe(
+      "nobody@users.h2train.invalid",
+    );
+    expect(ownership.has("auth_9c594b24-0277-4379-b356-c5e967348f35")).toBe(false);
+    expect(ownership.has("javier.alayon@ulpgc.es")).toBe(true);
+  });
+});
