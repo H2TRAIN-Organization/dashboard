@@ -854,7 +854,7 @@ export const translations: Record<Language, Translations> = {
       advancedSecurityDesc: 'Protección de datos con encriptación de grado médico'
     },
     dashboard: {
-      title: 'Diabetes Tracker',
+      title: 'Dashboard',
       subtitle: 'Monitoreo inteligente de la salud con tecnología de vanguardia. Gestiona usuarios, analiza datos y supervisa métricas de variabilidad cardíaca.',
       advancedControl: 'Panel de Control Avanzado',
       healthMonitoring: 'Panel de Salud',
@@ -1615,7 +1615,7 @@ export const translations: Record<Language, Translations> = {
       advancedSecurityDesc: 'Data protection with medical-grade encryption'
     },
     dashboard: {
-      title: 'Diabetes Tracker',
+      title: 'Dashboard',
       subtitle: 'Intelligent health monitoring with cutting-edge technology. Manage users, analyze data and monitor heart rate variability metrics.',
       advancedControl: 'Advanced Control Panel',
       healthMonitoring: 'Health Panel',

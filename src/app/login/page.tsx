@@ -86,7 +86,7 @@ export default function LoginPage() {
               </div>
             </div>
             <h1 className="mb-4 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-center text-5xl font-bold text-transparent">
-              Diabetes Tracker Dashboard
+              H2TRAIN Dashboard
             </h1>
           </div>
 
