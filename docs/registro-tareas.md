@@ -492,3 +492,10 @@ Timestamp: 2026-11-16T13:55:00+00:00
 Tarea ejecutada: T-073 - Frontend: encabezado fijo en todas las vistas (solo el contenido se desplaza).
 Resultado: PASS. Navigation y HybridNavigation (las únicas cabeceras usadas por las vistas del dashboard) pasan de flujo normal a fixed inset-x-0 top-0 (HybridNavigation gana z-50). La altura real del encabezado (móvil y escritorio, sensible a reflow vía ResizeObserver) se publica en la variable CSS --app-header-h y el componente reserva ese espacio con un separador aria-hidden, de modo que el contenido se desplaza bajo el encabezado al hacer scroll sin tocar ninguna página. Vistas sin cabecera (login, privacy, app legacy) no cambian. `npm run check` PASS: 64 archivos, 551 tests. Gitflow: codex/feature/fixed-header, merge --no-ff a codex/release/0.2.0, push y redeploy preview (production permanece fijado al estado previo del equipo).
 Observaciones: Cambio solicitado explícitamente por el usuario; alcance limitado a la cabecera. Sin cambios de contenido, datos ni backend.
+------------------------------------
+
+Rol: Implementador
+Timestamp: 2026-11-17T10:30:00+00:00
+Tarea ejecutada: T-074 - Frontend: titular de login H2TRAIN Dashboard y resto de vistas "Dashboard" (solo texto).
+Resultado: PASS. login/page.tsx: titular Diabetes Tracker Dashboard → H2TRAIN Dashboard. translations.ts (es y en): dashboard.title Diabetes Tracker → Dashboard, que alimenta el título de la cabecera en el resto de vistas. Intacto a propósito: el nombre del equipo Kubios Diabetes Tracker - H2TRAIN (KUBIOS_TARGET_TEAM_NAME y comentarios), que es el nombre real del equipo en Kubios Cloud y no es un texto de vista. `npm run check` PASS: 64 archivos, 551 tests. Gitflow: codex/feature/rename-titles, merge --no-ff a codex/release/0.2.0, push y redeploy preview (production permanece fijado al estado previo del equipo).
+Observaciones: Cambio solicitado explícitamente por el usuario; alcance limitado a textos de título.
