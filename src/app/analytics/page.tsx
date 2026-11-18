@@ -41,6 +41,7 @@ import {
   summarizeDosesByDate,
 } from '@/lib/chart-grouping'
 import { splitFoodRecords } from '@/lib/meal-classification'
+import { periodDurationChartRows } from '@/lib/period-chart-data'
 import { finiteAverage, latestValidDate, parseFiniteNumber, parseFiniteNumberOrZero } from '@/lib/number-stats'
 import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
@@ -374,6 +375,13 @@ export default function AnalyticsPage() {
   )
   const moodEvolutionRows = dailyChartRows(
     countByDate(withinChartRange('mood-evolution', moodData), (row) => timeOf(row.date_time), dayLabelOf),
+  )
+  const periodStartsRows = dailyChartRows(
+    countByDate(withinChartRange('period-starts', periodData), (row) => timeOf(row.startDate), dayLabelOf),
+  )
+  const periodDurationsRows = periodDurationChartRows(
+    withinChartRange('period-duration', periodData),
+    dayLabelOf,
   )
 
   return (
@@ -1162,6 +1170,95 @@ export default function AnalyticsPage() {
                     )}
                   </ExpandableChartCard>
                 )}
+
+                {/* Evolución de periodos: solo aparece cuando la cuenta tiene registros. */}
+                {periodData.length > 0 && (
+                  <ExpandableChartCard
+                    icon={CalendarDays}
+                    iconGradient="from-purple-500 to-violet-600"
+                    title={t.analytics.periodEvolution}
+                    description={
+                      <>
+                        {t.analytics.showsPeriodStarts}
+                        <strong className="text-purple-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} |
+                        <strong className="text-purple-600"> {t.analytics.yAxis}:</strong> {t.analytics.numberOfRecords}
+                      </>
+                    }
+                    scopedFilter={rangeScopedFilter('period-starts')}
+                  >
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={periodStartsRows.length * LINE_INNER_WIDTH_PER_ITEM}>
+                        <BarChart data={periodStartsRows}>
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                          <XAxis
+                            dataKey="date"
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                            tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
+                          />
+                          <YAxis
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                            tick={CHART_TICK_STYLE}
+                            allowDecimals={false}
+                            label={{ value: t.analytics.numberOfRecords, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
+                          />
+                          <Tooltip
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                            formatter={(value) => [`${value} ${t.analytics.records}`, t.analytics.periodStarts]}
+                            labelFormatter={(label) => `${t.analytics.date}: ${label}`}
+                          />
+                          <Bar dataKey="count" fill={CHART_SERIES_COLORS[4]} name={t.analytics.periodStarts} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ScrollableChart>
+                    )}
+                  </ExpandableChartCard>
+                )}
+
+                {periodDurationsRows.length > 0 && (
+                  <ExpandableChartCard
+                    icon={CalendarDays}
+                    iconGradient="from-violet-500 to-purple-600"
+                    title={t.analytics.periodDuration}
+                    description={
+                      <>
+                        {t.analytics.showsPeriodDuration}
+                        <strong className="text-purple-600"> {t.analytics.xAxis}:</strong> {t.analytics.dates} |
+                        <strong className="text-purple-600"> {t.analytics.yAxis}:</strong> {t.analytics.periodDays}
+                      </>
+                    }
+                    scopedFilter={rangeScopedFilter('period-duration')}
+                  >
+                    {({ expanded }) => (
+                      <ScrollableChart height={expanded ? 520 : 300} minInnerWidth={periodDurationsRows.length * LINE_INNER_WIDTH_PER_ITEM}>
+                        <BarChart data={periodDurationsRows}>
+                          <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                          <XAxis
+                            dataKey="date"
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                            tick={CHART_TICK_STYLE}
+                            label={{ value: t.analytics.dates, position: 'insideBottom', offset: -5, style: { ...CHART_AXIS_LABEL_STYLE } }}
+                          />
+                          <YAxis
+                            stroke={CHART_AXIS_LINE_STYLE.stroke}
+                            tick={CHART_TICK_STYLE}
+                            allowDecimals={false}
+                            label={{ value: t.analytics.periodDays, angle: -90, position: 'insideLeft', style: { ...CHART_AXIS_LABEL_STYLE } }}
+                          />
+                          <Tooltip
+                            contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                            formatter={(value) => [`${value} ${t.analytics.periodDays}`, t.analytics.periodDuration]}
+                            labelFormatter={(label) => `${t.analytics.date}: ${label}`}
+                          />
+                          <Bar dataKey="days" fill={CHART_SERIES_COLORS[4]} name={t.analytics.periodDuration} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ScrollableChart>
+                    )}
+                  </ExpandableChartCard>
+                )}
               </div>
             </div>
           ) : null}
@@ -1169,4 +1266,4 @@ export default function AnalyticsPage() {
       </div>
     </ProtectedRoute>
   )
-} 
+}

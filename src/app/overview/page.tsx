@@ -33,6 +33,8 @@ import { useSession } from '@/contexts/SessionContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { hasAnyRecords } from '@/components/dashboard-shell/metrics'
 import { finiteAverage, latestValidDate } from '@/lib/number-stats'
+import { countByDate, dailyChartRows } from '@/lib/chart-grouping'
+import { healthRecordTimestamp, lastDaysRange, recordsWithinRange } from '@/lib/chart-scoped-filter'
 
 interface ActivityRecord {
   date_time?: string
@@ -67,8 +69,10 @@ export default function OverviewPage() {
   // resto de la página y solo estrechan lo ya cargado.
   const [distributionTop, setDistributionTop] = useState<number | 'all'>('all')
   const [activityDays, setActivityDays] = useState<number | null>(null)
+  const [periodChartDays, setPeriodChartDays] = useState<number | null>(null)
   const { open: distributionOpen, expand: expandDistribution, collapse: collapseDistribution } = useChartExpand()
   const { open: activityOpen, expand: expandActivity, collapse: collapseActivity } = useChartExpand()
+  const { open: periodChartOpen, expand: expandPeriodChart, collapse: collapsePeriodChart } = useChartExpand()
   const locale = language === 'en' ? 'en-US' : 'es-ES'
 
   const currentRole = session?.user.role ?? null
@@ -262,6 +266,16 @@ export default function OverviewPage() {
     distributionTop === 'all'
       ? dataByType
       : [...dataByType].sort((a, b) => b.value - a.value).slice(0, distributionTop)
+
+  const periodRange = periodChartDays === null ? null : lastDaysRange(periodChartDays, now)
+  const periodChartRecords = recordsWithinRange(periodData, periodRange, healthRecordTimestamp)
+  const periodStartsByDate = dailyChartRows(
+    countByDate(
+      periodChartRecords,
+      (record) => new Date(record.startDate).getTime(),
+      (ms) => new Date(ms).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+    ),
+  )
 
   // Actividad por día (últimos 7 días, o los que marque SU filtro propio).
   const activityByDay = Array.from({ length: activityDays ?? 7 }, (_, i) => {
@@ -722,6 +736,84 @@ export default function OverviewPage() {
                 </ResponsiveContainer>
               )}
             />
+
+            {periodData.length > 0 && (
+              <>
+                <div className="rounded-2xl border border-gray-200/50 bg-white p-6 shadow-lg">
+                  <div className="relative z-10">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <h3 className="flex items-center text-lg font-medium text-gray-900">
+                        <CalendarDays className="mr-2 h-5 w-5 text-purple-600" />
+                        {t.analytics.periodEvolution}
+                      </h3>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {periodChartDays !== null && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-semibold text-purple-700">
+                            {t.chart.lastNDays.replace('{days}', String(periodChartDays))}
+                          </span>
+                        )}
+                        <ChartExpandButton onExpand={expandPeriodChart} />
+                      </div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={periodStartsByDate}>
+                        <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                        <XAxis dataKey="date" tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} />
+                        <YAxis tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ ...CHART_TOOLTIP_CONTENT_STYLE }}
+                          itemStyle={{ ...CHART_TOOLTIP_ITEM_STYLE }}
+                          labelStyle={{ ...CHART_TOOLTIP_LABEL_STYLE }}
+                        />
+                        <Area type="monotone" dataKey="count" name={t.analytics.periodStarts} stroke={seriesColor(4)} fill={seriesColor(4)} fillOpacity={0.24} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <ChartExpandOverlay
+                  open={periodChartOpen}
+                  onClose={collapsePeriodChart}
+                  title={t.analytics.periodEvolution}
+                  icon={CalendarDays}
+                  iconGradient="from-purple-500 to-violet-600"
+                  scopedFilter={{
+                    active: periodChartDays !== null,
+                    summary: periodChartDays === null ? undefined : t.chart.lastNDays.replace('{days}', String(periodChartDays)),
+                    onClear: () => setPeriodChartDays(null),
+                    node: (
+                      <Select
+                        value={periodChartDays === null ? 'none' : String(periodChartDays)}
+                        onChange={(event) =>
+                          setPeriodChartDays(event.target.value === 'none' ? null : Number(event.target.value))
+                        }
+                        aria-label={t.chart.ownFilterLabel}
+                        className="w-40"
+                      >
+                        <option value="none">{t.chart.ownFilterNone}</option>
+                        <option value="7">{t.data.last7Days}</option>
+                        <option value="14">{t.chart.last14Days}</option>
+                        <option value="30">{t.data.last30Days}</option>
+                      </Select>
+                    ),
+                  }}
+                  renderChart={() => (
+                    <ResponsiveContainer width="100%" height={520}>
+                      <AreaChart data={periodStartsByDate}>
+                        <CartesianGrid strokeDasharray={CHART_GRID_DASH} stroke={CHART_GRID_STROKE} />
+                        <XAxis dataKey="date" tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} />
+                        <YAxis tick={{ ...CHART_TICK_STYLE }} axisLine={CHART_AXIS_LINE_STYLE} tickLine={CHART_TICK_LINE_STYLE} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ ...CHART_TOOLTIP_CONTENT_STYLE }}
+                          itemStyle={{ ...CHART_TOOLTIP_ITEM_STYLE }}
+                          labelStyle={{ ...CHART_TOOLTIP_LABEL_STYLE }}
+                        />
+                        <Area type="monotone" dataKey="count" name={t.analytics.periodStarts} stroke={seriesColor(4)} fill={seriesColor(4)} fillOpacity={0.24} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                />
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -857,4 +949,4 @@ export default function OverviewPage() {
       </div>
     </HybridProtectedRoute>
   )
-} 
+}

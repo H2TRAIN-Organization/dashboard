@@ -393,6 +393,8 @@ export interface Translations {
     mealEvolution: string
     exerciseEvolution: string
     moodEvolution: string
+    periodEvolution: string
+    periodDuration: string
     insulinCorrelation: string
     injections: string
     insulinType: string
@@ -457,6 +459,10 @@ export interface Translations {
     numberOfSessions: string
     showsMoodRecords: string
     numberOfMoodRecords: string
+    periodStarts: string
+    periodDays: string
+    showsPeriodStarts: string
+    showsPeriodDuration: string
     foodTypes: string
     dates: string
     quantity: string
@@ -1181,6 +1187,8 @@ export const translations: Record<Language, Translations> = {
       mealEvolution: 'Evolución de Registros de Comidas',
       exerciseEvolution: 'Evolución de Registros de Ejercicio',
       moodEvolution: 'Evolución de Registros de Estado de Ánimo',
+      periodEvolution: 'Inicios de Periodo por Fecha',
+      periodDuration: 'Duración de cada Periodo',
       insulinCorrelation: 'Correlación Insulina vs Carbohidratos',
       injections: 'inyecciones',
       insulinType: 'Tipo de Insulina',
@@ -1248,6 +1256,10 @@ export const translations: Record<Language, Translations> = {
       numberOfSessions: 'Número de Sesiones',
       showsMoodRecords: 'Muestra cuántos registros de estado de ánimo se hicieron cada día.',
       numberOfMoodRecords: 'Número de Registros',
+      periodStarts: 'Inicios de periodo',
+      periodDays: 'días',
+      showsPeriodStarts: 'Muestra cuántos periodos comenzaron en cada fecha.',
+      showsPeriodDuration: 'Muestra la duración registrada de cada periodo, contando los días de inicio y fin.',
       foodTypes: 'Tipos de Comida',
       dates: 'Fechas',
       quantity: 'Cantidad',
@@ -1957,6 +1969,8 @@ export const translations: Record<Language, Translations> = {
       mealEvolution: 'Meal Records Evolution',
       exerciseEvolution: 'Exercise Records Evolution',
       moodEvolution: 'Mood Records Evolution',
+      periodEvolution: 'Period Starts by Date',
+      periodDuration: 'Duration of Each Period',
       insulinCorrelation: 'Insulin vs Carbohydrates Correlation',
       injections: 'injections',
       insulinType: 'Insulin Type',
@@ -2024,6 +2038,10 @@ export const translations: Record<Language, Translations> = {
       numberOfSessions: 'Number of Sessions',
       showsMoodRecords: 'Shows how many mood records were made each day.',
       numberOfMoodRecords: 'Number of Records',
+      periodStarts: 'Period starts',
+      periodDays: 'days',
+      showsPeriodStarts: 'Shows how many periods started on each date.',
+      showsPeriodDuration: 'Shows the recorded duration of each period, counting both the start and end days.',
       foodTypes: 'Food Types',
       dates: 'Dates',
       quantity: 'Quantity',

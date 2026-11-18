@@ -44,6 +44,16 @@ const MOOD = EVOLUTION_DATES.map((date, index) => ({
   date_time: `${date}T20:00:00.000Z`,
   rowKey: `mood-${index}`,
 }));
+const PERIODS = EVOLUTION_DATES.map((date, index) => ({
+  username: 'synthetic-participant',
+  startDate: `${date}T00:00:00.000Z`,
+  endDate: `${date}T00:00:00.000Z`,
+  intensity: 'Media',
+  symptoms: [],
+  notes: '',
+  date_time: `${date}T00:00:00.000Z`,
+  rowKey: `period-${index}`,
+}));
 
 const SESSION = {
   user: { id: '1', username: 'root', email: null, role: 'admin', uuid: null, gdprConsent: true, gdprConsentAt: null, createdAt: null },
@@ -52,7 +62,7 @@ const SESSION = {
   privacy: { policyVersion: PRIVACY_POLICY_VERSION, policyHash: PRIVACY_POLICY_HASH, state: 'complete' },
 };
 
-async function mockAnalytics(page: Page) {
+async function mockAnalytics(page: Page, periods = PERIODS) {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/auth/session') return route.fulfill({ json: SESSION });
@@ -64,7 +74,7 @@ async function mockAnalytics(page: Page) {
         insulinData: INSULIN,
         foodData: FOOD,
         exerciseData: EXERCISE,
-        periodData: [],
+        periodData: periods,
         moodData: MOOD,
       } });
     }
@@ -124,10 +134,25 @@ test('todos los gráficos analytics y overview ofrecen expandir', async ({ page 
   await mockAnalytics(page);
   await page.goto('/analytics');
 
-  // 10 gráficos de analytics, cada uno con su botón de expandir.
-  await expect(page.getByRole('button', { name: 'Expandir gráfico' })).toHaveCount(10);
+  // 12 gráficos con los dos gráficos de period cuando hay registros.
+  await expect(page.getByRole('button', { name: 'Expandir gráfico' })).toHaveCount(12);
+
+  await expect(page.getByRole('heading', { name: 'Inicios de Periodo por Fecha' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Duración de cada Periodo' })).toBeVisible();
 
   await page.goto('/overview');
-  // El resumen general: pie por tipo + actividad por día.
-  await expect(page.getByRole('button', { name: 'Expandir gráfico' })).toHaveCount(2);
+  // El resumen general añade la evolución de periodos cuando hay registros.
+  await expect(page.getByRole('button', { name: 'Expandir gráfico' })).toHaveCount(3);
+  await expect(page.getByRole('heading', { name: 'Inicios de Periodo por Fecha' })).toBeVisible();
+});
+
+test('los gráficos de period no aparecen sin registros', async ({ page }) => {
+  await mockAnalytics(page, []);
+  await page.goto('/analytics');
+
+  await expect(page.getByRole('heading', { name: 'Inicios de Periodo por Fecha' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Duración de cada Periodo' })).toHaveCount(0);
+
+  await page.goto('/overview');
+  await expect(page.getByRole('heading', { name: 'Inicios de Periodo por Fecha' })).toHaveCount(0);
 });
